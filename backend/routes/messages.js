@@ -6,6 +6,7 @@ const { verifyToken } = require('./auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'messages');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -48,6 +49,26 @@ const upload = multer({
     fileSize: 15 * 1024 * 1024,
   },
 });
+
+function revealField(value) {
+  if (value === null || typeof value === 'undefined') return value;
+  const text = String(value);
+  if (!isEncryptedValue(text)) return value;
+  return decryptField(text);
+}
+
+function normalizeUserPublic(user) {
+  if (!user) return null;
+  const resolvedName = revealField(user.fullName) || revealField(user.name) || 'User';
+  return {
+    id: String(user._id || user.id || ''),
+    fullName: resolvedName,
+    name: revealField(user.name) || resolvedName,
+    email: user.email || '',
+    profileImage: revealField(user.profileImage) || '',
+    jobTitle: user.jobTitle || '',
+  };
+}
 
 const normalizeGifItem = (item, index) => {
   const media = item?.media_formats?.gif || item?.media_formats?.mediumgif || item?.media_formats?.tinygif || null;
@@ -138,12 +159,8 @@ router.get('/conversations', verifyToken, async (req, res) => {
 
       conversations.push({
         participant: {
+          ...normalizeUserPublic(otherUser),
           id: otherId,
-          fullName: otherUser.fullName || otherUser.name || 'User',
-          name: otherUser.name || 'User',
-          email: otherUser.email || '',
-          profileImage: otherUser.profileImage || '',
-          jobTitle: otherUser.jobTitle || '',
         },
         lastMessage: msg.text || (msg.imageUrl ? 'Photo' : (msg.attachmentOriginalName || 'File')),
         lastMessageAt: msg.createdAt,
@@ -179,7 +196,15 @@ router.get('/:recipientId', verifyToken, async (req, res) => {
       { path: 'sender', select: 'name fullName profileImage' },
       { path: 'recipient', select: 'name fullName profileImage' },
     ]);
-    res.json({ messages: populated });
+    const normalized = populated.map((item) => {
+      const plain = item?.toObject ? item.toObject() : item;
+      return {
+        ...plain,
+        sender: normalizeUserPublic(plain.sender),
+        recipient: normalizeUserPublic(plain.recipient),
+      };
+    });
+    res.json({ messages: normalized });
   } catch (err) {
     console.error('GET /api/messages/:recipientId error:', err);
     res.status(500).json({ error: 'Failed to fetch messages.' });
@@ -234,7 +259,14 @@ router.post('/:recipientId', verifyToken, (req, res, next) => {
     const populated = await Message.findById(message._id)
       .populate('sender', 'name fullName profileImage')
       .populate('recipient', 'name fullName profileImage');
-    res.json({ message: populated });
+    const plain = populated?.toObject ? populated.toObject() : populated;
+    res.json({
+      message: {
+        ...plain,
+        sender: normalizeUserPublic(plain.sender),
+        recipient: normalizeUserPublic(plain.recipient),
+      },
+    });
   } catch (err) {
     console.error('POST /api/messages/:recipientId error:', err);
     const validationError = err && err.name === 'ValidationError';
