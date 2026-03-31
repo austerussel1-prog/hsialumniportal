@@ -32,6 +32,24 @@ function displayName(value) {
   return decryptField(raw);
 }
 
+function revealEncrypted(value) {
+  if (value === null || typeof value === 'undefined') return value;
+  const raw = String(value);
+  if (!isEncryptedValue(raw)) return value;
+  return decryptField(raw);
+}
+
+function normalizeUserRecord(user) {
+  if (!user) return user;
+  return {
+    ...user,
+    name: revealEncrypted(user.name),
+    contactNumber: revealEncrypted(user.contactNumber),
+    address: revealEncrypted(user.address),
+    profileImage: revealEncrypted(user.profileImage),
+  };
+}
+
 function isLegacyPendingRequest(user) {
   const status = String(user?.dataRemovalRequestStatus || '').trim().toLowerCase();
   if (status === 'pending') return true;
@@ -110,9 +128,10 @@ router.get('/pending-users', verifyAdmin, async (req, res) => {
   try {
     const pendingUsers = await User.find({ status: 'pending', role: 'user' })
       .select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json({ users: pendingUsers });
+    res.json({ users: pendingUsers.map(normalizeUserRecord) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error fetching pending users' });
@@ -124,9 +143,10 @@ router.get('/all-users', verifyAdmin, async (req, res) => {
   try {
     const users = await User.find({ role: { $ne: 'super_admin' } })
       .select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json({ users });
+    res.json({ users: users.map(normalizeUserRecord) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error fetching users' });
@@ -1012,9 +1032,10 @@ router.get('/all-alumni', verifyAdmin, async (req, res) => {
   try {
     const alumni = await User.find({ role: 'alumni' })
       .select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json({ alumni });
+    res.json({ alumni: alumni.map(normalizeUserRecord) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error fetching alumni' });
@@ -1156,8 +1177,10 @@ const updateUserHandler = async (req, res) => {
 
     await user.save();
 
-    const updatedUser = await User.findById(userId).select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash');
-    res.json({ message: 'User updated successfully', user: updatedUser });
+    const updatedUser = await User.findById(userId)
+      .select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash')
+      .lean();
+    res.json({ message: 'User updated successfully', user: normalizeUserRecord(updatedUser) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error updating user' });
