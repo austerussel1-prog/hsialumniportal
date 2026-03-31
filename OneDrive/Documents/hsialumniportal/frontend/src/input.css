@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  button {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    font-weight: 500 !important;
+  }
+
+  button::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.28);
+    transform: scaleX(0);
+    transform-origin: left;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  button:hover::before,
+  button:focus-visible::before {
+    animation: fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .hsi-btn {
+    border: none;
+    border-radius: 14px;
+    min-height: 48px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 500 !important;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    line-height: 1.2;
+    text-decoration: none;
+  }
+
+  .hsi-btn-secondary {
+    background: #ffffff;
+    color: #32435f;
+    border: 1px solid #d1d9e6;
+  }
+
+  .hsi-btn-primary {
+    background: #d4af0d;
+    color: #ffffff;
+  }
+
+  .hsi-btn-danger {
+    background: #ef4444;
+    color: #ffffff;
+  }
+
+  /* Opt out for link-like text buttons that should never crop glyphs. */
+  button.hsi-no-clip {
+    overflow: visible;
+  }
+
+  button.hsi-no-clip::before {
+    display: none;
+  }
+}
+
+/* Utility: hide scrollbar but keep scroll */
+.hsi-hide-scrollbar {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.hsi-hide-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chrome/Safari */
+}
+
+@layer utilities {
+  @keyframes fillBounce {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+  
+  .animate-shake {
+    animation: shake 0.5s ease-in-out;
+  }
+
+  .hsi-hover-fill {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hsi-hover-fill::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: inherit;
+    transform: scaleX(0);
+    transform-origin: left;
+    pointer-events: none;
+  }
+
+  .hsi-hover-fill:hover::before {
+    animation: fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .hsi-hover-fill-text {
+    display: inline-block;
+    border-radius: 0.375rem;
+    padding: 0.125rem 0.25rem;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+ 
+  .scrollbar-hide {
+    -ms-overflow-style: none;  
+    scrollbar-width: none; 
+  }
+}
