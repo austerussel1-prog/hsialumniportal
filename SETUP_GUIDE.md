@@ -37,6 +37,11 @@ Edit `backend/.env` and add your Gmail credentials:
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASSWORD=your_gmail_app_password
 DATA_ENCRYPTION_KEY=your_32_byte_secret_or_64_char_hex
+## Optional: persistent media storage (recommended on Render)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+CLOUDINARY_UPLOAD_FOLDER=hsialumniportal
 LOGIN_MAX_ATTEMPTS=5
 LOGIN_LOCK_MINUTES=15
 RETENTION_AUDIT_LOG_DAYS=90

@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { touchUserActivity } = require('../utils/userActivity');
+const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
 
 const router = express.Router();
 
@@ -79,7 +80,16 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
       let kind = 'image';
       if (mediaType && ['image', 'video'].includes(mediaType)) kind = mediaType;
       else if (req.file.mimetype && req.file.mimetype.startsWith('video')) kind = 'video';
-      const url = `/uploads/${req.file.filename}`;
+      let url = `/uploads/${req.file.filename}`;
+      try {
+        const uploadedUrl = await uploadLocalFile(req.file.path, { folder: 'announcements', resourceType: 'auto' });
+        if (uploadedUrl) {
+          url = uploadedUrl;
+          cleanupLocalFile(req.file.path);
+        }
+      } catch (uploadErr) {
+        console.error('Announcement media cloud upload failed:', uploadErr.message);
+      }
       announcement.attachments = announcement.attachments || [];
       announcement.attachments.push({ kind, url });
     }

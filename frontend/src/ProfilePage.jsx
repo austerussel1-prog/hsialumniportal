@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, LinkedinLogo, TwitterLogo, InstagramLogo, PencilSimple, UploadSimple, X, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, Plus, Gear, SignOut, User, BookOpen, Briefcase, Bell } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints, API_URL } from './config/api';
+import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -13,7 +13,7 @@ export default function ProfilePage() {
     if (!value) return fallbackProfileImage;
     if (String(value).includes('gear-icon.svg')) return fallbackProfileImage;
     if (value.includes('via.placeholder.com')) return fallbackProfileImage;
-    return value;
+    return resolveApiAssetUrl(value);
   };
   const [isEditing, setIsEditing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -239,11 +239,7 @@ export default function ProfilePage() {
     const normalizeAvatarUrl = (raw) => {
       const value = String(raw || '').trim();
       if (!value) return '';
-      if (value.startsWith('data:image/')) return value;
-      if (/^https?:\/\//i.test(value)) return value;
-      if (value.startsWith('/')) return `${API_URL}${value}`;
-      if (value.startsWith('uploads/')) return `${API_URL}/${value}`;
-      return `${API_URL}/uploads/${value}`;
+      return resolveApiAssetUrl(value);
     };
 
     const formatRelativeTime = (iso) => {
@@ -748,7 +744,9 @@ export default function ProfilePage() {
         return;
       }
       const data = await resp.json();
-      const url = data?.url ? `${API_URL}${data.url}` : (data?.user?.profileImage ? `${API_URL}${data.user.profileImage}` : null);
+      const url = data?.url
+        ? resolveApiAssetUrl(data.url)
+        : (data?.user?.profileImage ? resolveApiAssetUrl(data.user.profileImage) : null);
       if (url) {
         setProfileImagePreview(url);
         setFormData({ ...formData, profileImage: url });
@@ -780,7 +778,9 @@ export default function ProfilePage() {
         return;
       }
       const data = await resp.json();
-      const url = data?.url ? `${API_URL}${data.url}` : (data?.user?.profileImage ? `${API_URL}${data.user.profileImage}` : null);
+      const url = data?.url
+        ? resolveApiAssetUrl(data.url)
+        : (data?.user?.profileImage ? resolveApiAssetUrl(data.user.profileImage) : null);
       if (url) {
         setProfileImagePreview(url);
         setFormData({ ...formData, profileImage: url });

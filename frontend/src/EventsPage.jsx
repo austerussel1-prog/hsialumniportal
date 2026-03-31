@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints, API_URL } from './config/api';
+import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 export default function EventsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -269,8 +269,7 @@ export default function EventsPage() {
   };
   const resolveEventImage = (value) => {
     if (!value) return '/hero.jpg';
-    if (typeof value === 'string' && value.startsWith('/')) return `${API_URL}${value}`;
-    return value;
+    return resolveApiAssetUrl(value);
   };
 
   const handleDeleteEvent = async (ev) => {

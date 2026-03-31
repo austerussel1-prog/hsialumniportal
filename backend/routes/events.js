@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { sendEventFeedbackEmail } = require('../services/emailService');
 const { touchUserActivity } = require('../utils/userActivity');
+const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
 
 // ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -104,7 +105,18 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
 
     const isVirtual = String(payload.isVirtual || '').toLowerCase() === 'true' || payload.isVirtual === true || payload.isVirtual === 'on';
     const capacity = payload.capacity === '' || payload.capacity == null ? undefined : Number(payload.capacity);
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : payload.imageUrl;
+    let imageUrl = req.file ? `/uploads/${req.file.filename}` : payload.imageUrl;
+    if (req.file) {
+      try {
+        const uploadedUrl = await uploadLocalFile(req.file.path, { folder: 'events', resourceType: 'image' });
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+          cleanupLocalFile(req.file.path);
+        }
+      } catch (uploadErr) {
+        console.error('Event image cloud upload failed:', uploadErr.message);
+      }
+    }
     // allow admin to set virtual/onsite via isVirtual boolean, location or virtualLink
     const event = new Event({
       title,

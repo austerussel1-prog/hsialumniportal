@@ -11,6 +11,7 @@ const { sendAccountFeedbackEmail } = require('../services/emailService');
 const sendOTPEmail = require('../utils/sendEmail');
 const { logAuditEvent, getClientIp } = require('../utils/auditLogger');
 const { touchUserActivity } = require('../utils/userActivity');
+const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
 
 const router = express.Router();
 
@@ -1201,8 +1202,19 @@ router.post('/me/avatar', verifyToken, upload.single('avatar'), async (req, res)
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Save relative URL to profileImage
-    user.profileImage = `/uploads/${req.file.filename}`;
+    // Save cloud URL when configured; otherwise keep local uploads path.
+    let profileImageUrl = `/uploads/${req.file.filename}`;
+    try {
+      const uploadedUrl = await uploadLocalFile(req.file.path, { folder: 'avatars', resourceType: 'image' });
+      if (uploadedUrl) {
+        profileImageUrl = uploadedUrl;
+        cleanupLocalFile(req.file.path);
+      }
+    } catch (uploadErr) {
+      console.error('Avatar cloud upload failed:', uploadErr.message);
+    }
+
+    user.profileImage = profileImageUrl;
     await user.save();
 
     res.json({ message: 'Avatar uploaded', url: user.profileImage, user: buildUserPayload(user) });

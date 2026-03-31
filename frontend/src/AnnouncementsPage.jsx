@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints, API_URL } from './config/api';
+import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 // Small inline SVG icons
 const PhotoIcon = () => (
@@ -19,8 +19,7 @@ const EventIcon = () => (
 const resolveProfileImage = (value) => {
   if (!value) return '/Logo.jpg';
   if (String(value).includes('gear-icon.svg')) return '/Logo.jpg';
-  if (typeof value === 'string' && value.startsWith('/')) return `${API_URL}${value}`;
-  return value;
+  return resolveApiAssetUrl(value);
 };
 
 const resolveDisplayName = (person, fallback = 'User') => {
@@ -515,9 +514,9 @@ export default function AnnouncementsPage() {
                             {a.attachments.map((att, idx) => (
                               <div key={idx} className="mb-2">
                                 {att.kind === 'image' ? (
-                                  <img src={`${API_URL}${att.url}`} alt={`attachment-${idx}`} className="w-full max-w-sm rounded object-cover" />
+                                  <img src={resolveApiAssetUrl(att.url)} alt={`attachment-${idx}`} className="w-full max-w-sm rounded object-cover" />
                                 ) : (
-                                  <video src={`${API_URL}${att.url}`} controls className="w-full max-w-md rounded" />
+                                  <video src={resolveApiAssetUrl(att.url)} controls className="w-full max-w-md rounded" />
                                 )}
                               </div>
                             ))}
@@ -665,9 +664,9 @@ function FullPostModal({ post, onClose, onHeart, onCommentSubmit }) {
                 {post.attachments.map((att, i) => (
                   <div key={i} className="mb-3">
                     {att.kind === 'image' ? (
-                      <img src={`${API_URL}${att.url}`} alt={`att-${i}`} className="w-full max-w-md rounded object-cover" />
+                      <img src={resolveApiAssetUrl(att.url)} alt={`att-${i}`} className="w-full max-w-md rounded object-cover" />
                     ) : (
-                      <video src={`${API_URL}${att.url}`} controls className="w-full rounded" />
+                      <video src={resolveApiAssetUrl(att.url)} controls className="w-full rounded" />
                     )}
                   </div>
                 ))}

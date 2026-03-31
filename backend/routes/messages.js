@@ -7,6 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
+const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
 
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'messages');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -242,14 +243,27 @@ router.post('/:recipientId', verifyToken, (req, res, next) => {
       return res.status(400).json({ error: 'Message must include text, an image, or a file.' });
     }
 
+    let storedFileUrl = hasAttachment ? `/uploads/messages/${uploadedFile.filename}` : '';
+    if (hasAttachment && uploadedFile?.path) {
+      try {
+        const uploadedUrl = await uploadLocalFile(uploadedFile.path, { folder: 'messages', resourceType: 'auto' });
+        if (uploadedUrl) {
+          storedFileUrl = uploadedUrl;
+          cleanupLocalFile(uploadedFile.path);
+        }
+      } catch (uploadErr) {
+        console.error('Message attachment cloud upload failed:', uploadErr.message);
+      }
+    }
+
     const message = new Message({
       sender: userId,
       recipient: recipientId,
       text: normalizedText,
-      imageUrl: hasAttachment && isImageAttachment ? `/uploads/messages/${uploadedFile.filename}` : '',
+      imageUrl: hasAttachment && isImageAttachment ? storedFileUrl : '',
       imageMimeType: hasAttachment && isImageAttachment ? uploadedFile.mimetype || '' : '',
       imageOriginalName: hasAttachment && isImageAttachment ? uploadedFile.originalname || '' : '',
-      attachmentUrl: hasAttachment ? `/uploads/messages/${uploadedFile.filename}` : '',
+      attachmentUrl: hasAttachment ? storedFileUrl : '',
       attachmentMimeType: hasAttachment ? uploadedFile.mimetype || '' : '',
       attachmentOriginalName: hasAttachment ? uploadedFile.originalname || '' : '',
       attachmentSize: hasAttachment ? Number(uploadedFile.size || 0) : 0,
