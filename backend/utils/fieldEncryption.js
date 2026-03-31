@@ -35,6 +35,16 @@ function getEncryptionKey() {
   return cachedKey;
 }
 
+function hasEncryptionKey() {
+  return Boolean(getEncryptionKey());
+}
+
+function getEncryptionKeyFingerprint() {
+  const key = getEncryptionKey();
+  if (!key) return '';
+  return crypto.createHash('sha256').update(key).digest('hex').slice(0, 12);
+}
+
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -99,4 +109,6 @@ module.exports = {
   encryptField,
   decryptField,
   isEncryptedValue,
+  hasEncryptionKey,
+  getEncryptionKeyFingerprint,
 };

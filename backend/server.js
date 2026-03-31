@@ -19,6 +19,7 @@ const documentsRoutes = require('./routes/documents');
 const mentorshipRoutes = require('./routes/mentorship');
 const jobApplicationRoutes = require('./routes/jobApplications');
 const { scheduleDataRetentionJob } = require('./services/privacyRetentionService');
+const { hasEncryptionKey, getEncryptionKeyFingerprint } = require('./utils/fieldEncryption');
 
 const app = express();
 
@@ -35,6 +36,17 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 if (!process.env.MONGODB_URI) {
   console.error('MongoDB connection error: MONGODB_URI is undefined. Check your .env file.');
   process.exit(1);
+}
+
+if (process.env.NODE_ENV === 'production' && !hasEncryptionKey()) {
+  console.error('Startup error: DATA_ENCRYPTION_KEY is required in production.');
+  process.exit(1);
+}
+
+if (hasEncryptionKey()) {
+  console.log(`[privacy] Encryption key fingerprint: ${getEncryptionKeyFingerprint()}`);
+} else {
+  console.warn('[privacy] DATA_ENCRYPTION_KEY is not set. Sensitive fields may be exposed as encrypted text.');
 }
 
 mongoose.connect(process.env.MONGODB_URI)
