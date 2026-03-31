@@ -169,7 +169,7 @@ function Sidebar(props) {
                   alt="Profile"
                   className="h-9 w-9 rounded-full object-cover border-2 border-white/40"
                   onError={(event) => {
-                    event.currentTarget.style.display = 'none';
+                    event.currentTarget.src = '/Logo.jpg';
                   }}
                 />
               ) : (

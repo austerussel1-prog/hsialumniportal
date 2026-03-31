@@ -416,6 +416,7 @@ export default function DirectoryPage() {
                 <img
                   src={profile.avatar}
                   alt={profile.name}
+                  onError={(event) => { event.currentTarget.src = '/Logo.jpg'; }}
                   style={{ width: isMobile ? '36px' : '54px', height: isMobile ? '36px' : '54px', borderRadius: isMobile ? '10px' : '14px', objectFit: 'cover' }}
                 />
                 <div>

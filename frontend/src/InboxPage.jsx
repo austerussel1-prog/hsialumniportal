@@ -29,6 +29,11 @@ export default function InboxPage() {
   const SELECTED_RECIPIENT_STORAGE_KEY = 'hsi_inbox_selected_recipient_id';
   const LAST_READ_BY_USER_STORAGE_KEY = 'hsi_inbox_last_read_by_user';
   const DEFAULT_AVATAR = '/Logo.jpg';
+  const applyAvatarFallback = (event) => {
+    if (event?.currentTarget) {
+      event.currentTarget.src = DEFAULT_AVATAR;
+    }
+  };
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [userLastChats, setUserLastChats] = useState({});
@@ -1153,6 +1158,7 @@ export default function InboxPage() {
                         <img
                           src={resolveApiAssetUrl(user.profileImage) || DEFAULT_AVATAR}
                           alt={displayName}
+                          onError={applyAvatarFallback}
                           style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e4d6c4', flexShrink: 0 }}
                         />
                         <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
@@ -1238,6 +1244,7 @@ export default function InboxPage() {
                       <img
                         src={resolveApiAssetUrl(selectedUser?.profileImage) || DEFAULT_AVATAR}
                         alt={selectedUser?.fullName || selectedUser?.name || 'Conversation avatar'}
+                        onError={applyAvatarFallback}
                         onClick={() => openUserProfile(selectedRecipientId)}
                         style={{
                           width: 32,
@@ -1477,6 +1484,7 @@ export default function InboxPage() {
                           <img
                             src={isMine ? (resolveApiAssetUrl(currentUser?.profileImage) || DEFAULT_AVATAR) : senderProfile}
                             alt={isMine ? 'Me' : senderName}
+                            onError={applyAvatarFallback}
                             onClick={() => {
                               if (isMine) {
                                 openOwnProfile();
@@ -2047,6 +2055,7 @@ export default function InboxPage() {
               <img
                 src={resolveApiAssetUrl(selectedUser?.profileImage) || DEFAULT_AVATAR}
                 alt={selectedUser?.fullName || selectedUser?.name || 'Conversation user'}
+                onError={applyAvatarFallback}
                 onClick={() => selectedRecipientId && openUserProfile(selectedRecipientId)}
                 style={{
                   width: 84,
