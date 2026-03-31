@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Career logo">
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="#ffffff" />
+  <g fill="none" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 192 V80" stroke="#4285F4" />
+    <path d="M64 80 L128 128" stroke="#EA4335" />
+    <path d="M128 128 L192 80" stroke="#FBBC05" />
+    <path d="M192 80 V192" stroke="#34A853" />
+  </g>
+</svg>

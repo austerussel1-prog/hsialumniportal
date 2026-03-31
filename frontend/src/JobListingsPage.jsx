@@ -1,0 +1,910 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { CaretDown, MagnifyingGlass } from '@phosphor-icons/react';
+import Sidebar from './components/Sidebar';
+
+const USER_POSTED_JOBS_KEY = 'hsi_user_job_posts';
+const allJobs = [];
+
+const categoryMeta = {
+  all: {
+    title: 'Career & Job Opportunities',
+    subtitle: 'Explore available departments and current openings within the company.',
+  },
+  exclusive: {
+    title: 'Exclusive HSI Job Postings',
+    subtitle: 'Direct openings shared for alumni members.',
+  },
+  freelance: {
+    title: 'Freelance & Project-based Opportunities',
+    subtitle: 'Flexible contracts and short-term projects.',
+  },
+  internship: {
+    title: 'Internship & OJT Opportunities',
+    subtitle: 'Student-ready internships and practical training roles.',
+  },
+  'part-time': {
+    title: 'Part-time Opportunities',
+    subtitle: 'Flexible part-time roles and short shift-based work.',
+  },
+  contract: {
+    title: 'Contract Opportunities',
+    subtitle: 'Fixed-term roles for contractual and seasonal hires.',
+  },
+};
+
+export default function JobListingsPage() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 900;
+  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortOrder, setSortOrder] = useState('newest');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState('all');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [jobsVersion, setJobsVersion] = useState(0);
+  const [postModalOpen, setPostModalOpen] = useState(false);
+  const [postQueryHandled, setPostQueryHandled] = useState(false);
+  const [hoverButton, setHoverButton] = useState(null);
+  const [postForm, setPostForm] = useState({
+    category: 'exclusive',
+    company: '',
+    position: '',
+    location: '',
+    type: 'Project-based',
+  });
+
+  const category = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('category') || 'all';
+  }, [location.search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldOpen = params.get('post') === '1';
+    if (!shouldOpen || postQueryHandled) return;
+
+    setPostQueryHandled(true);
+    setPostModalOpen(true);
+    setPostForm((prev) => ({
+      ...prev,
+      category: params.get('category') || 'exclusive',
+      type: prev.type || 'Project-based',
+    }));
+
+    params.delete('post');
+    const nextSearch = params.toString();
+    navigate(
+      { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' },
+      { replace: true },
+    );
+  }, [location.pathname, location.search, navigate, postQueryHandled]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const openPostModal = () => {
+    setPostModalOpen(true);
+    setPostForm((prev) => ({
+      ...prev,
+      category: category === 'all' ? 'exclusive' : (category || 'exclusive'),
+      company: '',
+      position: '',
+      location: '',
+      type: 'Project-based',
+    }));
+  };
+
+  const handlePostOpportunity = (event) => {
+    event.preventDefault();
+
+    const nextCategory = (postForm.category || 'exclusive').trim();
+    const company = postForm.company.trim();
+    const position = postForm.position.trim();
+    const jobLocation = postForm.location.trim();
+
+    if (!company || !position || !jobLocation) return;
+
+    const resolvedType = nextCategory === 'freelance'
+      ? (postForm.type || 'Project-based')
+      : undefined;
+
+    const postedJob = {
+      id: Date.now(),
+      category: nextCategory,
+      company,
+      position,
+      location: jobLocation,
+      type: resolvedType,
+      status: 'Open',
+      applyLink: `mailto:hr@hsi.com?subject=Application%20-%20${encodeURIComponent(position)}`,
+    };
+
+    let existing = [];
+    try {
+      const raw = localStorage.getItem(USER_POSTED_JOBS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      existing = Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      existing = [];
+    }
+
+    localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify([...existing, postedJob]));
+    setJobsVersion((prev) => prev + 1);
+    setPostModalOpen(false);
+
+    navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
+  };
+
+  const jobs = useMemo(() => {
+    let userPostedJobs = [];
+    try {
+      const raw = localStorage.getItem(USER_POSTED_JOBS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      userPostedJobs = Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      userPostedJobs = [];
+    }
+
+    return [...allJobs, ...userPostedJobs]
+      .map((job) => ({
+        ...job,
+        status: job.status || 'Open',
+        type: job.type || ({
+          freelance: 'Project-based',
+          internship: 'Internship/OJT',
+          'part-time': 'Part-time',
+          contract: 'Contract',
+          exclusive: 'Full-time',
+        }[job.category] || 'Full-time'),
+        description: job.description || (job.category === 'freelance'
+          ? 'Flexible short-term work for project-based contributors.'
+          : job.category === 'internship'
+            ? 'Gain real-world experience with guided internship and OJT work.'
+            : 'Learn and grow your skills with hands-on mentoring.'),
+        department: job.department || 'General',
+        role: job.role || 'Staff',
+        tag: job.tag || (job.category === 'freelance' ? 'Short-term' : 'Standard'),
+      }))
+      .filter((job) => (category === 'all' ? true : job.category === category));
+  }, [category, jobsVersion]);
+
+  const filteredJobs = useMemo(() => {
+    const lowerSearch = searchTerm.trim().toLowerCase();
+    const filtered = jobs.filter((job) => {
+      const matchesSearch = !lowerSearch
+        || job.position.toLowerCase().includes(lowerSearch)
+        || job.company.toLowerCase().includes(lowerSearch)
+        || job.location.toLowerCase().includes(lowerSearch);
+      const matchesDepartment = departmentFilter === 'all' || job.department === departmentFilter;
+      const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+      const matchesRole = roleFilter === 'all' || job.role === roleFilter;
+      const matchesTag = tagFilter === 'all' || job.tag === tagFilter;
+      return matchesSearch && matchesDepartment && matchesStatus && matchesRole && matchesTag;
+    });
+
+    return [...filtered].sort((a, b) => (
+      sortOrder === 'newest' ? Number(b.id) - Number(a.id) : Number(a.id) - Number(b.id)
+    ));
+  }, [jobs, searchTerm, sortOrder, departmentFilter, statusFilter, roleFilter, tagFilter]);
+
+  const activeMeta = categoryMeta[category] || categoryMeta.exclusive;
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSortOrder('newest');
+    setDepartmentFilter('all');
+    setStatusFilter('all');
+    setRoleFilter('all');
+    setTagFilter('all');
+  };
+
+  const derivedPostType = ({
+    exclusive: 'Full-time',
+    internship: 'Internship/OJT',
+    'part-time': 'Part-time',
+    contract: 'Contract',
+  }[postForm.category] || 'Full-time');
+
+  return (
+    <motion.div
+      style={{ display: 'flex', minHeight: '100vh', background: '#f6f2ea' }}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.3 }}
+    >
+      <style>{`
+        @keyframes fillBounce {
+          from { transform: scaleX(0); }
+          to { transform: scaleX(1); }
+        }
+      `}</style>
+      <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
+
+        <div style={{ flex: 1, padding: isMobile ? '76px 10px 16px' : '30px 40px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px' }}>
+        <div>
+          {location.pathname !== '/training' ? (
+            <Link to="/training" style={{ color: '#6b7280', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>
+              {'< Back to Career & Job Opportunities'}
+            </Link>
+          ) : null}
+          <h1 style={{ marginTop: isMobile ? '4px' : '10px', fontSize: isMobile ? '24px' : '34px', fontWeight: '900', color: '#111827', lineHeight: 1.1 }}>
+            Career &amp; Job <span style={{ color: '#e1aa18' }}>Opportunities</span>
+          </h1>
+          <p style={{ color: '#6b7280', marginTop: '6px', fontStyle: 'italic', fontSize: isMobile ? '12px' : '13px' }}>{activeMeta.subtitle}</p>
+        </div>
+
+        <div style={{ background: '#fff', border: '1px solid #efe4d3', borderRadius: '14px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', gap: isMobile ? '8px' : '14px', alignItems: 'center', padding: isMobile ? '10px' : '14px 16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: isMobile ? '100%' : '320px', position: 'relative' }}>
+              <MagnifyingGlass size={15} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search"
+                style={{
+                  width: '100%',
+                  height: isMobile ? '38px' : '40px',
+                  padding: isMobile ? '0 10px 0 34px' : '0 12px 0 36px',
+                  border: '1px solid #d9dde5',
+                  borderRadius: '10px',
+                  fontSize: '12px',
+                  color: '#374151',
+                  outline: 'none',
+                }}
+              />
+            </div>
+            <div style={{ minWidth: isMobile ? 'calc(50% - 4px)' : '190px', position: 'relative' }}>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: isMobile ? '38px' : '40px',
+                  padding: '0 30px 0 12px',
+                  border: '1px solid #d9dde5',
+                  borderRadius: '10px',
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  background: '#f9fafb',
+                  appearance: 'none',
+                }}
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+              <CaretDown size={13} color="#9ca3af" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
+            <button
+              type="button"
+              onClick={openPostModal}
+              onMouseEnter={() => setHoverButton('postJobTop')}
+              onMouseLeave={() => setHoverButton(null)}
+              style={{
+                height: isMobile ? '38px' : '40px',
+                padding: isMobile ? '0 12px' : '0 16px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#e1aa18',
+                color: '#ffffff',
+                borderRadius: '10px',
+                fontSize: isMobile ? '10px' : '11px',
+                fontWeight: '400',
+                border: 'none',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {hoverButton === 'postJobTop' ? (
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0, 0, 0, 0.15)',
+                    borderRadius: '10px',
+                    transform: 'scaleX(0)',
+                    transformOrigin: 'left',
+                    animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  }}
+                />
+              ) : null}
+              <span style={{ position: 'relative', zIndex: 1 }}>Post a Job</span>
+            </button>
+          </div>
+
+          <div style={{ height: '1px', background: '#efe4d3' }} />
+
+          <div style={{ display: 'flex', gap: isMobile ? '8px' : '12px', alignItems: 'center', flexWrap: 'wrap', padding: isMobile ? '10px' : '14px 16px' }}>
+            {[
+              { label: 'Department', value: departmentFilter, setter: setDepartmentFilter, options: ['all', 'General'] },
+              { label: 'Status', value: statusFilter, setter: setStatusFilter, options: ['all', 'Open'] },
+              { label: 'Role', value: roleFilter, setter: setRoleFilter, options: ['all', 'Staff'] },
+              { label: 'Tag', value: tagFilter, setter: setTagFilter, options: ['all', 'Standard'] },
+            ].map((item) => (
+              <div key={item.label} style={{ minWidth: isMobile ? 'calc(50% - 4px)' : '150px', position: 'relative' }}>
+                <select
+                  value={item.value}
+                  onChange={(e) => item.setter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: isMobile ? '36px' : '34px',
+                    padding: '0 26px 0 12px',
+                    border: '1px solid #d9dde5',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    color: '#6b7280',
+                    background: '#f9fafb',
+                    appearance: 'none',
+                  }}
+                >
+                  {item.options.map((option) => (
+                    <option key={option} value={option}>
+                      {option === 'all' ? item.label : option}
+                    </option>
+                  ))}
+                </select>
+                <CaretDown size={12} color="#9ca3af" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+              </div>
+            ))}
+            <button
+              onClick={clearFilters}
+              onMouseEnter={() => setHoverButton('clearFilters')}
+              onMouseLeave={() => setHoverButton(null)}
+              style={{
+                height: isMobile ? '36px' : '34px',
+                padding: isMobile ? '0 14px' : '0 16px',
+                background: '#e1aa18',
+                color: '#ffffff',
+                borderRadius: '10px',
+                border: 'none',
+                fontSize: isMobile ? '11px' : '12px',
+                fontWeight: '400',
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden',
+                marginLeft: isMobile ? 'auto' : 0,
+              }}
+            >
+              {hoverButton === 'clearFilters' ? (
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: '100%',
+                    height: '100%',
+                    background: 'rgba(0, 0, 0, 0.15)',
+                    borderRadius: '10px',
+                    transform: 'scaleX(0)',
+                    transformOrigin: 'left',
+                    animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  }}
+                />
+              ) : null}
+              <span style={{ position: 'relative', zIndex: 1 }}>CLEAR</span>
+            </button>
+          </div>
+        </div>
+
+        {filteredJobs.length === 0 ? (
+          <div
+            style={{
+              background: '#fff',
+              border: '1px dashed #d6c6a3',
+              borderRadius: '14px',
+              padding: '24px',
+              textAlign: 'center',
+              color: '#6b7280',
+              fontStyle: 'italic',
+              fontSize: '14px',
+            }}
+          >
+            <div>No job opportunities yet. You can post openings here.</div>
+            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={openPostModal}
+                onMouseEnter={() => setHoverButton('postJobEmpty')}
+                onMouseLeave={() => setHoverButton(null)}
+                style={{
+                  height: '38px',
+                  padding: '0 18px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#e1aa18',
+                  color: '#ffffff',
+                  borderRadius: '10px',
+                  fontSize: '12px',
+                  fontWeight: '400',
+                  border: 'none',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                {hoverButton === 'postJobEmpty' ? (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      width: '100%',
+                      height: '100%',
+                      background: 'rgba(0, 0, 0, 0.15)',
+                      borderRadius: '10px',
+                      transform: 'scaleX(0)',
+                      transformOrigin: 'left',
+                      animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    }}
+                  />
+                ) : null}
+                <span style={{ position: 'relative', zIndex: 1 }}>Post a Job</span>
+              </button>
+            </div>
+          </div>
+        ) : (['all', 'exclusive', 'freelance', 'internship', 'part-time', 'contract'].includes(category)) ? (
+          <div style={{ display: 'grid', gap: isMobile ? '10px' : '16px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(460px, 1fr))' }}>
+            {filteredJobs.map((job) => (
+              <div
+                key={job.id}
+                style={{
+                  background: '#fff',
+                  border: '2px solid #efe4d3',
+                  borderRadius: '16px',
+                  padding: isMobile ? '10px' : '18px 20px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: isMobile ? '7px' : '10px',
+                  boxShadow: isMobile ? '0 6px 14px rgba(17, 24, 39, 0.08)' : '0 10px 24px rgba(17, 24, 39, 0.08)',
+                }}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '44px 1fr' : '96px 1fr', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <img src="/Lion.png" alt="HSI logo" style={{ width: isMobile ? '34px' : '72px', height: isMobile ? '34px' : '72px', objectFit: 'contain' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <h2 style={{ fontSize: isMobile ? '14px' : '20px', fontWeight: '800', color: '#111827', lineHeight: 1.15 }}>
+                      {job.position}
+                    </h2>
+                    {!isMobile && (
+                      <p style={{ marginTop: '3px', fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>
+                        {job.description}
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: '7px', marginTop: '6px' }}>
+                      <span
+                        style={{
+                          border: '1px solid #86efac',
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          padding: '2px 10px',
+                          borderRadius: '999px',
+                          fontSize: isMobile ? '9px' : '10px',
+                          fontWeight: '700',
+                        }}
+                      >
+                        {job.status}
+                      </span>
+                      <span
+                        style={{
+                          border: '1px solid #d1d5db',
+                          background: '#f3f4f6',
+                          color: '#374151',
+                          padding: '2px 10px',
+                          borderRadius: '999px',
+                          fontSize: isMobile ? '9px' : '10px',
+                          fontWeight: '700',
+                        }}
+                      >
+                        {job.type}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: '800', color: '#111827', fontSize: isMobile ? '10px' : '13px' }}>{job.company}</div>
+                    <div style={{ color: '#6b7280', fontStyle: 'italic', fontSize: isMobile ? '9px' : '11px' }}>{job.location}</div>
+                  </div>
+                  <img src="/Lion.png" alt="HSI logo small" style={{ width: isMobile ? '20px' : '34px', height: isMobile ? '20px' : '34px', opacity: 0.9 }} />
+                </div>
+
+                <Link
+                  to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
+                  onMouseEnter={() => setHoverButton(`view-details-${String(job.id)}`)}
+                  onMouseLeave={() => setHoverButton(null)}
+                  style={{
+                    marginTop: '2px',
+                    width: '100%',
+                    background: '#e1aa18',
+                    color: '#ffffff',
+                    textDecoration: 'none',
+                    borderRadius: isMobile ? '10px' : '12px',
+                    fontWeight: '700',
+                    fontSize: isMobile ? '9px' : '10px',
+                    textAlign: 'center',
+                    padding: isMobile ? '8px 10px' : '10px 12px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {hoverButton === `view-details-${String(job.id)}` ? (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0, 0, 0, 0.15)',
+                        borderRadius: '12px',
+                        transform: 'scaleX(0)',
+                        transformOrigin: 'left',
+                        animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                      }}
+                    />
+                  ) : null}
+                  <span style={{ position: 'relative', zIndex: 1 }}>
+                    {job.category === 'freelance' ? 'View Project Details' : 'View Job Details'}
+                  </span>
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+            {filteredJobs.map((job) => (
+              <div
+                key={job.id}
+                style={{
+                  background: '#fff',
+                  border: '2px solid #efe4d3',
+                  borderRadius: '16px',
+                  padding: '18px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  boxShadow: '0 10px 22px rgba(17, 24, 39, 0.08)',
+                }}
+              >
+                <div style={{ fontSize: '12px', color: '#b07a15', fontWeight: '700' }}>{job.company}</div>
+                <div style={{ fontSize: '19px', color: '#111827', fontWeight: '800' }}>{job.position}</div>
+                <div style={{ fontSize: '13px', color: '#6b7280' }}>{job.location}</div>
+                <Link
+                  to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
+                  onMouseEnter={() => setHoverButton(`view-details-small-${String(job.id)}`)}
+                  onMouseLeave={() => setHoverButton(null)}
+                  style={{
+                    marginTop: '6px',
+                    background: '#e1aa18',
+                    color: '#111827',
+                    textDecoration: 'none',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    fontSize: isMobile ? '10px' : '11px',
+                    textAlign: 'center',
+                    padding: '10px 12px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {hoverButton === `view-details-small-${String(job.id)}` ? (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0, 0, 0, 0.12)',
+                        borderRadius: '10px',
+                        transform: 'scaleX(0)',
+                        transformOrigin: 'left',
+                        animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                      }}
+                    />
+                  ) : null}
+                  <span style={{ position: 'relative', zIndex: 1 }}>View Details</span>
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {postModalOpen ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setPostModalOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(17, 24, 39, 0.45)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 50,
+              padding: isMobile ? '10px' : '18px',
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: isMobile ? '94vw' : '620px',
+                background: '#fff',
+                borderRadius: isMobile ? '12px' : '16px',
+                border: '1px solid #efe4d3',
+                boxShadow: '0 18px 40px rgba(17, 24, 39, 0.18)',
+                padding: isMobile ? '12px' : '18px',
+                overflowX: 'hidden',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                <div style={{ minWidth: isMobile ? '100%' : 'auto' }}>
+                  <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', color: '#111827' }}>Post an Opportunity</div>
+                  <div style={{ marginTop: '4px', fontSize: isMobile ? '11px' : '12px', color: '#6b7280' }}>
+                    Post OJT, project-based, part-time, contract, and full-time openings.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPostModalOpen(false)}
+                  onMouseEnter={() => setHoverButton('postModalClose')}
+                  onMouseLeave={() => setHoverButton(null)}
+                  style={{
+                    border: '1px solid #e5e7eb',
+                    background: '#fff',
+                    borderRadius: '10px',
+                    height: isMobile ? '32px' : '34px',
+                    padding: '0 12px',
+                    fontSize: isMobile ? '10px' : '11px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    color: '#374151',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                  }}
+                >
+                  {hoverButton === 'postModalClose' ? (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0, 0, 0, 0.08)',
+                        borderRadius: '10px',
+                        transform: 'scaleX(0)',
+                        transformOrigin: 'left',
+                        animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                      }}
+                    />
+                  ) : null}
+                  <span style={{ position: 'relative', zIndex: 1 }}>Close</span>
+                </button>
+              </div>
+
+              <div style={{ height: '1px', background: '#efe4d3', margin: '14px 0' }} />
+
+              <form onSubmit={handlePostOpportunity} style={{ display: 'grid', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Category</div>
+                    <select
+                      value={postForm.category}
+                      onChange={(e) => setPostForm((prev) => ({ ...prev, category: e.target.value }))}
+                      style={{
+                        height: '40px',
+                        borderRadius: '10px',
+                        border: '1px solid #d9dde5',
+                        padding: '0 12px',
+                        fontSize: '12px',
+                        background: '#f9fafb',
+                        color: '#374151',
+                      }}
+                    >
+                      <option value="exclusive">Full-time / Exclusive</option>
+                      <option value="part-time">Part-time</option>
+                      <option value="contract">Contract</option>
+                      <option value="freelance">Freelance / Project-based</option>
+                      <option value="internship">Internship / OJT</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Type</div>
+                    <select
+                      value={postForm.category === 'freelance' ? postForm.type : derivedPostType}
+                      onChange={(e) => setPostForm((prev) => ({ ...prev, type: e.target.value }))}
+                      disabled={postForm.category !== 'freelance'}
+                      style={{
+                        height: '40px',
+                        borderRadius: '10px',
+                        border: '1px solid #d9dde5',
+                        padding: '0 12px',
+                        fontSize: '12px',
+                        background: postForm.category === 'freelance' ? '#f9fafb' : '#f3f4f6',
+                        color: '#374151',
+                        opacity: postForm.category === 'freelance' ? 1 : 0.8,
+                      }}
+                    >
+                      {postForm.category === 'freelance' ? (
+                        <>
+                          <option value="Project-based">Project-based</option>
+                          <option value="Freelance">Freelance</option>
+                          <option value="Contract">Contract</option>
+                        </>
+                      ) : (
+                        <option value={derivedPostType}>{derivedPostType}</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Company Name</div>
+                    <input
+                      value={postForm.company}
+                      onChange={(e) => setPostForm((prev) => ({ ...prev, company: e.target.value }))}
+                      placeholder="Company Name"
+                      style={{
+                        height: '40px',
+                        borderRadius: '10px',
+                        border: '1px solid #d9dde5',
+                        padding: '0 12px',
+                        fontSize: '12px',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Position / Role</div>
+                      <input
+                        value={postForm.position}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, position: e.target.value }))}
+                        placeholder="Position"
+                        style={{
+                          height: '40px',
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '0 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Location</div>
+                      <input
+                        value={postForm.location}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, location: e.target.value }))}
+                        placeholder="Location / Remote"
+                        style={{
+                          height: '40px',
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '0 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPostModalOpen(false)}
+                    onMouseEnter={() => setHoverButton('postModalCancel')}
+                    onMouseLeave={() => setHoverButton(null)}
+                    style={{
+                      height: isMobile ? '36px' : '40px',
+                      padding: isMobile ? '0 12px' : '0 14px',
+                      borderRadius: '10px',
+                      border: '1px solid #d9dde5',
+                      background: '#fff',
+                      color: '#374151',
+                      fontSize: isMobile ? '10px' : '11px',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {hoverButton === 'postModalCancel' ? (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          width: '100%',
+                          height: '100%',
+                          background: 'rgba(0, 0, 0, 0.08)',
+                          borderRadius: '10px',
+                          transform: 'scaleX(0)',
+                          transformOrigin: 'left',
+                          animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        }}
+                      />
+                    ) : null}
+                    <span style={{ position: 'relative', zIndex: 1 }}>Cancel</span>
+                  </button>
+                  <button
+                    type="submit"
+                    onMouseEnter={() => setHoverButton('postModalSubmit')}
+                    onMouseLeave={() => setHoverButton(null)}
+                    style={{
+                      height: isMobile ? '36px' : '40px',
+                      padding: isMobile ? '0 14px' : '0 16px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      background: '#e1aa18',
+                      color: '#111827',
+                      fontSize: isMobile ? '10px' : '11px',
+                      fontWeight: '900',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {hoverButton === 'postModalSubmit' ? (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          width: '100%',
+                          height: '100%',
+                          background: 'rgba(0, 0, 0, 0.15)',
+                          borderRadius: '10px',
+                          transform: 'scaleX(0)',
+                          transformOrigin: 'left',
+                          animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        }}
+                      />
+                    ) : null}
+                    <span style={{ position: 'relative', zIndex: 1 }}>Post</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </motion.div>
+  );
+}

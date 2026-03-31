@@ -1,0 +1,286 @@
+const express = require('express');
+const router = express.Router();
+const Event = require('../models/Event');
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { sendEventFeedbackEmail } = require('../services/emailService');
+const { touchUserActivity } = require('../utils/userActivity');
+
+// ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const safe = Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, safe);
+  }
+});
+
+const upload = multer({ storage });
+
+// Middleware to verify user and attach user to req
+const verifyUser = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'No token provided' });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) return res.status(401).json({ message: 'Invalid user' });
+    if (user.isDeleted) return res.status(403).json({ message: 'This account is scheduled for deletion and can no longer be used.' });
+    touchUserActivity(user._id).catch(() => {});
+    req.user = user;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Invalid token' });
+  }
+};
+
+// Middleware to check admin
+const verifyAdmin = (req, res, next) => {
+  if (!['super_admin', 'admin', 'hr', 'alumni_officer'].includes(req.user.role)) {
+    return res.status(403).json({ message: 'Admins only' });
+  }
+  next();
+};
+
+// List all events
+router.get('/', async (req, res) => {
+  try {
+    const events = await Event.find().sort({ startDate: 1 }).lean();
+    res.json(events);
+  } catch (err) {
+    console.error('GET /api/events error', err);
+    res.status(500).json({ message: 'Failed to fetch events' });
+  }
+});
+
+// Route check (useful for debugging deployments/restarts)
+router.get('/_route_check', (req, res) => {
+  res.json({ ok: true, router: 'events', hasDelete: true });
+});
+
+// Get a single event
+router.get('/:id', async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id).lean();
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    res.json(event);
+  } catch (err) {
+    console.error('GET /api/events/:id error', err);
+    res.status(500).json({ message: 'Failed to fetch event' });
+  }
+});
+
+// Create an event (admin only)
+// allow optional single image upload via 'image' field (multipart/form-data)
+router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
+  if (!req.is('multipart/form-data')) return next();
+  upload.single('image')(req, res, function (err) {
+    if (err) {
+      console.error('Multer upload error:', err);
+      return res.status(400).json({ message: 'Upload failed', error: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const title = String(payload.title || '').trim();
+    const description = String(payload.description || '').trim();
+    if (!title) {
+      return res.status(400).json({ message: 'Title is required' });
+    }
+    if (description.length < 100) {
+      return res.status(400).json({ message: 'Description must be at least 100 characters' });
+    }
+
+    const isVirtual = String(payload.isVirtual || '').toLowerCase() === 'true' || payload.isVirtual === true || payload.isVirtual === 'on';
+    const capacity = payload.capacity === '' || payload.capacity == null ? undefined : Number(payload.capacity);
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : payload.imageUrl;
+    // allow admin to set virtual/onsite via isVirtual boolean, location or virtualLink
+    const event = new Event({
+      title,
+      description,
+      category: payload.category,
+      startDate: payload.startDate,
+      endDate: payload.endDate,
+      isVirtual,
+      location: payload.location,
+      virtualLink: payload.virtualLink,
+      imageUrl,
+      capacity,
+      createdBy: req.user._id
+    });
+    await event.save();
+    res.status(201).json(event);
+  } catch (err) {
+    console.error('POST /api/events error', err);
+    if (err && (err.name === 'ValidationError' || err.name === 'CastError')) {
+      return res.status(400).json({ message: err.message || 'Invalid event data' });
+    }
+    res.status(500).json({ message: 'Failed to create event' });
+  }
+});
+
+// Delete an event (admin only)
+router.delete('/:id', verifyUser, verifyAdmin, async (req, res) => {
+  try {
+    const deleted = await Event.findByIdAndDelete(req.params.id).lean();
+    if (!deleted) return res.status(404).json({ message: 'Event not found' });
+    res.json({ message: 'Event deleted' });
+  } catch (err) {
+    console.error('DELETE /api/events/:id error', err);
+    res.status(500).json({ message: 'Failed to delete event' });
+  }
+});
+
+// Register for an event
+router.post('/:id/register', async (req, res) => {
+  try {
+    const { name, email, phone } = req.body;
+    if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
+
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    // basic capacity check
+    if (event.capacity && event.registrations.length >= event.capacity) {
+      return res.status(400).json({ message: 'Event capacity reached' });
+    }
+
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const hasExisting = event.registrations.some((r) => String(r?.email || '').trim().toLowerCase() === normalizedEmail);
+    if (hasExisting) {
+      return res.status(409).json({ message: 'You already registered for this event' });
+    }
+
+    event.registrations.push({ name, email, phone, status: 'pending' });
+    await event.save();
+    res.json({ message: 'Registration submitted and pending admin approval', registrations: event.registrations });
+  } catch (err) {
+    console.error('POST /api/events/:id/register error', err);
+    res.status(500).json({ message: 'Failed to register' });
+  }
+});
+
+// List registrations for an event (admin only)
+router.get('/:id/registrations', verifyUser, verifyAdmin, async (req, res) => {
+  try {
+    const status = String(req.query.status || '').trim().toLowerCase();
+    const event = await Event.findById(req.params.id).select('registrations').lean();
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    let list = Array.isArray(event.registrations) ? event.registrations : [];
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      list = list.filter((r) => String(r?.status || 'pending').toLowerCase() === status);
+    }
+
+    list.sort((a, b) => new Date(b?.registeredAt || 0) - new Date(a?.registeredAt || 0));
+    return res.json({ registrations: list });
+  } catch (err) {
+    console.error('GET /api/events/:id/registrations error', err);
+    return res.status(500).json({ message: 'Failed to load registrations' });
+  }
+});
+
+// Approve event registration (admin only)
+router.patch('/:id/registrations/:registrationId/approve', verifyUser, verifyAdmin, async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    const registration = event.registrations.id(req.params.registrationId);
+    if (!registration) return res.status(404).json({ message: 'Registration not found' });
+
+    registration.status = 'approved';
+    registration.rejectionReason = '';
+    registration.decisionAt = new Date();
+    registration.decisionBy = req.user._id;
+    await event.save();
+
+    return res.json({ message: 'Registration approved', registration });
+  } catch (err) {
+    console.error('PATCH /api/events/:id/registrations/:registrationId/approve error', err);
+    return res.status(500).json({ message: 'Failed to approve registration' });
+  }
+});
+
+// Reject event registration (admin only)
+router.patch('/:id/registrations/:registrationId/reject', verifyUser, verifyAdmin, async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    const registration = event.registrations.id(req.params.registrationId);
+    if (!registration) return res.status(404).json({ message: 'Registration not found' });
+
+    registration.status = 'rejected';
+    registration.rejectionReason = reason;
+    registration.decisionAt = new Date();
+    registration.decisionBy = req.user._id;
+    await event.save();
+
+    return res.json({ message: 'Registration rejected', registration });
+  } catch (err) {
+    console.error('PATCH /api/events/:id/registrations/:registrationId/reject error', err);
+    return res.status(500).json({ message: 'Failed to reject registration' });
+  }
+});
+
+// Submit feedback for an event
+router.post('/:id/feedback', async (req, res) => {
+  try {
+    const { name, email, rating, comments } = req.body;
+    if (!name || !email || rating === undefined || rating === null || rating === '') {
+      return res.status(400).json({ message: 'Name, email, and rating are required' });
+    }
+
+    const ratingValue = Number(rating);
+    if (!Number.isFinite(ratingValue) || ratingValue < 1 || ratingValue > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+
+    const event = await Event.findById(req.params.id);
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+
+    await sendEventFeedbackEmail({
+      event,
+      feedback: {
+        name,
+        email,
+        rating: ratingValue,
+        comments,
+      },
+    });
+
+    event.feedback.push({ name, email, rating: ratingValue, comments });
+    await event.save();
+    res.json({ message: 'Feedback submitted and emailed to admin' });
+  } catch (err) {
+    console.error('POST /api/events/:id/feedback error', err);
+    res.status(500).json({ message: 'Failed to submit feedback' });
+  }
+});
+
+// Get attendees for an event
+router.get('/:id/attendees', async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id).select('registrations').lean();
+    if (!event) return res.status(404).json({ message: 'Event not found' });
+    res.json(event.registrations || []);
+  } catch (err) {
+    console.error('GET /api/events/:id/attendees error', err);
+    res.status(500).json({ message: 'Failed to fetch attendees' });
+  }
+});
+
+module.exports = router;
