@@ -82,7 +82,18 @@ app.use('/api/job-applications', jobApplicationRoutes);
 
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running', message: 'Backend is working!' });
+  res.json({
+    status: 'Server is running',
+    message: 'Backend is working!',
+    nodeEnv: process.env.NODE_ENV || 'unset',
+    encryptionConfigured: hasEncryptionKey(),
+    encryptionKeyFingerprint: hasEncryptionKey() ? getEncryptionKeyFingerprint() : null,
+    commit:
+      process.env.RENDER_GIT_COMMIT
+      || process.env.RENDER_GIT_BRANCH
+      || process.env.VERCEL_GIT_COMMIT_SHA
+      || null,
+  });
 });
 
 

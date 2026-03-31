@@ -2,6 +2,7 @@ const crypto = require('crypto');
 
 const ENCRYPTION_PREFIX = 'enc:v1';
 let cachedKey = null;
+let cachedFallbackKeys = null;
 let warnedMissingKey = false;
 
 function isHexKey(input) {
@@ -20,19 +21,31 @@ function getEncryptionKey() {
     return null;
   }
 
-  if (isHexKey(raw)) {
-    cachedKey = Buffer.from(raw, 'hex');
-    return cachedKey;
-  }
-
-  const asBase64 = Buffer.from(raw, 'base64');
-  if (asBase64.length === 32) {
-    cachedKey = asBase64;
-    return cachedKey;
-  }
-
-  cachedKey = crypto.createHash('sha256').update(raw).digest();
+  cachedKey = deriveKey(raw);
   return cachedKey;
+}
+
+function deriveKey(rawInput) {
+  const raw = String(rawInput || '').trim();
+  if (!raw) return null;
+  if (isHexKey(raw)) return Buffer.from(raw, 'hex');
+  const asBase64 = Buffer.from(raw, 'base64');
+  if (asBase64.length === 32) return asBase64;
+  return crypto.createHash('sha256').update(raw).digest();
+}
+
+function getFallbackEncryptionKeys() {
+  if (cachedFallbackKeys) return cachedFallbackKeys;
+  const raw = String(process.env.DATA_ENCRYPTION_FALLBACK_KEYS || '').trim();
+  if (!raw) {
+    cachedFallbackKeys = [];
+    return cachedFallbackKeys;
+  }
+  cachedFallbackKeys = raw
+    .split(',')
+    .map((item) => deriveKey(item))
+    .filter(Boolean);
+  return cachedFallbackKeys;
 }
 
 function hasEncryptionKey() {
@@ -89,18 +102,24 @@ function decryptField(value) {
   const parts = text.split(':');
   if (parts.length !== 5) return text;
 
-  try {
-    const iv = Buffer.from(parts[2], 'base64');
-    const authTag = Buffer.from(parts[3], 'base64');
-    const encrypted = Buffer.from(parts[4], 'base64');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-    return decrypted.toString('utf8');
-  } catch (err) {
-    console.error('[privacy] Failed to decrypt field value:', err.message);
-    return text;
+  const iv = Buffer.from(parts[2], 'base64');
+  const authTag = Buffer.from(parts[3], 'base64');
+  const encrypted = Buffer.from(parts[4], 'base64');
+
+  const keysToTry = [key, ...getFallbackEncryptionKeys()];
+  for (const candidate of keysToTry) {
+    try {
+      const decipher = crypto.createDecipheriv('aes-256-gcm', candidate, iv);
+      decipher.setAuthTag(authTag);
+      const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+      return decrypted.toString('utf8');
+    } catch (_) {
+      // try next candidate key
+    }
   }
+
+  console.error('[privacy] Failed to decrypt field value with configured keys');
+  return text;
 }
 
 module.exports = {
