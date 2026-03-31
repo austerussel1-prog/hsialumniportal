@@ -22,7 +22,7 @@ import {
 } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints } from './config/api';
+import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 export default function InboxPage() {
   const navigate = useNavigate();
@@ -213,9 +213,7 @@ export default function InboxPage() {
   };
 
   const resolveMediaUrl = (url) => {
-    if (!url) return '';
-    if (/^https?:\/\//i.test(url)) return url;
-    return `${apiEndpoints.getMessages.replace('/api/messages', '')}${url}`;
+    return resolveApiAssetUrl(url);
   };
 
   const formatFileSize = (bytes) => {
@@ -1153,7 +1151,7 @@ export default function InboxPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
                         <img
-                          src={user.profileImage || DEFAULT_AVATAR}
+                          src={resolveApiAssetUrl(user.profileImage) || DEFAULT_AVATAR}
                           alt={displayName}
                           style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e4d6c4', flexShrink: 0 }}
                         />
@@ -1238,7 +1236,7 @@ export default function InboxPage() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                       <img
-                        src={selectedUser?.profileImage || DEFAULT_AVATAR}
+                        src={resolveApiAssetUrl(selectedUser?.profileImage) || DEFAULT_AVATAR}
                         alt={selectedUser?.fullName || selectedUser?.name || 'Conversation avatar'}
                         onClick={() => openUserProfile(selectedRecipientId)}
                         style={{
@@ -1450,7 +1448,7 @@ export default function InboxPage() {
                       const senderId = String(senderObj._id || senderObj.id || msg.sender || '');
                       const isMine = senderId === currentUserId;
                       const senderName = senderObj.fullName || senderObj.name || 'User';
-                      const senderProfile = senderObj.profileImage || DEFAULT_AVATAR;
+                      const senderProfile = resolveApiAssetUrl(senderObj.profileImage) || DEFAULT_AVATAR;
                       const gifUrlFromText = extractGifUrlFromText(msg.text);
                       const imageUrl = resolveMediaUrl(msg.imageUrl || gifUrlFromText || '');
                       const attachmentUrl = resolveMediaUrl(msg.attachmentUrl || '');
@@ -1477,7 +1475,7 @@ export default function InboxPage() {
                           style={{ marginBottom: '14px', display: 'flex', flexDirection: isMine ? 'row-reverse' : 'row', alignItems: 'flex-end' }}
                         >
                           <img
-                            src={isMine ? (currentUser?.profileImage || DEFAULT_AVATAR) : senderProfile}
+                            src={isMine ? (resolveApiAssetUrl(currentUser?.profileImage) || DEFAULT_AVATAR) : senderProfile}
                             alt={isMine ? 'Me' : senderName}
                             onClick={() => {
                               if (isMine) {
@@ -2047,7 +2045,7 @@ export default function InboxPage() {
               }}
             >
               <img
-                src={selectedUser?.profileImage || DEFAULT_AVATAR}
+                src={resolveApiAssetUrl(selectedUser?.profileImage) || DEFAULT_AVATAR}
                 alt={selectedUser?.fullName || selectedUser?.name || 'Conversation user'}
                 onClick={() => selectedRecipientId && openUserProfile(selectedRecipientId)}
                 style={{

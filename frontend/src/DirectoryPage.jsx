@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints } from './config/api';
+import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 const sortOptions = ['Sort By', 'Name', 'Department', 'Role'];
 
@@ -47,7 +47,7 @@ export default function DirectoryPage() {
       highlights,
       skills,
       avatar: (user.profileImage && !String(user.profileImage).includes('gear-icon.svg'))
-        ? user.profileImage
+        ? resolveApiAssetUrl(user.profileImage)
         : '/Logo.jpg',
       email: user.email || '',
     };

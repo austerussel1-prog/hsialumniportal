@@ -1,6 +1,21 @@
 // API configuration
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+export function resolveApiAssetUrl(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  if (/^(https?:)?\/\//i.test(raw) || raw.startsWith('data:') || raw.startsWith('blob:')) {
+    return raw;
+  }
+
+  // Upload assets are served by the backend service, not by the Vercel frontend domain.
+  if (raw.startsWith('/uploads/')) return `${API_URL}${raw}`;
+  if (raw.startsWith('uploads/')) return `${API_URL}/${raw}`;
+
+  return raw;
+}
+
 export const apiEndpoints = {
   // Auth endpoints
   googleAuth: `${API_URL}/api/auth/google`,

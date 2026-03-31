@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { resolveApiAssetUrl } from '../config/api';
 
 import {
   House,
@@ -50,7 +51,7 @@ function Sidebar(props) {
   const user = userData ? JSON.parse(userData) : null;
   const canAccessAdmin = ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(user?.role);
   const profileImage = typeof user?.profileImage === 'string' && user.profileImage.trim()
-    ? user.profileImage
+    ? resolveApiAssetUrl(user.profileImage)
     : null;
 
   const isOpen = isMobile ? mobileOpen : controlledOpen;
