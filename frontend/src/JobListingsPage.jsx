@@ -311,7 +311,28 @@ export default function JobListingsPage() {
           return;
         }
 
-        const latest = [data.job, ...serverJobs];
+        let latest = [];
+        try {
+          const refreshRes = await fetch(apiEndpoints.jobs, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const refreshData = await refreshRes.json().catch(() => ({}));
+          if (refreshRes.ok && Array.isArray(refreshData?.jobs)) {
+            latest = refreshData.jobs;
+          }
+        } catch (_error) {
+          // fallback below
+        }
+
+        if (!latest.length) {
+          const newJobKey = String(data.job.id || data.job._id || '');
+          const base = getStoredJobs();
+          latest = [
+            data.job,
+            ...base.filter((item) => String(item.id || item._id || '') !== newJobKey),
+          ];
+        }
+
         setServerJobs(latest);
         localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(latest));
         setJobsVersion((prev) => prev + 1);

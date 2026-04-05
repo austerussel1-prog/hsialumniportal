@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
@@ -154,6 +154,9 @@ export default function JobDetailsPage() {
   const params = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const showToast = (type, text) => {
+    window.dispatchEvent(new CustomEvent('hsi-toast', { detail: { type, text } }));
+  };
 
   useEffect(() => {
     if (!editOpen) return undefined;
@@ -297,6 +300,7 @@ export default function JobDetailsPage() {
       setEditOpen(false);
       setEditDraft(null);
       setJobVersion((prev) => prev + 1);
+      showToast('success', 'Job details updated successfully.');
     };
 
     if (!token || !job?._id) {
@@ -353,6 +357,7 @@ export default function JobDetailsPage() {
           setEditOpen(false);
           setEditDraft(null);
           setJobVersion((prev) => prev + 1);
+          showToast('success', 'Job details updated successfully.');
         }).catch(() => {
           applyLocalUpdate();
         });
@@ -407,6 +412,15 @@ export default function JobDetailsPage() {
         @keyframes fillBounce {
           from { transform: scaleX(0); }
           to { transform: scaleX(1); }
+        }
+        .job-edit-modal-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .job-edit-modal-scroll::-webkit-scrollbar {
+          width: 0;
+          height: 0;
+          display: none;
         }
       `}</style>
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
@@ -710,39 +724,48 @@ export default function JobDetailsPage() {
         </div>
       </div>
 
-      {editOpen && canEdit && editDraft ? (
-        <div
-          role="presentation"
-          onClick={() => setEditOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(17, 24, 39, 0.55)',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'center',
-            zIndex: 60,
-            padding: isMobile ? '10px' : '18px',
-            overflowY: 'auto',
-            overscrollBehavior: 'contain',
-          }}
-        >
-          <div
+      <AnimatePresence>
+        {editOpen && canEdit && editDraft ? (
+          <motion.div
             role="presentation"
-            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            onClick={() => setEditOpen(false)}
             style={{
-              width: '100%',
-              maxWidth: isMobile ? '94vw' : '860px',
-              maxHeight: isMobile ? 'calc(100vh - 20px)' : 'calc(100vh - 36px)',
-              overflowY: 'auto',
-              background: '#ffffff',
-              borderRadius: isMobile ? '12px' : '16px',
-              border: '1px solid #ececec',
-              boxShadow: '0 20px 50px rgba(17, 24, 39, 0.25)',
-              padding: isMobile ? '12px' : '18px',
-              overflowX: 'hidden',
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(17, 24, 39, 0.55)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 60,
+              padding: isMobile ? '10px' : '18px',
+              overflow: 'hidden',
             }}
           >
+            <motion.div
+              role="presentation"
+              initial={{ opacity: 0, scale: 0.98, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              onClick={(e) => e.stopPropagation()}
+              className="job-edit-modal-scroll"
+              style={{
+                width: '100%',
+                maxWidth: isMobile ? '94vw' : '860px',
+                maxHeight: isMobile ? 'calc(100vh - 20px)' : 'calc(100vh - 36px)',
+                overflowY: 'auto',
+                background: '#ffffff',
+                borderRadius: isMobile ? '12px' : '16px',
+                border: '1px solid #ececec',
+                boxShadow: '0 20px 50px rgba(17, 24, 39, 0.25)',
+                padding: isMobile ? '12px' : '18px',
+                overflowX: 'hidden',
+              }}
+            >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
               <div style={{ minWidth: isMobile ? '100%' : 'auto' }}>
                 <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', color: '#111827' }}>Edit Job Details</div>
@@ -910,9 +933,10 @@ export default function JobDetailsPage() {
                 <span style={{ position: 'relative', zIndex: 1 }}>Save Changes</span>
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </motion.div>
   );
 }
