@@ -81,14 +81,20 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
       if (mediaType && ['image', 'video'].includes(mediaType)) kind = mediaType;
       else if (req.file.mimetype && req.file.mimetype.startsWith('video')) kind = 'video';
       let url = `/uploads/${req.file.filename}`;
+      let uploadSucceeded = false;
       try {
         const uploadedUrl = await uploadLocalFile(req.file.path, { folder: 'announcements', resourceType: 'auto' });
         if (uploadedUrl) {
           url = uploadedUrl;
+          uploadSucceeded = true;
           cleanupLocalFile(req.file.path);
         }
       } catch (uploadErr) {
         console.error('Announcement media cloud upload failed:', uploadErr.message);
+      }
+      if (!uploadSucceeded && process.env.NODE_ENV === 'production') {
+        cleanupLocalFile(req.file.path);
+        return res.status(500).json({ message: 'Failed to store announcement media. Please try again.' });
       }
       announcement.attachments = announcement.attachments || [];
       announcement.attachments.push({ kind, url });

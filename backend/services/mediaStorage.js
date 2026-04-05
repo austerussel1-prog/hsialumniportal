@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const { v2: cloudinary } = require('cloudinary');
 
 let configured = false;
@@ -27,10 +28,24 @@ async function uploadLocalFile(filePath, options = {}) {
   ensureCloudinaryConfigured();
 
   const folder = options.folder || process.env.CLOUDINARY_UPLOAD_FOLDER || 'hsialumniportal';
-  const result = await cloudinary.uploader.upload(filePath, {
+  const resourceType = options.resourceType || 'auto';
+  const extension = String(path.extname(filePath) || '').toLowerCase();
+  const fileSize = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+  const shouldUseLargeUpload = resourceType === 'video'
+    || fileSize >= 100 * 1024 * 1024
+    || ['.mp4', '.mov', '.m4v', '.avi', '.webm'].includes(extension);
+
+  const uploadOptions = {
     folder,
-    resource_type: options.resourceType || 'auto',
-  });
+    resource_type: resourceType,
+  };
+
+  const result = shouldUseLargeUpload
+    ? await cloudinary.uploader.upload_large(filePath, {
+      ...uploadOptions,
+      chunk_size: 6 * 1024 * 1024,
+    })
+    : await cloudinary.uploader.upload(filePath, uploadOptions);
 
   return result?.secure_url || null;
 }
