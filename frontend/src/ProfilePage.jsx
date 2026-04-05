@@ -586,6 +586,14 @@ export default function ProfilePage() {
     setFormData({ ...formData, [field]: value });
   };
 
+  const showSuccessToast = (text) => {
+    window.dispatchEvent(
+      new CustomEvent('hsi-toast', {
+        detail: { type: 'success', text },
+      }),
+    );
+  };
+
   const handleSave = async () => {
     setProfileData(formData);
     setIsEditing(false);
@@ -677,6 +685,7 @@ export default function ProfilePage() {
               localStorage.setItem(`profileData_${data.user.email}`, JSON.stringify(serverProfile));
             }
           }
+          showSuccessToast('Profile updated successfully.');
         }
       } catch (err) {
         console.error('Error saving profile', err);
@@ -722,6 +731,8 @@ export default function ProfilePage() {
       localStorage.removeItem(`projects_${oldProfileKey}`);
       localStorage.removeItem(`careerDocuments_${oldProfileKey}`);
     }
+
+    showSuccessToast('Profile updated successfully.');
   };
 
   const handleProfileImageUpload = async (event) => {

@@ -156,7 +156,11 @@ export default function JobApplicationForm() {
         if (response.status === 404) {
           throw new Error('Application service not found (404). Please restart the backend and try again.');
         }
-        throw new Error((data && data.message) ? data.message : `Failed to submit application (HTTP ${response.status}).`);
+        throw new Error(
+          (data && (data.error || data.message))
+            ? (data.error || data.message)
+            : `Failed to submit application (HTTP ${response.status}).`,
+        );
       }
 
       notify('success', 'Application submitted successfully.');
