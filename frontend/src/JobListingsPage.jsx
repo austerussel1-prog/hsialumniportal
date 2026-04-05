@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
 const USER_POSTED_JOBS_KEY = 'hsi_user_job_posts';
+const ADMIN_ROLES = ['super_admin', 'superadmin', 'admin', 'hr', 'alumni_officer'];
 
 function getStoredJobs() {
   try {
@@ -70,6 +71,8 @@ export default function JobListingsPage() {
   const navigate = useNavigate();
   const [jobsVersion, setJobsVersion] = useState(0);
   const [postModalOpen, setPostModalOpen] = useState(false);
+  const [deleteModalJob, setDeleteModalJob] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [postQueryHandled, setPostQueryHandled] = useState(false);
   const [hoverButton, setHoverButton] = useState(null);
   const [serverJobs, setServerJobs] = useState([]);
@@ -86,10 +89,36 @@ export default function JobListingsPage() {
     return params.get('category') || 'all';
   }, [location.search]);
 
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_error) {
+      return null;
+    }
+  }, []);
+
+  const isAdminUser = Boolean(currentUser && ADMIN_ROLES.includes(currentUser.role));
+
+  const showToast = (type, text) => {
+    window.dispatchEvent(new CustomEvent('hsi-toast', { detail: { type, text } }));
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const shouldOpen = params.get('post') === '1';
     if (!shouldOpen || postQueryHandled) return;
+
+    if (!isAdminUser) {
+      params.delete('post');
+      const nextSearch = params.toString();
+      navigate(
+        { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' },
+        { replace: true },
+      );
+      setPostQueryHandled(true);
+      return;
+    }
 
     setPostQueryHandled(true);
     setPostModalOpen(true);
@@ -105,13 +134,23 @@ export default function JobListingsPage() {
       { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' },
       { replace: true },
     );
-  }, [location.pathname, location.search, navigate, postQueryHandled]);
+  }, [isAdminUser, location.pathname, location.search, navigate, postQueryHandled]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    const hasModalOpen = postModalOpen || Boolean(deleteModalJob);
+    if (!hasModalOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [postModalOpen, deleteModalJob]);
 
   useEffect(() => {
     let mounted = true;
@@ -190,6 +229,10 @@ export default function JobListingsPage() {
   }, []);
 
   const openPostModal = () => {
+    if (!isAdminUser) {
+      showToast('error', 'Admin access required to post jobs.');
+      return;
+    }
     setPostModalOpen(true);
     setPostForm((prev) => ({
       ...prev,
@@ -203,6 +246,10 @@ export default function JobListingsPage() {
 
   const handlePostOpportunity = (event) => {
     event.preventDefault();
+    if (!isAdminUser) {
+      showToast('error', 'Admin access required to post jobs.');
+      return;
+    }
 
     const nextCategory = (postForm.category || 'exclusive').trim();
     const company = postForm.company.trim();
@@ -232,6 +279,7 @@ export default function JobListingsPage() {
       localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify([...existing, postedJob]));
       setJobsVersion((prev) => prev + 1);
       setPostModalOpen(false);
+      showToast('success', 'Job posted successfully.');
       navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
     };
 
@@ -268,11 +316,75 @@ export default function JobListingsPage() {
         localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(latest));
         setJobsVersion((prev) => prev + 1);
         setPostModalOpen(false);
+        showToast('success', 'Job posted successfully.');
         navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
       })
       .catch(() => {
         fallbackPost();
       });
+  };
+
+  const canDeleteJob = (job) => {
+    if (!job) return false;
+    return isAdminUser;
+  };
+
+  const requestDeleteJob = (job) => {
+    if (!isAdminUser) {
+      showToast('error', 'Admin access required to delete jobs.');
+      return;
+    }
+    setDeleteModalJob(job || null);
+  };
+
+  const handleDeleteJob = async (job) => {
+    const jobKey = String(job?.id || job?._id || '');
+    if (!jobKey || deleteBusy) return;
+
+    setDeleteBusy(true);
+
+    const removeFromLocalState = () => {
+      const nextLocal = getStoredJobs().filter((item) => String(item.id || item._id) !== jobKey);
+      localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(nextLocal));
+      setServerJobs((prev) => prev.filter((item) => String(item.id || item._id) !== jobKey));
+      setJobsVersion((prev) => prev + 1);
+      setDeleteModalJob(null);
+    };
+
+    if (!job._id) {
+      removeFromLocalState();
+      showToast('success', 'Job deleted successfully.');
+      setDeleteBusy(false);
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      removeFromLocalState();
+      showToast('success', 'Job deleted successfully.');
+      setDeleteBusy(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(apiEndpoints.jobById(encodeURIComponent(String(job._id))), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showToast('error', data?.message || 'Failed to delete job.');
+        setDeleteBusy(false);
+        return;
+      }
+
+      removeFromLocalState();
+      showToast('success', 'Job deleted successfully.');
+    } catch (_error) {
+      showToast('error', 'Failed to delete job.');
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const jobs = useMemo(() => {
@@ -356,6 +468,7 @@ export default function JobListingsPage() {
           to { transform: scaleX(1); }
         }
       `}</style>
+
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
         <div style={{ flex: 1, padding: isMobile ? '76px 10px 16px' : '30px 40px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px' }}>
@@ -412,47 +525,49 @@ export default function JobListingsPage() {
               </select>
               <CaretDown size={13} color="#9ca3af" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             </div>
-            <button
-              type="button"
-              onClick={openPostModal}
-              onMouseEnter={() => setHoverButton('postJobTop')}
-              onMouseLeave={() => setHoverButton(null)}
-              style={{
-                height: isMobile ? '38px' : '40px',
-                padding: isMobile ? '0 12px' : '0 16px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#e1aa18',
-                color: '#ffffff',
-                borderRadius: '10px',
-                fontSize: isMobile ? '10px' : '11px',
-                fontWeight: '400',
-                border: 'none',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              {hoverButton === 'postJobTop' ? (
-                <span
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    width: '100%',
-                    height: '100%',
-                    background: 'rgba(0, 0, 0, 0.15)',
-                    borderRadius: '10px',
-                    transform: 'scaleX(0)',
-                    transformOrigin: 'left',
-                    animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                  }}
-                />
-              ) : null}
-              <span style={{ position: 'relative', zIndex: 1 }}>Post a Job</span>
-            </button>
+            {isAdminUser ? (
+              <button
+                type="button"
+                onClick={openPostModal}
+                onMouseEnter={() => setHoverButton('postJobTop')}
+                onMouseLeave={() => setHoverButton(null)}
+                style={{
+                  height: isMobile ? '38px' : '40px',
+                  padding: isMobile ? '0 12px' : '0 16px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#e1aa18',
+                  color: '#ffffff',
+                  borderRadius: '10px',
+                  fontSize: isMobile ? '10px' : '11px',
+                  fontWeight: '400',
+                  border: 'none',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                {hoverButton === 'postJobTop' ? (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 0,
+                      width: '100%',
+                      height: '100%',
+                      background: 'rgba(0, 0, 0, 0.15)',
+                      borderRadius: '10px',
+                      transform: 'scaleX(0)',
+                      transformOrigin: 'left',
+                      animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    }}
+                  />
+                ) : null}
+                <span style={{ position: 'relative', zIndex: 1 }}>Post a Job</span>
+              </button>
+            ) : null}
           </div>
 
           <div style={{ height: '1px', background: '#efe4d3' }} />
@@ -543,48 +658,50 @@ export default function JobListingsPage() {
             }}
           >
             <div>No job opportunities yet. You can post openings here.</div>
-            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
-              <button
-                type="button"
-                onClick={openPostModal}
-                onMouseEnter={() => setHoverButton('postJobEmpty')}
-                onMouseLeave={() => setHoverButton(null)}
-                style={{
-                  height: '38px',
-                  padding: '0 18px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#e1aa18',
-                  color: '#ffffff',
-                  borderRadius: '10px',
-                  fontSize: '12px',
-                  fontWeight: '400',
-                  border: 'none',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                {hoverButton === 'postJobEmpty' ? (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: 0,
-                      width: '100%',
-                      height: '100%',
-                      background: 'rgba(0, 0, 0, 0.15)',
-                      borderRadius: '10px',
-                      transform: 'scaleX(0)',
-                      transformOrigin: 'left',
-                      animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    }}
-                  />
-                ) : null}
-                <span style={{ position: 'relative', zIndex: 1 }}>Post a Job</span>
-              </button>
-            </div>
+            {isAdminUser ? (
+              <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={openPostModal}
+                  onMouseEnter={() => setHoverButton('postJobEmpty')}
+                  onMouseLeave={() => setHoverButton(null)}
+                  style={{
+                    height: '38px',
+                    padding: '0 18px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#e1aa18',
+                    color: '#ffffff',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    fontWeight: '400',
+                    border: 'none',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {hoverButton === 'postJobEmpty' ? (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: '100%',
+                        height: '100%',
+                        background: 'rgba(0, 0, 0, 0.15)',
+                        borderRadius: '10px',
+                        transform: 'scaleX(0)',
+                        transformOrigin: 'left',
+                        animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                      }}
+                    />
+                  ) : null}
+                  <span style={{ position: 'relative', zIndex: 1 }}>Post a Job</span>
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : (['all', 'exclusive', 'freelance', 'internship', 'part-time', 'contract'].includes(category)) ? (
           <div style={{ display: 'grid', gap: isMobile ? '10px' : '16px', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(460px, 1fr))' }}>
@@ -655,45 +772,96 @@ export default function JobListingsPage() {
                   <img src="/Lion.png" alt="HSI logo small" style={{ width: isMobile ? '20px' : '34px', height: isMobile ? '20px' : '34px', opacity: 0.9 }} />
                 </div>
 
-                <Link
-                  to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
-                  onMouseEnter={() => setHoverButton(`view-details-${String(job.id)}`)}
-                  onMouseLeave={() => setHoverButton(null)}
-                  style={{
-                    marginTop: '2px',
-                    width: '100%',
-                    background: '#e1aa18',
-                    color: '#ffffff',
-                    textDecoration: 'none',
-                    borderRadius: isMobile ? '10px' : '12px',
-                    fontWeight: '700',
-                    fontSize: isMobile ? '9px' : '10px',
-                    textAlign: 'center',
-                    padding: isMobile ? '8px 10px' : '10px 12px',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {hoverButton === `view-details-${String(job.id)}` ? (
-                    <span
+                <div style={{ marginTop: '2px', display: 'grid', gridTemplateColumns: canDeleteJob(job) ? '1fr auto' : '1fr', gap: '8px', alignItems: 'center' }}>
+                  <Link
+                    to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
+                    onMouseEnter={() => setHoverButton(`view-details-${String(job.id)}`)}
+                    onMouseLeave={() => setHoverButton(null)}
+                    style={{
+                      width: '100%',
+                      background: '#e1aa18',
+                      color: '#ffffff',
+                      textDecoration: 'none',
+                      borderRadius: isMobile ? '10px' : '12px',
+                      fontWeight: '700',
+                      fontSize: isMobile ? '9px' : '10px',
+                      textAlign: 'center',
+                      padding: isMobile ? '8px 10px' : '10px 12px',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {hoverButton === `view-details-${String(job.id)}` ? (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          width: '100%',
+                          height: '100%',
+                          background: 'rgba(0, 0, 0, 0.15)',
+                          borderRadius: '12px',
+                          transform: 'scaleX(0)',
+                          transformOrigin: 'left',
+                          animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        }}
+                      />
+                    ) : null}
+                    <span style={{ position: 'relative', zIndex: 1 }}>
+                      {job.category === 'freelance' ? 'View Project Details' : 'View Job Details'}
+                    </span>
+                  </Link>
+                  {canDeleteJob(job) ? (
+                    <button
+                      type="button"
+                      onClick={() => requestDeleteJob(job)}
+                      onMouseEnter={() => setHoverButton(`delete-${String(job.id)}`)}
+                      onMouseLeave={() => setHoverButton(null)}
+                      title="Delete job"
+                      aria-label="Delete job"
                       style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'rgba(0, 0, 0, 0.15)',
-                        borderRadius: '12px',
-                        transform: 'scaleX(0)',
-                        transformOrigin: 'left',
-                        animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        width: isMobile ? '34px' : '36px',
+                        height: isMobile ? '34px' : '36px',
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#b91c1c',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
-                    />
+                    >
+                      {hoverButton === `delete-${String(job.id)}` ? (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            width: '100%',
+                            height: '100%',
+                            background: 'rgba(185, 28, 28, 0.08)',
+                            borderRadius: '8px',
+                            transform: 'scaleX(0)',
+                            transformOrigin: 'left',
+                            animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                          }}
+                        />
+                      ) : null}
+                      <span style={{ position: 'relative', zIndex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width={isMobile ? 16 : 17} height={isMobile ? 16 : 17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                        </svg>
+                      </span>
+                    </button>
                   ) : null}
-                  <span style={{ position: 'relative', zIndex: 1 }}>
-                    {job.category === 'freelance' ? 'View Project Details' : 'View Job Details'}
-                  </span>
-                </Link>
+                </div>
               </div>
             ))}
           </div>
@@ -716,42 +884,71 @@ export default function JobListingsPage() {
                 <div style={{ fontSize: '12px', color: '#b07a15', fontWeight: '700' }}>{job.company}</div>
                 <div style={{ fontSize: '19px', color: '#111827', fontWeight: '800' }}>{job.position}</div>
                 <div style={{ fontSize: '13px', color: '#6b7280' }}>{job.location}</div>
-                <Link
-                  to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
-                  onMouseEnter={() => setHoverButton(`view-details-small-${String(job.id)}`)}
-                  onMouseLeave={() => setHoverButton(null)}
-                  style={{
-                    marginTop: '6px',
-                    background: '#e1aa18',
-                    color: '#111827',
-                    textDecoration: 'none',
-                    borderRadius: '10px',
-                    fontWeight: '800',
-                    fontSize: isMobile ? '10px' : '11px',
-                    textAlign: 'center',
-                    padding: '10px 12px',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {hoverButton === `view-details-small-${String(job.id)}` ? (
-                    <span
+                <div style={{ marginTop: '6px', display: 'grid', gridTemplateColumns: canDeleteJob(job) ? '1fr auto' : '1fr', gap: '8px', alignItems: 'center' }}>
+                  <Link
+                    to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
+                    onMouseEnter={() => setHoverButton(`view-details-small-${String(job.id)}`)}
+                    onMouseLeave={() => setHoverButton(null)}
+                    style={{
+                      background: '#e1aa18',
+                      color: '#111827',
+                      textDecoration: 'none',
+                      borderRadius: '10px',
+                      fontWeight: '800',
+                      fontSize: isMobile ? '10px' : '11px',
+                      textAlign: 'center',
+                      padding: '10px 12px',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {hoverButton === `view-details-small-${String(job.id)}` ? (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          width: '100%',
+                          height: '100%',
+                          background: 'rgba(0, 0, 0, 0.12)',
+                          borderRadius: '10px',
+                          transform: 'scaleX(0)',
+                          transformOrigin: 'left',
+                          animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        }}
+                      />
+                    ) : null}
+                    <span style={{ position: 'relative', zIndex: 1 }}>View Details</span>
+                  </Link>
+                  {canDeleteJob(job) ? (
+                    <button
+                      type="button"
+                      onClick={() => requestDeleteJob(job)}
+                      title="Delete job"
+                      aria-label="Delete job"
                       style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        width: '100%',
-                        height: '100%',
-                        background: 'rgba(0, 0, 0, 0.12)',
-                        borderRadius: '10px',
-                        transform: 'scaleX(0)',
-                        transformOrigin: 'left',
-                        animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        width: isMobile ? '34px' : '36px',
+                        height: isMobile ? '34px' : '36px',
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#b91c1c',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
-                    />
+                    >
+                      <svg width={isMobile ? 16 : 17} height={isMobile ? 16 : 17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                        <path d="M10 11v6" />
+                        <path d="M14 11v6" />
+                      </svg>
+                    </button>
                   ) : null}
-                  <span style={{ position: 'relative', zIndex: 1 }}>View Details</span>
-                </Link>
+                </div>
               </div>
             ))}
           </div>
@@ -1028,6 +1225,94 @@ export default function JobListingsPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        ) : null}
+        {deleteModalJob ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => {
+              if (!deleteBusy) setDeleteModalJob(null);
+            }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(17, 24, 39, 0.45)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 60,
+              padding: isMobile ? '12px' : '18px',
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: isMobile ? '94vw' : '448px',
+                background: '#ffffff',
+                borderRadius: '16px',
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 18px 40px rgba(17, 24, 39, 0.18)',
+                padding: isMobile ? '16px' : '24px',
+              }}
+            >
+              <div style={{ fontSize: isMobile ? '18px' : '18px', fontWeight: '600', color: '#111827', lineHeight: 1.2 }}>
+                Delete job post
+              </div>
+              <div style={{ marginTop: '8px', color: '#4b5563', fontSize: '14px', lineHeight: 1.35 }}>
+                Delete "{deleteModalJob.position}"? This cannot be undone.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '14px', marginTop: isMobile ? '18px' : '24px' }}>
+                <button
+                  type="button"
+                  onClick={() => setDeleteModalJob(null)}
+                  disabled={deleteBusy}
+                  style={{
+                    height: '44px',
+                    minWidth: '112px',
+                    padding: '0 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    background: '#fff',
+                    color: '#111827',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: deleteBusy ? 'not-allowed' : 'pointer',
+                    opacity: deleteBusy ? 0.7 : 1,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteJob(deleteModalJob)}
+                  disabled={deleteBusy}
+                  style={{
+                    height: '44px',
+                    minWidth: '112px',
+                    padding: '0 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #dc2626',
+                    background: '#e02424',
+                    color: '#ffffff',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: deleteBusy ? 'not-allowed' : 'pointer',
+                    opacity: deleteBusy ? 0.7 : 1,
+                  }}
+                >
+                  {deleteBusy ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         ) : null}

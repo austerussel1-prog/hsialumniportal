@@ -91,7 +91,7 @@ router.get('/:id', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, ensureAdmin, async (req, res) => {
   try {
     const payload = sanitizePayload(req.body || {});
     if (!payload.company || !payload.position || !payload.location) {
@@ -140,6 +140,19 @@ router.patch('/:id', verifyToken, ensureAdmin, async (req, res) => {
   } catch (error) {
     console.error('PATCH /api/jobs/:id error', error);
     return res.status(500).json({ message: 'Failed to update job' });
+  }
+});
+
+router.delete('/:id', verifyToken, ensureAdmin, async (req, res) => {
+  try {
+    const job = await JobPosting.findById(req.params.id).select('_id').lean();
+    if (!job) return res.status(404).json({ message: 'Job not found' });
+
+    await JobPosting.deleteOne({ _id: job._id });
+    return res.json({ message: 'Job deleted' });
+  } catch (error) {
+    console.error('DELETE /api/jobs/:id error', error);
+    return res.status(500).json({ message: 'Failed to delete job' });
   }
 });
 
