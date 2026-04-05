@@ -31,6 +31,7 @@ export default function DirectoryPage() {
       ? user.skills.split(',').map((item) => item.trim()).filter(Boolean)
       : [];
     const highlights = [user.bio, user.bio2].filter(Boolean);
+    const hasDetails = highlights.length > 0 || skills.length > 0;
     const departmentLabel = user.major
       ? `${user.major} Department`
       : 'Alumni Department';
@@ -48,6 +49,7 @@ export default function DirectoryPage() {
       tag: user.company ? 'Onsite' : 'Remote',
       highlights,
       skills,
+      hasDetails,
       avatar: (user.profileImage && !String(user.profileImage).includes('gear-icon.svg'))
         ? resolveApiAssetUrl(user.profileImage)
         : '/Logo.jpg',
@@ -427,32 +429,53 @@ export default function DirectoryPage() {
                 </div>
               </div>
 
-              <div style={{ marginTop: isMobile ? '8px' : '12px', display: 'grid', gap: isMobile ? '4px' : '6px', fontSize: isMobile ? '10px' : '12px', color: '#6b7280' }}>
-                {(isMobile ? profile.highlights.slice(0, 2) : profile.highlights).map((item) => (
-                  <div key={item} style={{ display: 'flex', gap: '8px' }}>
-                    <span style={{ color: '#e1aa18' }}>✓</span>
-                    <span>{item}</span>
+              {profile.hasDetails ? (
+                <>
+                  <div style={{ marginTop: isMobile ? '8px' : '12px', display: 'grid', gap: isMobile ? '4px' : '6px', fontSize: isMobile ? '10px' : '12px', color: '#6b7280' }}>
+                    {(isMobile ? profile.highlights.slice(0, 2) : profile.highlights).map((item) => (
+                      <div key={item} style={{ display: 'flex', gap: '8px' }}>
+                        <span style={{ color: '#e1aa18' }}>✓</span>
+                        <span>{item}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              {profile.skills.length > 0 && (
+                  {profile.skills.length > 0 && (
+                    <div style={{ marginTop: isMobile ? '8px' : '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {(isMobile ? profile.skills.slice(0, 2) : profile.skills).map((skill) => (
+                        <span
+                          key={skill}
+                          style={{
+                            fontSize: isMobile ? '10px' : '11px',
+                            padding: isMobile ? '3px 7px' : '4px 8px',
+                            borderRadius: '8px',
+                            border: '1px solid #e5e7eb',
+                            color: '#4b5563',
+                            background: '#f9fafb',
+                          }}
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
                 <div style={{ marginTop: isMobile ? '8px' : '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {(isMobile ? profile.skills.slice(0, 2) : profile.skills).map((skill) => (
-                    <span
-                      key={skill}
-                      style={{
-                        fontSize: isMobile ? '10px' : '11px',
-                        padding: isMobile ? '3px 7px' : '4px 8px',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e7eb',
-                        color: '#4b5563',
-                        background: '#f9fafb',
-                      }}
-                    >
-                      {skill}
-                    </span>
-                  ))}
+                  <div
+                    style={{
+                      width: '100%',
+                      borderRadius: '12px',
+                      border: '1px dashed #d1d5db',
+                      background: '#f9fafb',
+                      color: '#6b7280',
+                      fontSize: isMobile ? '10px' : '12px',
+                      lineHeight: 1.5,
+                      padding: isMobile ? '10px 12px' : '12px 14px',
+                    }}
+                  >
+                    This user has not added profile details yet.
+                  </div>
                 </div>
               )}
 
