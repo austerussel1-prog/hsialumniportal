@@ -85,6 +85,16 @@ const resolveProfileSubtitle = (person) => {
 
 const MAX_ANNOUNCEMENT_VIDEO_BYTES = 100 * 1024 * 1024;
 
+const showToast = (type, text) => {
+  window.dispatchEvent(new CustomEvent('hsi-toast', {
+    detail: {
+      type,
+      message: text,
+      text,
+    },
+  }));
+};
+
 export default function AnnouncementsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
@@ -194,7 +204,7 @@ export default function AnnouncementsPage() {
 
   const handlePost = async () => {
     if (!title.trim() && !content.trim()) {
-      setError('Title or content required');
+      showToast('error', 'Title or content required.');
       return;
     }
 
@@ -231,8 +241,9 @@ export default function AnnouncementsPage() {
       // surface backend error messages for easier debugging
       const resBody = await res.json().catch(() => null);
       if (!res.ok) {
+        const message = resBody?.message || resBody?.error || `Post failed (HTTP ${res.status})`;
         console.error('Announcement POST failed', res.status, resBody);
-        setError(resBody?.message || resBody?.error || `Post failed (HTTP ${res.status})`);
+        showToast('error', message);
         return;
       }
       setTitle('');
@@ -248,7 +259,7 @@ export default function AnnouncementsPage() {
       }));
       fetchAnnouncements();
     } catch (e) {
-      setError('Failed to post announcement');
+      showToast('error', 'Failed to post announcement.');
     } finally {
       setLoading(false);
     }
@@ -480,7 +491,7 @@ export default function AnnouncementsPage() {
                         setSelectedMedia(null);
                         setMediaPreview('');
                         setMediaType('');
-                        setError('Video is too large. Please choose one smaller than 100 MB.');
+                        showToast('error', 'Video is too large. Please choose one smaller than 100 MB.');
                         if (fileInputRef.current) fileInputRef.current.value = '';
                         return;
                       }
@@ -516,7 +527,6 @@ export default function AnnouncementsPage() {
                       </div>
                     )}
                   </div>
-                  {error && <div className="text-red-500 text-xs mt-2">{error}</div>}
                 </div>
               ) : (
                 <div>
@@ -550,10 +560,10 @@ export default function AnnouncementsPage() {
                               <svg width="18" height="6" viewBox="0 0 24 6" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="4" cy="3" r="1.2"/><circle cx="12" cy="3" r="1.2"/><circle cx="20" cy="3" r="1.2"/></svg>
                             </button>
                             {menuOpenId === a._id && (
-                              <div className="absolute right-0 mt-2 w-44 bg-white border rounded shadow-md z-10">
-                                <button onClick={() => { setSelectedAnnouncement(a); setMenuOpenId(null); }} className="w-full text-left px-4 py-2 hover:bg-gray-50">View Full Post</button>
+                              <div onClick={(e) => e.stopPropagation()} className="absolute right-0 mt-2 w-44 bg-white border rounded shadow-md z-10">
+                                <button onClick={(e) => { e.stopPropagation(); setSelectedAnnouncement(a); setMenuOpenId(null); }} className="w-full text-left px-4 py-2 hover:bg-gray-50">View Full Post</button>
                                 {(isAdmin || (a.author && String(a.author._id || a.author) === String(currentUserId))) && (
-                                  <button onClick={() => { setMenuOpenId(null); handleDeleteAnnouncement(a._id); }} className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50">Delete</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(null); handleDeleteAnnouncement(a._id); }} className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50">Delete</button>
                                 )}
                               </div>
                             )}
