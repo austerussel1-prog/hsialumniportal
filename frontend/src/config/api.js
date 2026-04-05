@@ -136,4 +136,8 @@ export const apiEndpoints = {
   volunteerAdminLogs: (status = 'pending') => `${API_URL}/api/mentorship/volunteer/admin/logs?status=${encodeURIComponent(status)}`,
   volunteerApproveLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/approve`,
   volunteerRejectLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/reject`,
+
+  // Career jobs endpoints
+  jobs: `${API_URL}/api/jobs`,
+  jobById: (id) => `${API_URL}/api/jobs/${id}`,
 };

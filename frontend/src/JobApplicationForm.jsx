@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
-import { API_URL } from './config/api';
+import { API_URL, apiEndpoints } from './config/api';
 
 const USER_POSTED_JOBS_KEY = 'hsi_user_job_posts';
 
@@ -40,11 +40,42 @@ export default function JobApplicationForm() {
     const search = new URLSearchParams(location.search);
     return parseJobId(search.get('id'));
   }, [location.search, location.state, params.jobId]);
+  const [remoteJob, setRemoteJob] = useState(null);
 
   const job = useMemo(() => {
     if (jobId === null) return null;
     const stored = getStoredJobs();
-    return stored.find((item) => String(item.id) === String(jobId)) || null;
+    const localJob = stored.find((item) => String(item.id || item._id) === String(jobId)) || null;
+    return localJob || remoteJob;
+  }, [jobId, remoteJob]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchRemoteJob() {
+      if (jobId === null) return;
+      const hasLocal = getStoredJobs().some((item) => String(item.id || item._id) === String(jobId));
+      if (hasLocal) return;
+
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const response = await fetch(apiEndpoints.jobById(encodeURIComponent(String(jobId))), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.job || !mounted) return;
+        setRemoteJob({ ...data.job, id: data.job.id || data.job._id });
+      } catch (_error) {
+        // no-op
+      }
+    }
+
+    fetchRemoteJob();
+    return () => {
+      mounted = false;
+    };
   }, [jobId]);
 
   const [form, setForm] = useState({

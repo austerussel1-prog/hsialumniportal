@@ -18,6 +18,7 @@ const eventsRoutes = require('./routes/events');
 const documentsRoutes = require('./routes/documents');
 const mentorshipRoutes = require('./routes/mentorship');
 const jobApplicationRoutes = require('./routes/jobApplications');
+const jobRoutes = require('./routes/jobs');
 const { scheduleDataRetentionJob } = require('./services/privacyRetentionService');
 const { hasEncryptionKey, getEncryptionKeyFingerprint } = require('./utils/fieldEncryption');
 
@@ -79,6 +80,7 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/mentorship', mentorshipRoutes);
 app.use('/api/job-applications', jobApplicationRoutes);
+app.use('/api/jobs', jobRoutes);
 
 
 app.get('/api/health', (req, res) => {

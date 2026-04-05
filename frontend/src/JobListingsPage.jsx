@@ -3,9 +3,29 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CaretDown, MagnifyingGlass } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
+import { apiEndpoints } from './config/api';
 
 const USER_POSTED_JOBS_KEY = 'hsi_user_job_posts';
-const allJobs = [];
+
+function getStoredJobs() {
+  try {
+    const raw = localStorage.getItem(USER_POSTED_JOBS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function resolveSortTimestamp(job) {
+  const fromCreatedAt = Date.parse(job?.createdAt || '');
+  if (Number.isFinite(fromCreatedAt)) return fromCreatedAt;
+  const fromUpdatedAt = Date.parse(job?.updatedAt || '');
+  if (Number.isFinite(fromUpdatedAt)) return fromUpdatedAt;
+  const asNumber = Number(job?.id);
+  if (Number.isFinite(asNumber)) return asNumber;
+  return 0;
+}
 
 const categoryMeta = {
   all: {
@@ -52,6 +72,7 @@ export default function JobListingsPage() {
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [postQueryHandled, setPostQueryHandled] = useState(false);
   const [hoverButton, setHoverButton] = useState(null);
+  const [serverJobs, setServerJobs] = useState([]);
   const [postForm, setPostForm] = useState({
     category: 'exclusive',
     company: '',
@@ -92,6 +113,82 @@ export default function JobListingsPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchJobs() {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        if (mounted) setServerJobs([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(apiEndpoints.jobs, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return;
+
+        let jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+
+        if (jobs.length === 0) {
+          const localJobs = getStoredJobs();
+          if (localJobs.length > 0) {
+            const migratedResults = await Promise.all(localJobs.map(async (item) => {
+              const category = String(item?.category || 'exclusive').trim() || 'exclusive';
+              const company = String(item?.company || '').trim();
+              const position = String(item?.position || '').trim();
+              const postingLocation = String(item?.location || '').trim();
+              if (!company || !position || !postingLocation) return null;
+
+              const postRes = await fetch(apiEndpoints.jobs, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  category,
+                  company,
+                  position,
+                  location: postingLocation,
+                  type: item?.type || '',
+                  status: item?.status || 'Open',
+                  applyLink: item?.applyLink || '',
+                  description: item?.description || '',
+                  department: item?.department || 'General',
+                  role: item?.role || 'Staff',
+                  tag: item?.tag || 'Standard',
+                }),
+              });
+              const postData = await postRes.json().catch(() => ({}));
+              if (!postRes.ok || !postData?.job) return null;
+              return postData.job;
+            }));
+
+            jobs = migratedResults.filter(Boolean);
+          }
+        }
+
+        if (!mounted) return;
+
+        setServerJobs(jobs);
+        if (jobs.length > 0) {
+          localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(jobs));
+        }
+        setJobsVersion((prev) => prev + 1);
+      } catch (_error) {
+        // Keep local fallback data when API is unavailable.
+      }
+    }
+
+    fetchJobs();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const openPostModal = () => {
     setPostModalOpen(true);
     setPostForm((prev) => ({
@@ -129,35 +226,63 @@ export default function JobListingsPage() {
       applyLink: `mailto:hr@hsi.com?subject=Application%20-%20${encodeURIComponent(position)}`,
     };
 
-    let existing = [];
-    try {
-      const raw = localStorage.getItem(USER_POSTED_JOBS_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      existing = Array.isArray(parsed) ? parsed : [];
-    } catch (_error) {
-      existing = [];
+    const token = localStorage.getItem('token');
+    const fallbackPost = () => {
+      const existing = getStoredJobs();
+      localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify([...existing, postedJob]));
+      setJobsVersion((prev) => prev + 1);
+      setPostModalOpen(false);
+      navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
+    };
+
+    if (!token) {
+      fallbackPost();
+      return;
     }
 
-    localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify([...existing, postedJob]));
-    setJobsVersion((prev) => prev + 1);
-    setPostModalOpen(false);
+    fetch(apiEndpoints.jobs, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        category: nextCategory,
+        company,
+        position,
+        location: jobLocation,
+        type: resolvedType,
+        status: 'Open',
+        applyLink: `mailto:hr@hsi.com?subject=Application%20-%20${encodeURIComponent(position)}`,
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.job) {
+          fallbackPost();
+          return;
+        }
 
-    navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
+        const latest = [data.job, ...serverJobs];
+        setServerJobs(latest);
+        localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(latest));
+        setJobsVersion((prev) => prev + 1);
+        setPostModalOpen(false);
+        navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
+      })
+      .catch(() => {
+        fallbackPost();
+      });
   };
 
   const jobs = useMemo(() => {
-    let userPostedJobs = [];
-    try {
-      const raw = localStorage.getItem(USER_POSTED_JOBS_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      userPostedJobs = Array.isArray(parsed) ? parsed : [];
-    } catch (_error) {
-      userPostedJobs = [];
-    }
+    const localJobs = getStoredJobs();
+    const sourceJobs = serverJobs.length > 0 ? serverJobs : localJobs;
 
-    return [...allJobs, ...userPostedJobs]
+    return sourceJobs
       .map((job) => ({
         ...job,
+        id: job.id || job._id,
         status: job.status || 'Open',
         type: job.type || ({
           freelance: 'Project-based',
@@ -176,7 +301,7 @@ export default function JobListingsPage() {
         tag: job.tag || (job.category === 'freelance' ? 'Short-term' : 'Standard'),
       }))
       .filter((job) => (category === 'all' ? true : job.category === category));
-  }, [category, jobsVersion]);
+  }, [category, jobsVersion, serverJobs]);
 
   const filteredJobs = useMemo(() => {
     const lowerSearch = searchTerm.trim().toLowerCase();
@@ -193,7 +318,9 @@ export default function JobListingsPage() {
     });
 
     return [...filtered].sort((a, b) => (
-      sortOrder === 'newest' ? Number(b.id) - Number(a.id) : Number(a.id) - Number(b.id)
+      sortOrder === 'newest'
+        ? resolveSortTimestamp(b) - resolveSortTimestamp(a)
+        : resolveSortTimestamp(a) - resolveSortTimestamp(b)
     ));
   }, [jobs, searchTerm, sortOrder, departmentFilter, statusFilter, roleFilter, tagFilter]);
 

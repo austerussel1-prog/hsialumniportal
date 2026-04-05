@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import { apiEndpoints } from './config/api';
 
 const USER_POSTED_JOBS_KEY = 'hsi_user_job_posts';
 const ADMIN_ROLES = ['super_admin', 'admin', 'hr', 'alumni_officer'];
@@ -146,6 +147,7 @@ export default function JobDetailsPage() {
     return window.innerWidth < 900;
   });
   const [jobVersion, setJobVersion] = useState(0);
+  const [remoteJob, setRemoteJob] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editDraft, setEditDraft] = useState(null);
   const [hoverButton, setHoverButton] = useState(null);
@@ -178,8 +180,39 @@ export default function JobDetailsPage() {
   const job = useMemo(() => {
     if (jobId === null) return null;
     const stored = getStoredJobs();
-    return stored.find((item) => String(item.id) === String(jobId)) || null;
-  }, [jobId, jobVersion]);
+    const localJob = stored.find((item) => String(item.id || item._id) === String(jobId)) || null;
+    return localJob || remoteJob;
+  }, [jobId, jobVersion, remoteJob]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchRemoteJob() {
+      if (jobId === null) return;
+      const hasLocal = getStoredJobs().some((item) => String(item.id || item._id) === String(jobId));
+      if (hasLocal) return;
+
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const response = await fetch(apiEndpoints.jobById(encodeURIComponent(String(jobId))), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.job || !mounted) return;
+
+        setRemoteJob({ ...data.job, id: data.job.id || data.job._id });
+      } catch (_error) {
+        // no-op
+      }
+    }
+
+    fetchRemoteJob();
+    return () => {
+      mounted = false;
+    };
+  }, [jobId]);
 
   const jobTitle = job?.position || 'Full stack developer';
   const company = job?.company || 'Highly Succeed Inc.';
@@ -243,37 +276,90 @@ export default function JobDetailsPage() {
     const nextRequirements = toLineList(editDraft.requirementsText);
     const nextResponsibilities = toLineList(editDraft.responsibilitiesText);
 
-    const stored = getStoredJobs();
-    const updated = stored.map((item) => {
-      if (String(item.id) !== String(job.id)) return item;
+    const token = localStorage.getItem('token');
+    const jobKey = String(job.id || job._id || '');
+    const applyLocalUpdate = () => {
+      const stored = getStoredJobs();
+      const updated = stored.map((item) => {
+        if (String(item.id || item._id) !== jobKey) return item;
 
-      const merged = { ...item };
+        const merged = { ...item };
+        if (nextExperience) merged.experience = nextExperience; else delete merged.experience;
+        if (nextVacancies) merged.vacancies = nextVacancies; else delete merged.vacancies;
+        if (nextSalary) merged.salary = nextSalary; else delete merged.salary;
+        if (nextDescription) merged.jobDescription = nextDescription; else delete merged.jobDescription;
+        if (nextRequirements.length) merged.requirements = nextRequirements; else delete merged.requirements;
+        if (nextResponsibilities.length) merged.responsibilities = nextResponsibilities; else delete merged.responsibilities;
+        return merged;
+      });
 
-      if (nextExperience) merged.experience = nextExperience;
-      else delete merged.experience;
+      localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(updated));
+      setEditOpen(false);
+      setEditDraft(null);
+      setJobVersion((prev) => prev + 1);
+    };
 
-      if (nextVacancies) merged.vacancies = nextVacancies;
-      else delete merged.vacancies;
+    if (!token || !job?._id) {
+      applyLocalUpdate();
+      return;
+    }
 
-      if (nextSalary) merged.salary = nextSalary;
-      else delete merged.salary;
+    fetch(apiEndpoints.jobById(encodeURIComponent(String(job._id))), {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        category: job.category,
+        company: job.company || company,
+        position: job.position || jobTitle,
+        location: job.location || jobLocation,
+        type: job.type || jobType,
+        status: job.status || 'Open',
+        applyLink: job.applyLink || '',
+        description: job.description || '',
+        department: job.department || 'General',
+        role: job.role || 'Staff',
+        tag: job.tag || 'Standard',
+        workMode: job.workMode || workMode,
+        experience: nextExperience,
+        vacancies: nextVacancies,
+        salary: nextSalary,
+        aboutCompany: job.aboutCompany || '',
+        jobDescription: nextDescription,
+        requirements: nextRequirements,
+        responsibilities: nextResponsibilities,
+      }),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          applyLocalUpdate();
+          return;
+        }
 
-      if (nextDescription) merged.jobDescription = nextDescription;
-      else delete merged.jobDescription;
+        return response.json().then((data) => {
+          const nextJob = data?.job ? { ...data.job, id: data.job.id || data.job._id } : null;
+          if (nextJob) {
+            setRemoteJob(nextJob);
+            const stored = getStoredJobs();
+            const exists = stored.some((item) => String(item.id || item._id) === String(nextJob.id));
+            const updated = exists
+              ? stored.map((item) => (String(item.id || item._id) === String(nextJob.id) ? nextJob : item))
+              : [nextJob, ...stored];
+            localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(updated));
+          }
 
-      if (nextRequirements.length) merged.requirements = nextRequirements;
-      else delete merged.requirements;
-
-      if (nextResponsibilities.length) merged.responsibilities = nextResponsibilities;
-      else delete merged.responsibilities;
-
-      return merged;
-    });
-
-    localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(updated));
-    setEditOpen(false);
-    setEditDraft(null);
-    setJobVersion((prev) => prev + 1);
+          setEditOpen(false);
+          setEditDraft(null);
+          setJobVersion((prev) => prev + 1);
+        }).catch(() => {
+          applyLocalUpdate();
+        });
+      })
+      .catch(() => {
+        applyLocalUpdate();
+      });
   };
 
   const shareUrl = useMemo(() => {
