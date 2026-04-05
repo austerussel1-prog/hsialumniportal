@@ -23,6 +23,8 @@ export default function DirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  const isVisibleDirectoryUser = (user) => String(user?.status || '').trim().toLowerCase() !== 'pending';
+
   const mapUsersToProfiles = (users) => users.map((user) => {
     const userId = user.id || user._id;
     const skills = typeof user.skills === 'string'
@@ -66,8 +68,8 @@ export default function DirectoryPage() {
           try {
             const parsed = JSON.parse(cached);
             if (Array.isArray(parsed)) {
-              cachedUsers = parsed;
-              setProfiles(mapUsersToProfiles(parsed));
+              cachedUsers = parsed.filter(isVisibleDirectoryUser);
+              setProfiles(mapUsersToProfiles(cachedUsers));
               setLoading(false);
             }
           } catch (err) {
@@ -112,7 +114,7 @@ export default function DirectoryPage() {
           }
         }
 
-        const users = Array.isArray(data.users) ? data.users : [];
+        const users = Array.isArray(data.users) ? data.users.filter(isVisibleDirectoryUser) : [];
         // Exclude the current logged-in user from the directory list
         let currentUser = null;
         try {

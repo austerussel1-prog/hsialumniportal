@@ -614,7 +614,8 @@ router.get('/directory', verifyToken, async (req, res) => {
   try {
     const includePrivate = String(req.query?.includePrivate || '').trim() === '1';
     const isAdminViewer = ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(String(req.user?.role || ''));
-    const query = (isAdminViewer || includePrivate)
+    const pendingFilter = { status: { $ne: 'pending' } };
+    const visibilityFilter = (isAdminViewer || includePrivate)
       ? {}
       : {
           $or: [
@@ -622,6 +623,10 @@ router.get('/directory', verifyToken, async (req, res) => {
             { _id: req.user.id },
           ],
         };
+    const query = {
+      ...pendingFilter,
+      ...visibilityFilter,
+    };
 
     const users = await User.find(query)
       .select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash')
