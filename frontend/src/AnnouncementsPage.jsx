@@ -22,6 +22,48 @@ const resolveProfileImage = (value) => {
   return resolveApiAssetUrl(value);
 };
 
+const inferAttachmentKind = (attachmentUrl, attachment = {}) => {
+  const explicitKind = String(attachment?.kind || '').trim().toLowerCase();
+  if (explicitKind === 'image' || explicitKind === 'video') return explicitKind;
+
+  const mimeType = String(attachment?.mimeType || attachment?.type || '').trim().toLowerCase();
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+
+  const normalizedUrl = String(attachmentUrl || '').trim().toLowerCase().split('?')[0];
+  if (/\.(png|jpe?g|gif|bmp|webp|avif|svg)$/i.test(normalizedUrl)) return 'image';
+  if (/\.(mp4|webm|ogg|mov|m4v|avi)$/i.test(normalizedUrl)) return 'video';
+
+  return 'image';
+};
+
+const normalizeAnnouncementAttachments = (announcement) => {
+  const attachments = Array.isArray(announcement?.attachments) ? announcement.attachments : [];
+
+  return attachments
+    .map((attachment) => {
+      if (!attachment) return null;
+
+      const rawUrl = [
+        attachment.url,
+        attachment.src,
+        attachment.mediaUrl,
+        attachment.imageUrl,
+        attachment.videoUrl,
+        attachment.attachmentUrl,
+      ].find((value) => typeof value === 'string' && value.trim());
+
+      if (!rawUrl) return null;
+
+      return {
+        ...attachment,
+        kind: inferAttachmentKind(rawUrl, attachment),
+        resolvedUrl: resolveApiAssetUrl(rawUrl),
+      };
+    })
+    .filter((attachment) => Boolean(attachment?.resolvedUrl));
+};
+
 const resolveDisplayName = (person, fallback = 'User') => {
   if (!person) return fallback;
   return person.fullName || person.name || fallback;
@@ -509,14 +551,14 @@ export default function AnnouncementsPage() {
 
                         <h3 className="text-xl font-extrabold text-[#111827] mt-3 mb-2">{a.title}</h3>
                         <div className="text-sm text-[#6b7280] mb-4">{a.content}</div>
-                        {a.attachments && a.attachments.length > 0 && (
+                        {normalizeAnnouncementAttachments(a).length > 0 && (
                           <div className="mt-3">
-                            {a.attachments.map((att, idx) => (
+                            {normalizeAnnouncementAttachments(a).map((att, idx) => (
                               <div key={idx} className="mb-2">
                                 {att.kind === 'image' ? (
-                                  <img src={resolveApiAssetUrl(att.url)} alt={`attachment-${idx}`} className="w-full max-w-sm rounded object-cover" />
+                                  <img src={att.resolvedUrl} alt={`attachment-${idx}`} className="w-full max-w-sm rounded object-cover" />
                                 ) : (
-                                  <video src={resolveApiAssetUrl(att.url)} controls className="w-full max-w-md rounded" />
+                                  <video src={att.resolvedUrl} controls className="w-full max-w-md rounded" />
                                 )}
                               </div>
                             ))}
@@ -659,14 +701,14 @@ function FullPostModal({ post, onClose, onHeart, onCommentSubmit }) {
             <h3 className="text-2xl font-extrabold mt-4 mb-2">{post.title}</h3>
             <div className="text-sm text-[#6b7280] mb-4">{post.content}</div>
 
-            {post.attachments && post.attachments.length > 0 && (
+            {normalizeAnnouncementAttachments(post).length > 0 && (
               <div className="mb-4">
-                {post.attachments.map((att, i) => (
+                {normalizeAnnouncementAttachments(post).map((att, i) => (
                   <div key={i} className="mb-3">
                     {att.kind === 'image' ? (
-                      <img src={resolveApiAssetUrl(att.url)} alt={`att-${i}`} className="w-full max-w-md rounded object-cover" />
+                      <img src={att.resolvedUrl} alt={`att-${i}`} className="w-full max-w-md rounded object-cover" />
                     ) : (
-                      <video src={resolveApiAssetUrl(att.url)} controls className="w-full rounded" />
+                      <video src={att.resolvedUrl} controls className="w-full rounded" />
                     )}
                   </div>
                 ))}

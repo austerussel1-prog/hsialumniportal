@@ -398,6 +398,9 @@ export default function DirectoryPage() {
                 border: '1px solid #e5e7eb',
                 padding: isMobile ? '10px' : '18px',
                 boxShadow: '0 6px 14px rgba(15, 23, 42, 0.06)',
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -479,7 +482,7 @@ export default function DirectoryPage() {
                 </div>
               )}
 
-              <div style={{ marginTop: isMobile ? '10px' : '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ marginTop: 'auto', paddingTop: isMobile ? '10px' : '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <button
                   onClick={() => navigate(`/directory/profile/${profile.id}`)}
                   style={{
