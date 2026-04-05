@@ -1,9 +1,19 @@
 const nodemailer = require('nodemailer');
 
+const emailUser = String(process.env.EMAIL_USER || '').trim();
+const emailPassword = String(process.env.EMAIL_PASSWORD || '').trim();
+
 // Prefer explicit SMTP config in production to avoid provider "service" auto-config issues.
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
 const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpSecure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || smtpPort === 465;
+
+if (!emailUser || !emailPassword) {
+  console.warn('[email] Missing SMTP credentials at startup', {
+    hasEmailUser: Boolean(emailUser),
+    hasEmailPassword: Boolean(emailPassword),
+  });
+}
 
 const transporter = nodemailer.createTransport({
   host: smtpHost,
@@ -14,12 +24,19 @@ const transporter = nodemailer.createTransport({
   greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 15000),
   socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
+    user: emailUser,
+    pass: emailPassword,
   },
 });
 
+const assertEmailConfig = () => {
+  if (!emailUser || !emailPassword) {
+    throw new Error('Server email config missing: EMAIL_USER and/or EMAIL_PASSWORD');
+  }
+};
+
 const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
+  assertEmailConfig();
   const recipient = process.env.APPLICATION_RECEIVER_EMAIL || process.env.EMAIL_USER;
 
   const safe = (value) => (value ? String(value) : '').trim();
@@ -97,6 +114,7 @@ const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
 
 // Send OTP email
 const sendOTP = async (email, otp) => {
+  assertEmailConfig();
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
@@ -129,6 +147,7 @@ const sendOTP = async (email, otp) => {
 
 // Send rejection notification
 const sendRejectionEmail = async (email, name, reason = '') => {
+  assertEmailConfig();
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
@@ -159,6 +178,7 @@ const sendRejectionEmail = async (email, name, reason = '') => {
 
 // Send approval notification
 const sendApprovalEmail = async (email, name) => {
+  assertEmailConfig();
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
@@ -191,6 +211,7 @@ const sendApprovalEmail = async (email, name) => {
 
 // Send referral invitation
 const sendReferralInvitationEmail = async (toEmail, jobLink, customMessage = '') => {
+  assertEmailConfig();
   const messageBody = customMessage && customMessage.trim()
     ? customMessage.trim()
     : 'Hi! I wanted to share this job opportunity with you.';
@@ -259,6 +280,7 @@ const sendDataRemovalDecisionEmail = async ({
   scheduledDeletionAt = null,
   finalAction = 'delete',
 }) => {
+  assertEmailConfig();
   const safeEmail = String(email || '').trim();
   if (!safeEmail) throw new Error('Recipient email is required');
 
@@ -313,6 +335,7 @@ const sendDataRemovalDecisionEmail = async ({
 };
 
 const sendAccountFeedbackEmail = async ({ user, feedback }) => {
+  assertEmailConfig();
   const companyEmail = pickEmailRecipient(
     process.env.COMPANY_FEEDBACK_EMAIL,
     process.env.ACCOUNT_FEEDBACK_RECEIVER_EMAIL,
@@ -398,6 +421,7 @@ const sendAccountFeedbackEmail = async ({ user, feedback }) => {
 };
 
 const sendEventFeedbackEmail = async ({ event, feedback }) => {
+  assertEmailConfig();
   const primaryRecipient = pickEmailRecipient(
     process.env.EVENT_FEEDBACK_RECEIVER_EMAIL,
     process.env.COMPANY_FEEDBACK_EMAIL,
