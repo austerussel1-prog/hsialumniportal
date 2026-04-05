@@ -83,6 +83,8 @@ const resolveProfileSubtitle = (person) => {
   return 'Alumni member';
 };
 
+const MAX_ANNOUNCEMENT_VIDEO_BYTES = 100 * 1024 * 1024;
+
 export default function AnnouncementsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
@@ -474,6 +476,15 @@ export default function AnnouncementsPage() {
                       if (!f) return;
                       setSelectedMedia(f);
                       const inferred = f.type && f.type.startsWith('video') ? 'video' : 'image';
+                      if (inferred === 'video' && Number(f.size || 0) > MAX_ANNOUNCEMENT_VIDEO_BYTES) {
+                        setSelectedMedia(null);
+                        setMediaPreview('');
+                        setMediaType('');
+                        setError('Video is too large. Please choose one smaller than 100 MB.');
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        return;
+                      }
+                      setError('');
                       setMediaType(inferred);
                       const url = URL.createObjectURL(f);
                       setMediaPreview(url);

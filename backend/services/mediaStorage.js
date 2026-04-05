@@ -41,9 +41,17 @@ async function uploadLocalFile(filePath, options = {}) {
   };
 
   const result = shouldUseLargeUpload
-    ? await cloudinary.uploader.upload_large(filePath, {
-      ...uploadOptions,
-      chunk_size: 6 * 1024 * 1024,
+    ? await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_large(filePath, {
+        ...uploadOptions,
+        chunk_size: 6 * 1024 * 1024,
+      }, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
     })
     : await cloudinary.uploader.upload(filePath, uploadOptions);
 

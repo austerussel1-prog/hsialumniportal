@@ -25,6 +25,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+const MAX_ANNOUNCEMENT_VIDEO_BYTES = 100 * 1024 * 1024;
 
 // Middleware to verify user and attach user to req
 const verifyUser = async (req, res, next) => {
@@ -80,10 +81,16 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
       let kind = 'image';
       if (mediaType && ['image', 'video'].includes(mediaType)) kind = mediaType;
       else if (req.file.mimetype && req.file.mimetype.startsWith('video')) kind = 'video';
+
+      if (kind === 'video' && Number(req.file.size || 0) > MAX_ANNOUNCEMENT_VIDEO_BYTES) {
+        cleanupLocalFile(req.file.path);
+        return res.status(400).json({ message: 'Video is too large. Please upload a file smaller than 100 MB.' });
+      }
+
       let url = `/uploads/${req.file.filename}`;
       let uploadSucceeded = false;
       try {
-        const uploadedUrl = await uploadLocalFile(req.file.path, { folder: 'announcements', resourceType: 'auto' });
+        const uploadedUrl = await uploadLocalFile(req.file.path, { folder: 'announcements', resourceType: kind });
         if (uploadedUrl) {
           url = uploadedUrl;
           uploadSucceeded = true;
@@ -91,6 +98,10 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
         }
       } catch (uploadErr) {
         console.error('Announcement media cloud upload failed:', uploadErr.message);
+        if (uploadErr?.http_code === 400 && String(uploadErr?.message || '').includes('Max: 104857600')) {
+          cleanupLocalFile(req.file.path);
+          return res.status(400).json({ message: 'Video is too large. Please upload a file smaller than 100 MB.' });
+        }
       }
       if (!uploadSucceeded && process.env.NODE_ENV === 'production') {
         cleanupLocalFile(req.file.path);
