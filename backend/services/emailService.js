@@ -38,9 +38,7 @@ const assertEmailConfig = () => {
 };
 
 const hasUsableResend = () => Boolean(
-  resendApiKey
-  && !/^re_x{3,}/i.test(resendApiKey)
-  && !/x{6,}/i.test(resendApiKey),
+  resendApiKey && resendApiKey.startsWith('re_'),
 );
 
 const sendViaResend = async (mailOptions) => {
