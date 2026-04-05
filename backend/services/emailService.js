@@ -41,6 +41,8 @@ const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
 
+console.log('[email] Provider mode:', hasUsableResend() ? 'resend' : 'smtp');
+
 const sendViaResend = async (mailOptions) => {
   const to = String(mailOptions?.to || '')
     .split(',')
@@ -88,12 +90,20 @@ const sendViaResend = async (mailOptions) => {
 
 const sendMail = async (mailOptions) => {
   if (hasUsableResend()) {
-    return sendViaResend(mailOptions);
+    try {
+      return await sendViaResend(mailOptions);
+    } catch (error) {
+      throw new Error(`Resend delivery failed: ${error.message}`);
+    }
   }
 
   assertEmailConfig();
-  await transporter.sendMail(mailOptions);
-  return true;
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    throw new Error(`SMTP delivery failed: ${error.message}`);
+  }
 };
 
 const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
