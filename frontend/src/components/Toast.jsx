@@ -58,12 +58,14 @@ export default function Toast({ toast, centerOffsetPx = 0 }) {
             style={{
               position: 'fixed',
               top: isMobile ? 12 : 16,
-              left: `calc(50% + ${centerOffsetPx}px)`,
-              transform: 'translateX(-50%)',
+              left: 0,
+              right: 0,
               zIndex: 9999,
               pointerEvents: 'none',
-              width: 'auto',
-              maxWidth: isMobile ? 'calc(100vw - 40px)' : 'none',
+              display: 'flex',
+              justifyContent: 'center',
+              transform: centerOffsetPx ? `translateX(${centerOffsetPx}px)` : 'none',
+              padding: isMobile ? '0 20px' : '0 12px',
             }}
           >
           <motion.div

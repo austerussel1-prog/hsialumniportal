@@ -36,3 +36,11 @@ yarn-error.log*
 node_modules/
 .env
 uploads/
+
+node_modules/
+.env
+.env.*
+.vscode/
+.DS_Store
+AppData/
+OneDrive/

@@ -93,7 +93,7 @@ function AppShell() {
   const footerVisiblePaths = ['/login', '/register', '/account'];
   const shouldShowFooter = footerVisiblePaths.includes(location.pathname);
   const [toast, setToast] = useState(null);
-  const toastCenterOffsetPx = 0;
+  const toastCenterOffsetPx = location.pathname.startsWith('/job-application') ? -120 : 0;
 
   useEffect(() => {
     const raw = sessionStorage.getItem('hsi_toast');

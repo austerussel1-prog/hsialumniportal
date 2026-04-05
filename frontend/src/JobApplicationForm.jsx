@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { API_URL, apiEndpoints } from './config/api';
@@ -92,11 +93,12 @@ export default function JobApplicationForm() {
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
-  const toastTimerRef = useRef(null);
 
-  useEffect(() => () => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-  }, []);
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeoutId = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timeoutId);
+  }, [toast]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
@@ -117,13 +119,6 @@ export default function JobApplicationForm() {
   const submitToBackend = async () => {
     setSubmitting(true);
     setSubmitError('');
-
-    const notify = (type, text) => {
-      const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      setToast({ id, type, text });
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToast(null), 3000);
-    };
 
     try {
       const payload = new FormData();
@@ -163,7 +158,11 @@ export default function JobApplicationForm() {
         );
       }
 
-      notify('success', 'Application submitted successfully.');
+      setToast({
+        id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        type: 'success',
+        text: 'Application submitted successfully.',
+      });
       setForm({
         name: '',
         email: '',
@@ -203,88 +202,82 @@ export default function JobApplicationForm() {
 
   const labelStyle = { fontSize: '14px', fontWeight: '700', color: '#111827' };
   const helperStyle = { marginTop: '6px', fontSize: '12px', color: '#9ca3af' };
+  const toastNode = toast && typeof document !== 'undefined'
+    ? createPortal(
+      <div
+        style={{
+          position: 'fixed',
+          top: 16,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          padding: isMobile ? '0 20px' : '0 12px',
+        }}
+      >
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '10px 14px',
+            background: '#dcfce7',
+            border: '1px solid #bbf7d0',
+            borderRadius: 12,
+            boxShadow: '0 10px 18px rgba(17, 24, 39, 0.10)',
+          }}
+        >
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 999,
+              background: '#22c55e',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#065f46' }}>
+            {toast.text}
+          </div>
+        </div>
+      </div>,
+      document.body,
+    )
+    : null;
 
   return (
-    <motion.div
-      style={{ display: 'flex', minHeight: '100vh', background: '#ffffff' }}
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ duration: 0.3 }}
-    >
-      <style>{`
-        /* Matches the drop-down toast feel from Events & Community */
-        @keyframes fillBounce {
-          from { transform: scaleX(0); }
-          to { transform: scaleX(1); }
-        }
-      `}</style>
+    <>
+      {toastNode}
+      <motion.div
+        style={{ display: 'flex', minHeight: '100vh', background: '#ffffff' }}
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        transition={{ duration: 0.3 }}
+      >
+        <style>{`
+          /* Matches the drop-down toast feel from Events & Community */
+          @keyframes fillBounce {
+            from { transform: scaleX(0); }
+            to { transform: scaleX(1); }
+          }
+        `}</style>
 
-      {/* Global toast (fixed at top of viewport) */}
-      <AnimatePresence>
-        {toast ? (() => {
-          const theme = toast.type === 'success'
-            ? { bg: '#dcfce7', border: '#bbf7d0', iconBg: '#22c55e', text: '#065f46' }
-            : { bg: '#fee2e2', border: '#fecaca', iconBg: '#ef4444', text: '#7f1d1d' };
 
-          return (
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, y: -14, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.98 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              style={{
-                position: 'fixed',
-                top: 18,
-                left: '50%',
-                transform: 'translateX(calc(-50% + -80px))',
-                zIndex: 90,
-                pointerEvents: 'none',
-              }}
-            >
-              <div
-                style={{
-                  pointerEvents: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '10px 14px',
-                  background: theme.bg,
-                  border: `1px solid ${theme.border}`,
-                  borderRadius: 12,
-                  boxShadow: '0 10px 18px rgba(17, 24, 39, 0.10)',
-                }}
-              >
-                <div
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 999,
-                    background: theme.iconBg,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: theme.text }}>
-                  {toast.text}
-                </div>
-              </div>
-            </motion.div>
-          );
-        })() : null}
-      </AnimatePresence>
+        <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
-
-      <div style={{ flex: 1, padding: isMobile ? '76px 10px 18px' : '22px 30px 40px' }}>
-        <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
-          <div>
+        <div style={{ flex: 1, padding: isMobile ? '76px 10px 18px' : '22px 30px 40px' }}>
+          <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
+            <div>
             <Link
               to={jobId !== null ? `/career/job-details/${encodeURIComponent(String(jobId))}` : '/training'}
               style={{ textDecoration: 'none', color: '#6b7280', fontSize: isMobile ? '12px' : '13px', fontWeight: '800', display: 'inline-block', marginBottom: '8px' }}
@@ -301,8 +294,8 @@ export default function JobApplicationForm() {
             ) : null}
           </div>
 
-          <form onSubmit={onSubmit} style={{ marginTop: isMobile ? '18px' : '44px' }}>
-            <div style={{ maxWidth: isMobile ? '100%' : '820px', margin: '0 auto', display: 'grid', gap: isMobile ? '16px' : '28px' }}>
+            <form onSubmit={onSubmit} style={{ marginTop: isMobile ? '18px' : '44px' }}>
+              <div style={{ maxWidth: isMobile ? '100%' : '820px', margin: '0 auto', display: 'grid', gap: isMobile ? '16px' : '28px' }}>
               <div style={{ display: 'grid', gap: '10px' }}>
                 <div style={labelStyle}>
                   Your Name <span style={{ color: '#ef4444' }}>*</span>
@@ -468,12 +461,11 @@ export default function JobApplicationForm() {
                   {submitError}
                 </div>
               ) : null}
-            </div>
-          </form>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
-
-      {/* Success message is shown inline as a green alert, similar to other pages. */}
-    </motion.div>
+      </motion.div>
+    </>
   );
 }
