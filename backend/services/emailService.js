@@ -7,6 +7,8 @@ const emailPassword = String(process.env.EMAIL_PASSWORD || '').trim();
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
 const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpSecure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || smtpPort === 465;
+const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
+const resendFrom = String(process.env.RESEND_FROM || process.env.EMAIL_USER || 'onboarding@resend.dev').trim();
 
 if (!emailUser || !emailPassword) {
   console.warn('[email] Missing SMTP credentials at startup', {
@@ -33,6 +35,67 @@ const assertEmailConfig = () => {
   if (!emailUser || !emailPassword) {
     throw new Error('Server email config missing: EMAIL_USER and/or EMAIL_PASSWORD');
   }
+};
+
+const hasUsableResend = () => Boolean(
+  resendApiKey
+  && !/^re_x{3,}/i.test(resendApiKey)
+  && !/x{6,}/i.test(resendApiKey),
+);
+
+const sendViaResend = async (mailOptions) => {
+  const to = String(mailOptions?.to || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!to.length) {
+    throw new Error('No recipient configured for email delivery');
+  }
+
+  const attachments = Array.isArray(mailOptions?.attachments)
+    ? mailOptions.attachments.map((att) => ({
+      filename: att.filename || 'attachment',
+      content: Buffer.isBuffer(att.content)
+        ? att.content.toString('base64')
+        : Buffer.from(String(att.content || ''), 'utf8').toString('base64'),
+      content_type: att.contentType || 'application/octet-stream',
+    }))
+    : [];
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: resendFrom,
+      to,
+      reply_to: mailOptions?.replyTo || undefined,
+      subject: mailOptions?.subject || 'HSI Alumni Portal',
+      html: mailOptions?.html || undefined,
+      text: mailOptions?.text || undefined,
+      attachments,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Resend API error (${response.status}): ${body || 'Unknown error'}`);
+  }
+
+  return true;
+};
+
+const sendMail = async (mailOptions) => {
+  if (hasUsableResend()) {
+    return sendViaResend(mailOptions);
+  }
+
+  assertEmailConfig();
+  await transporter.sendMail(mailOptions);
+  return true;
 };
 
 const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
@@ -103,7 +166,7 @@ const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendMail(mailOptions);
     console.log('Job application email sent successfully');
     return true;
   } catch (error) {
@@ -136,7 +199,7 @@ const sendOTP = async (email, otp) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendMail(mailOptions);
     console.log('OTP email sent successfully');
     return true;
   } catch (error) {
@@ -167,7 +230,7 @@ const sendRejectionEmail = async (email, name, reason = '') => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendMail(mailOptions);
     console.log('Rejection email sent successfully');
     return true;
   } catch (error) {
@@ -200,7 +263,7 @@ const sendApprovalEmail = async (email, name) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendMail(mailOptions);
     console.log('Approval email sent successfully');
     return true;
   } catch (error) {
@@ -235,7 +298,7 @@ const sendReferralInvitationEmail = async (toEmail, jobLink, customMessage = '')
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    await sendMail(mailOptions);
     console.log('Referral invitation email sent successfully');
     return true;
   } catch (error) {
@@ -330,7 +393,7 @@ const sendDataRemovalDecisionEmail = async ({
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  await sendMail(mailOptions);
   return true;
 };
 
@@ -416,7 +479,7 @@ const sendAccountFeedbackEmail = async ({ user, feedback }) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  await sendMail(mailOptions);
   return true;
 };
 
@@ -480,7 +543,7 @@ const sendEventFeedbackEmail = async ({ event, feedback }) => {
     `,
   };
 
-  await transporter.sendMail(mailOptions);
+  await sendMail(mailOptions);
   return true;
 };
 
