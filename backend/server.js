@@ -20,6 +20,7 @@ const mentorshipRoutes = require('./routes/mentorship');
 const jobApplicationRoutes = require('./routes/jobApplications');
 const jobRoutes = require('./routes/jobs');
 const { scheduleDataRetentionJob } = require('./services/privacyRetentionService');
+const { scheduleEventLifecycleJob } = require('./services/eventLifecycleService');
 const { hasEncryptionKey, getEncryptionKeyFingerprint } = require('./utils/fieldEncryption');
 
 const app = express();
@@ -54,6 +55,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('MongoDB connected');
     scheduleDataRetentionJob();
+    scheduleEventLifecycleJob();
   })
   .catch(err => console.log('MongoDB connection error:', err));
 

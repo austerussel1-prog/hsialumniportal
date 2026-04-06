@@ -9,6 +9,12 @@ const fs = require('fs');
 const { sendEventFeedbackEmail } = require('../services/emailService');
 const { touchUserActivity } = require('../utils/userActivity');
 const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
+const {
+  buildActiveEventsQuery,
+  cleanupExpiredEvents,
+  isEventExpired,
+  processExpiredEvent,
+} = require('../services/eventLifecycleService');
 
 // ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -55,7 +61,9 @@ const verifyAdmin = (req, res, next) => {
 // List all events
 router.get('/', async (req, res) => {
   try {
-    const events = await Event.find().sort({ startDate: 1 }).lean();
+    const now = new Date();
+    await cleanupExpiredEvents('events:list');
+    const events = await Event.find(buildActiveEventsQuery(now)).sort({ startDate: 1 }).lean();
     res.json(events);
   } catch (err) {
     console.error('GET /api/events error', err);
@@ -72,6 +80,10 @@ router.get('/_route_check', (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id).lean();
+    if (event && isEventExpired(event)) {
+      await processExpiredEvent(event, 'events:get');
+      return res.status(404).json({ message: 'Event not found' });
+    }
     if (!event) return res.status(404).json({ message: 'Event not found' });
     res.json(event);
   } catch (err) {
@@ -162,6 +174,10 @@ router.post('/:id/register', async (req, res) => {
 
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (isEventExpired(event)) {
+      await processExpiredEvent(event.toObject ? event.toObject() : event, 'events:register');
+      return res.status(410).json({ message: 'This event is already done and has been removed.' });
+    }
 
     // basic capacity check
     if (event.capacity && event.registrations.length >= event.capacity) {
@@ -189,6 +205,10 @@ router.get('/:id/registrations', verifyUser, verifyAdmin, async (req, res) => {
     const status = String(req.query.status || '').trim().toLowerCase();
     const event = await Event.findById(req.params.id).select('registrations').lean();
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (isEventExpired(event)) {
+      await processExpiredEvent(event, 'events:registrations');
+      return res.status(404).json({ message: 'Event not found' });
+    }
 
     let list = Array.isArray(event.registrations) ? event.registrations : [];
     if (status && ['pending', 'approved', 'rejected'].includes(status)) {
@@ -208,6 +228,10 @@ router.patch('/:id/registrations/:registrationId/approve', verifyUser, verifyAdm
   try {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (isEventExpired(event)) {
+      await processExpiredEvent(event.toObject ? event.toObject() : event, 'events:approve-registration');
+      return res.status(410).json({ message: 'This event is already done and has been removed.' });
+    }
 
     const registration = event.registrations.id(req.params.registrationId);
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
@@ -231,6 +255,10 @@ router.patch('/:id/registrations/:registrationId/reject', verifyUser, verifyAdmi
     const reason = String(req.body?.reason || '').trim();
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (isEventExpired(event)) {
+      await processExpiredEvent(event.toObject ? event.toObject() : event, 'events:reject-registration');
+      return res.status(410).json({ message: 'This event is already done and has been removed.' });
+    }
 
     const registration = event.registrations.id(req.params.registrationId);
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
@@ -263,6 +291,10 @@ router.post('/:id/feedback', async (req, res) => {
 
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (isEventExpired(event)) {
+      await processExpiredEvent(event.toObject ? event.toObject() : event, 'events:feedback');
+      return res.status(410).json({ message: 'This event is already done and has been removed.' });
+    }
 
     await sendEventFeedbackEmail({
       event,
@@ -288,6 +320,10 @@ router.get('/:id/attendees', async (req, res) => {
   try {
     const event = await Event.findById(req.params.id).select('registrations').lean();
     if (!event) return res.status(404).json({ message: 'Event not found' });
+    if (isEventExpired(event)) {
+      await processExpiredEvent(event, 'events:attendees');
+      return res.status(404).json({ message: 'Event not found' });
+    }
     res.json(event.registrations || []);
   } catch (err) {
     console.error('GET /api/events/:id/attendees error', err);
