@@ -262,7 +262,13 @@ export default function EventsPage() {
     const v = String(raw || '').trim();
     if (!v) return '';
     // datetime-local inputs typically look like "2026-03-03T18:00"
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return v;
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) {
+      const [datePart, timePart] = v.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hours, minutes] = String(timePart || '').split(':').map(Number);
+      const localDate = new Date(year, (month || 1) - 1, day || 1, hours || 0, minutes || 0, 0, 0);
+      if (!Number.isNaN(localDate.getTime())) return localDate.toISOString();
+    }
     const d = new Date(v);
     if (!Number.isNaN(d.getTime())) return d.toISOString();
     return v;
