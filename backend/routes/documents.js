@@ -6,10 +6,13 @@ const Document = require('../models/Document');
 const DocumentRequest = require('../models/DocumentRequest');
 const User = require('../models/User');
 const { verifyToken } = require('./auth');
+const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured } = require('../services/mediaStorage');
 
 const router = express.Router();
 
 const ADMIN_ROLES = ['super_admin', 'superadmin', 'admin', 'hr', 'alumni_officer'];
+const MAX_DOCUMENT_FILE_SIZE_BYTES = 15 * 1024 * 1024;
+const MAX_DOCUMENT_FILE_SIZE_LABEL = '15MB';
 
 const ensureAdmin = async (req, res, next) => {
   try {
@@ -42,8 +45,23 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+  limits: { fileSize: MAX_DOCUMENT_FILE_SIZE_BYTES },
 });
+
+const handleSingleDocumentUpload = (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: `File must be ${MAX_DOCUMENT_FILE_SIZE_LABEL} or smaller.` });
+    }
+
+    return res.status(400).json({ message: err.message || 'File upload failed.' });
+  });
+};
 
 const resolveCategory = (originalName, explicit) => {
   const fromClient = String(explicit || '').trim().toLowerCase();
@@ -52,6 +70,59 @@ const resolveCategory = (originalName, explicit) => {
   const lower = String(originalName || '').toLowerCase();
   if (lower.includes('certificate') || lower.includes('certification')) return 'certificate';
   return 'document';
+};
+
+const isRemoteDocumentUrl = (value) => /^https?:\/\//i.test(String(value || '').trim());
+
+const toDownloadName = (value) => String(value || 'document')
+  .replace(/[\r\n"]/g, '_')
+  .trim() || 'document';
+
+const storeUploadedDocumentFile = async (file) => {
+  if (!file?.filename) {
+    const error = new Error('No file uploaded');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const fallbackUrl = `/uploads/documents/${file.filename}`;
+  const cloudConfigured = isCloudinaryConfigured();
+  const cloudRequired = process.env.NODE_ENV === 'production';
+
+  if (cloudConfigured && file.path) {
+    try {
+      const uploadedUrl = await uploadLocalFile(file.path, {
+        folder: 'documents',
+        resourceType: 'auto',
+      });
+
+      if (uploadedUrl) {
+        cleanupLocalFile(file.path);
+        return {
+          storedName: file.filename,
+          url: uploadedUrl,
+        };
+      }
+    } catch (err) {
+      console.error('Document cloud upload failed:', err.message);
+      cleanupLocalFile(file.path);
+      const error = new Error('Cloud document upload failed. Please try again.');
+      error.statusCode = 503;
+      throw error;
+    }
+  }
+
+  if (cloudRequired) {
+    cleanupLocalFile(file.path);
+    const error = new Error('Cloudinary storage is not configured on the server.');
+    error.statusCode = 503;
+    throw error;
+  }
+
+  return {
+    storedName: file.filename,
+    url: fallbackUrl,
+  };
 };
 
 router.get('/_route_check', (req, res) => {
@@ -118,19 +189,19 @@ router.get('/my', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
+router.post('/upload', verifyToken, handleSingleDocumentUpload, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
     const userId = req.user.id;
     const category = resolveCategory(req.file.originalname, req.body?.category);
-    const url = `/uploads/documents/${req.file.filename}`;
+    const storedFile = await storeUploadedDocumentFile(req.file);
 
     const doc = await Document.create({
       owner: userId,
       originalName: req.file.originalname,
-      storedName: req.file.filename,
-      url,
+      storedName: storedFile.storedName,
+      url: storedFile.url,
       mimeType: req.file.mimetype || '',
       sizeBytes: req.file.size || 0,
       category,
@@ -139,7 +210,7 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
     return res.status(201).json({ message: 'Uploaded', document: doc });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Failed to upload document' });
+    return res.status(err.statusCode || 500).json({ message: err.message || 'Failed to upload document' });
   }
 });
 
@@ -153,6 +224,19 @@ router.get('/download/:id', verifyToken, async (req, res) => {
     const isAdmin = Boolean(user?.role && ADMIN_ROLES.includes(user.role));
     const isOwner = String(doc.owner) === String(req.user.id);
     if (!isOwner && !isAdmin) return res.status(403).json({ message: 'Not allowed' });
+
+    if (isRemoteDocumentUrl(doc.url)) {
+      const remoteResponse = await fetch(doc.url);
+      if (!remoteResponse.ok) {
+        return res.status(502).json({ message: 'Cloud document is unavailable right now' });
+      }
+
+      const fileBuffer = Buffer.from(await remoteResponse.arrayBuffer());
+      res.setHeader('Content-Type', remoteResponse.headers.get('content-type') || doc.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Length', String(fileBuffer.length));
+      res.setHeader('Content-Disposition', `attachment; filename="${toDownloadName(doc.originalName)}"`);
+      return res.send(fileBuffer);
+    }
 
     const filePath = path.join(uploadsDir, doc.storedName);
     if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File missing on server' });
@@ -220,7 +304,7 @@ router.get('/admin/requests', verifyToken, ensureAdmin, async (req, res) => {
   }
 });
 
-router.post('/admin/requests/:id/fulfill', verifyToken, ensureAdmin, upload.single('file'), async (req, res) => {
+router.post('/admin/requests/:id/fulfill', verifyToken, ensureAdmin, handleSingleDocumentUpload, async (req, res) => {
   try {
     const requestId = req.params.id;
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
@@ -231,13 +315,13 @@ router.post('/admin/requests/:id/fulfill', verifyToken, ensureAdmin, upload.sing
     if (request.status === 'rejected') return res.status(409).json({ message: 'Rejected request cannot be fulfilled' });
 
     const category = resolveCategory(req.file.originalname, req.body?.category);
-    const url = `/uploads/documents/${req.file.filename}`;
+    const storedFile = await storeUploadedDocumentFile(req.file);
 
     const doc = await Document.create({
       owner: request.requester,
       originalName: req.file.originalname,
-      storedName: req.file.filename,
-      url,
+      storedName: storedFile.storedName,
+      url: storedFile.url,
       mimeType: req.file.mimetype || '',
       sizeBytes: req.file.size || 0,
       category,
@@ -260,7 +344,7 @@ router.post('/admin/requests/:id/fulfill', verifyToken, ensureAdmin, upload.sing
     return res.json({ message: 'Fulfilled', request: updated, document: doc });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: 'Failed to fulfill request' });
+    return res.status(err.statusCode || 500).json({ message: err.message || 'Failed to fulfill request' });
   }
 });
 

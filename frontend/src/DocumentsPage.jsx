@@ -5,6 +5,8 @@ import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
 const ADMIN_REQUESTS_PER_PAGE = 5;
+const MAX_DOCUMENT_FILE_SIZE_BYTES = 15 * 1024 * 1024;
+const MAX_DOCUMENT_FILE_SIZE_LABEL = '15MB';
 
 export default function DocumentsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -112,7 +114,7 @@ export default function DocumentsPage() {
         if (contentType.includes('application/json')) return res.json();
         const text = await res.text();
         if (text && (text.includes('Cannot GET /api/documents') || text.startsWith('<!DOCTYPE html'))) {
-          return { message: 'Documents API not found. Restart backend and make sure it is running on http://localhost:5000.' };
+          return { message: `Documents API not found. Please check backend at ${import.meta.env.VITE_API_URL}.` };
         }
         return { message: text || 'Request failed' };
       };
@@ -205,6 +207,12 @@ export default function DocumentsPage() {
   const handleFiles = async (files) => {
     const fileList = Array.from(files || []);
     if (fileList.length === 0) return;
+
+    const oversizedFile = fileList.find((file) => Number(file?.size || 0) > MAX_DOCUMENT_FILE_SIZE_BYTES);
+    if (oversizedFile) {
+      setError(`${oversizedFile.name} exceeds the ${MAX_DOCUMENT_FILE_SIZE_LABEL} upload limit.`);
+      return;
+    }
 
     const token = localStorage.getItem('token');
     if (!token) {
@@ -417,6 +425,11 @@ export default function DocumentsPage() {
     event.target.value = '';
     if (!file || !adminUploadRequestId) return;
 
+    if (Number(file.size || 0) > MAX_DOCUMENT_FILE_SIZE_BYTES) {
+      setError(`${file.name} exceeds the ${MAX_DOCUMENT_FILE_SIZE_LABEL} upload limit.`);
+      return;
+    }
+
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -592,7 +605,8 @@ export default function DocumentsPage() {
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#111827' }}>
                   {busyUpload ? 'Uploading...' : 'Click to upload or drag and drop'}
                 </div>
-                <div style={{ fontSize: '12px' }}>PDF, JPG, PNG, DOC up to 15MB</div>
+                <div style={{ fontSize: '12px' }}>Upload files up to {MAX_DOCUMENT_FILE_SIZE_LABEL}</div>
+                <div style={{ fontSize: '11px', color: '#9ca3af' }}>Stored securely in cloud storage after upload</div>
               </div>
               <input
                 ref={fileInputRef}

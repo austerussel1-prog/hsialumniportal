@@ -37,7 +37,7 @@ Edit `backend/.env` and add your Gmail credentials:
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASSWORD=your_gmail_app_password
 DATA_ENCRYPTION_KEY=your_32_byte_secret_or_64_char_hex
-## Optional: persistent media storage (recommended on Render)
+## Persistent cloud storage for uploads
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
@@ -56,6 +56,8 @@ ACCOUNT_SOFT_DELETE_FINAL_ACTION=delete
 ```
 
 `DATA_ENCRYPTION_KEY` is required so `name`, `contactNumber`, `address`, and `profileImage` are encrypted at rest. `email` stays plain-text for search/login lookups.
+
+Cloudinary is used as the cloud storage platform for uploaded images, videos, documents, and other files.
 
 **To get Gmail App Password:**
 1. Go to Google Account settings

@@ -7,7 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
-const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
+const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured } = require('../services/mediaStorage');
 
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'messages');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -246,13 +246,22 @@ router.post('/:recipientId', verifyToken, (req, res, next) => {
     let storedFileUrl = hasAttachment ? `/uploads/messages/${uploadedFile.filename}` : '';
     if (hasAttachment && uploadedFile?.path) {
       try {
-        const uploadedUrl = await uploadLocalFile(uploadedFile.path, { folder: 'messages', resourceType: 'auto' });
+        const uploadedUrl = await uploadLocalFile(uploadedFile.path, {
+          folder: 'messages',
+          resourceType: isImageAttachment ? 'image' : 'auto',
+        });
+
         if (uploadedUrl) {
           storedFileUrl = uploadedUrl;
           cleanupLocalFile(uploadedFile.path);
+        } else if (process.env.NODE_ENV === 'production' && !isCloudinaryConfigured()) {
+          cleanupLocalFile(uploadedFile.path);
+          return res.status(503).json({ error: 'Cloudinary storage is not configured on the server.' });
         }
       } catch (uploadErr) {
-        console.error('Message attachment cloud upload failed:', uploadErr.message);
+        console.error('Message attachment upload failed:', uploadErr.message);
+        cleanupLocalFile(uploadedFile.path);
+        return res.status(503).json({ error: 'Failed to upload the attachment. Please try again.' });
       }
     }
 
