@@ -16,6 +16,24 @@ const {
   processExpiredEvent,
 } = require('../services/eventLifecycleService');
 
+const PORTAL_TIMEZONE_OFFSET = String(process.env.PORTAL_TIMEZONE_OFFSET || '+08:00').trim() || '+08:00';
+
+function normalizeEventDateInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return undefined;
+
+  const hasExplicitTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+  const isDateTimeWithoutTimezone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/.test(raw);
+
+  const normalized = !hasExplicitTimezone && isDateTimeWithoutTimezone
+    ? `${raw}${PORTAL_TIMEZONE_OFFSET}`
+    : raw;
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed;
+}
+
 // ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -108,11 +126,19 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
     const payload = req.body || {};
     const title = String(payload.title || '').trim();
     const description = String(payload.description || '').trim();
+    const startDate = normalizeEventDateInput(payload.startDate);
+    const endDate = normalizeEventDateInput(payload.endDate);
     if (!title) {
       return res.status(400).json({ message: 'Title is required' });
     }
+    if (!startDate) {
+      return res.status(400).json({ message: 'Valid start date is required' });
+    }
     if (description.length < 100) {
       return res.status(400).json({ message: 'Description must be at least 100 characters' });
+    }
+    if (endDate && endDate.getTime() < startDate.getTime()) {
+      return res.status(400).json({ message: 'End date must be the same as or later than the start date' });
     }
 
     const isVirtual = String(payload.isVirtual || '').toLowerCase() === 'true' || payload.isVirtual === true || payload.isVirtual === 'on';
@@ -134,8 +160,8 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
       title,
       description,
       category: payload.category,
-      startDate: payload.startDate,
-      endDate: payload.endDate,
+      startDate,
+      endDate,
       isVirtual,
       location: payload.location,
       virtualLink: payload.virtualLink,
