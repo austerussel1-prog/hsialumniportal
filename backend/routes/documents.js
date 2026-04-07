@@ -6,7 +6,7 @@ const Document = require('../models/Document');
 const DocumentRequest = require('../models/DocumentRequest');
 const User = require('../models/User');
 const { verifyToken } = require('./auth');
-const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured } = require('../services/mediaStorage');
+const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured, isRemoteFileUrl, fetchRemoteFile } = require('../services/mediaStorage');
 
 const router = express.Router();
 
@@ -72,8 +72,6 @@ const resolveCategory = (originalName, explicit) => {
   return 'document';
 };
 
-const isRemoteDocumentUrl = (value) => /^https?:\/\//i.test(String(value || '').trim());
-
 const toDownloadName = (value) => String(value || 'document')
   .replace(/[\r\n"]/g, '_')
   .trim() || 'document';
@@ -93,7 +91,7 @@ const storeUploadedDocumentFile = async (file) => {
     try {
       const uploadedUrl = await uploadLocalFile(file.path, {
         folder: 'documents',
-        resourceType: 'auto',
+        resourceType: 'raw',
       });
 
       if (uploadedUrl) {
@@ -225,8 +223,8 @@ router.get('/download/:id', verifyToken, async (req, res) => {
     const isOwner = String(doc.owner) === String(req.user.id);
     if (!isOwner && !isAdmin) return res.status(403).json({ message: 'Not allowed' });
 
-    if (isRemoteDocumentUrl(doc.url)) {
-      const remoteResponse = await fetch(doc.url);
+    if (isRemoteFileUrl(doc.url)) {
+      const remoteResponse = await fetchRemoteFile(doc.url);
       if (!remoteResponse.ok) {
         return res.status(502).json({ message: 'Cloud document is unavailable right now' });
       }

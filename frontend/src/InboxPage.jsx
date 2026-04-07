@@ -229,6 +229,89 @@ export default function InboxPage() {
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const getFilenameFromDisposition = (headerValue, fallbackName) => {
+    const raw = String(headerValue || '');
+    const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(raw);
+    if (utf8Match?.[1]) {
+      try {
+        return decodeURIComponent(utf8Match[1]);
+      } catch {
+        return utf8Match[1];
+      }
+    }
+
+    const basicMatch = /filename="([^"]+)"/i.exec(raw);
+    if (basicMatch?.[1]) return basicMatch[1];
+    return fallbackName || 'Attachment';
+  };
+
+  const fetchMessageAttachment = async (messageId, fallbackName, download = false) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('You must be signed in to access attachments.');
+    }
+
+    const response = await fetch(apiEndpoints.messageAttachment(messageId, download), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      const body = contentType.includes('application/json')
+        ? await response.json()
+        : { error: await response.text() };
+      throw new Error(getDisplayError(body, 'Failed to load attachment.'));
+    }
+
+    const blob = await response.blob();
+    return {
+      blob,
+      filename: getFilenameFromDisposition(response.headers.get('content-disposition'), fallbackName),
+    };
+  };
+
+  const handleOpenAttachment = async (messageId, fallbackName = 'Attachment') => {
+    try {
+      setError('');
+      const { blob } = await fetchMessageAttachment(messageId, fallbackName, false);
+      const objectUrl = URL.createObjectURL(blob);
+      const openedWindow = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+
+      if (!openedWindow) {
+        const fallbackLink = document.createElement('a');
+        fallbackLink.href = objectUrl;
+        fallbackLink.target = '_blank';
+        fallbackLink.rel = 'noreferrer';
+        document.body.appendChild(fallbackLink);
+        fallbackLink.click();
+        fallbackLink.remove();
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (err) {
+      setError(err?.message || 'Failed to open attachment.');
+    }
+  };
+
+  const handleDownloadAttachment = async (messageId, fallbackName = 'Attachment') => {
+    try {
+      setError('');
+      const { blob, filename } = await fetchMessageAttachment(messageId, fallbackName, true);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      setError(err?.message || 'Failed to download attachment.');
+    }
+  };
+
   const getAttachmentMeta = (name, mimeType) => {
     const normalizedName = String(name || '').toLowerCase();
     const normalizedType = String(mimeType || '').toLowerCase();
@@ -329,7 +412,6 @@ export default function InboxPage() {
       })
       .map((msg, index) => ({
         id: String(msg._id || `file-${index}`),
-        url: resolveMediaUrl(msg.attachmentUrl || ''),
         name: msg.attachmentOriginalName || 'Attachment',
         mimeType: msg.attachmentMimeType || '',
         size: formatFileSize(msg.attachmentSize),
@@ -1609,37 +1691,38 @@ export default function InboxPage() {
                                       {msg.attachmentMimeType || 'File'}{attachmentSize ? ` â€¢ ${attachmentSize}` : ''}
                                     </div>
                                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                                      <a
-                                        href={attachmentUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenAttachment(msg._id, attachmentName)}
                                         style={{
-                                          textDecoration: 'none',
+                                          border: 'none',
                                           padding: '6px 10px',
                                           borderRadius: 999,
                                           background: '#f3d24f',
                                           color: '#1f2937',
                                           fontSize: 12,
                                           fontWeight: 700,
+                                          cursor: 'pointer',
                                         }}
                                       >
                                         Open
-                                      </a>
-                                      <a
-                                        href={attachmentUrl}
-                                        download={attachmentName}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadAttachment(msg._id, attachmentName)}
                                         style={{
-                                          textDecoration: 'none',
+                                          border: 'none',
                                           padding: '6px 10px',
                                           borderRadius: 999,
                                           background: '#f3f4f6',
                                           color: '#111827',
                                           fontSize: 12,
                                           fontWeight: 700,
+                                          cursor: 'pointer',
                                         }}
                                       >
                                         Download
-                                      </a>
+                                      </button>
                                     </div>
                                   </div>
                                 )}
@@ -2257,37 +2340,38 @@ export default function InboxPage() {
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                          <a
-                            href={item.url}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAttachment(item.id, item.name)}
                             style={{
-                              textDecoration: 'none',
+                              border: 'none',
                               padding: '6px 10px',
                               borderRadius: 999,
                               background: '#f6efe2',
                               color: '#8a5a00',
                               fontSize: 12,
                               fontWeight: 700,
+                              cursor: 'pointer',
                             }}
                           >
                             Open
-                          </a>
-                          <a
-                            href={item.url}
-                            download={item.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadAttachment(item.id, item.name)}
                             style={{
-                              textDecoration: 'none',
+                              border: 'none',
                               padding: '6px 10px',
                               borderRadius: 999,
                               background: '#f3f4f6',
                               color: '#111827',
                               fontSize: 12,
                               fontWeight: 700,
+                              cursor: 'pointer',
                             }}
                           >
                             Download
-                          </a>
+                          </button>
                         </div>
                       </div>
                     ))}

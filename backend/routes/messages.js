@@ -7,7 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
-const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured } = require('../services/mediaStorage');
+const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured, isRemoteFileUrl, fetchRemoteFile } = require('../services/mediaStorage');
 
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'messages');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -50,6 +50,24 @@ const upload = multer({
     fileSize: 15 * 1024 * 1024,
   },
 });
+
+function toDownloadName(value) {
+  return String(value || 'attachment')
+    .replace(/[\r\n"]/g, '_')
+    .trim() || 'attachment';
+}
+
+function resolveStoredAttachmentResourceType(file) {
+  const mimeType = String(file?.mimetype || '').toLowerCase();
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/') || mimeType.startsWith('audio/')) return 'video';
+  return 'raw';
+}
+
+function isAttachmentDownloadRequest(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
 
 function revealField(value) {
   if (value === null || typeof value === 'undefined') return value;
@@ -134,6 +152,62 @@ const handleGifSearch = async (req, res) => {
 
 router.get('/gifs', verifyToken, handleGifSearch);
 router.get('/search-gifs', verifyToken, handleGifSearch);
+
+router.get('/attachments/:messageId', verifyToken, async (req, res) => {
+  try {
+    const messageId = String(req.params.messageId || '');
+    if (!mongoose.isValidObjectId(messageId)) {
+      return res.status(400).json({ error: 'Invalid attachment request.' });
+    }
+
+    const message = await Message.findById(messageId)
+      .select('sender recipient attachmentUrl attachmentOriginalName attachmentMimeType')
+      .lean();
+
+    if (!message?.attachmentUrl) {
+      return res.status(404).json({ error: 'Attachment not found.' });
+    }
+
+    const userId = String(req.user.id || '');
+    const isParticipant = String(message.sender || '') === userId || String(message.recipient || '') === userId;
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'Not allowed to access this attachment.' });
+    }
+
+    const fileName = toDownloadName(message.attachmentOriginalName || 'attachment');
+    const disposition = isAttachmentDownloadRequest(req.query.download) ? 'attachment' : 'inline';
+
+    if (isRemoteFileUrl(message.attachmentUrl)) {
+      const remoteResponse = await fetchRemoteFile(message.attachmentUrl);
+      if (!remoteResponse.ok) {
+        return res.status(502).json({ error: 'Attachment is unavailable right now.' });
+      }
+
+      const fileBuffer = Buffer.from(await remoteResponse.arrayBuffer());
+      res.setHeader('Content-Type', remoteResponse.headers.get('content-type') || message.attachmentMimeType || 'application/octet-stream');
+      res.setHeader('Content-Length', String(fileBuffer.length));
+      res.setHeader('Content-Disposition', `${disposition}; filename="${fileName}"`);
+      return res.send(fileBuffer);
+    }
+
+    const storedFileName = path.basename(String(message.attachmentUrl || ''));
+    const filePath = path.join(uploadsDir, storedFileName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Attachment file is missing on the server.' });
+    }
+
+    if (disposition === 'attachment') {
+      return res.download(filePath, fileName);
+    }
+
+    res.setHeader('Content-Type', message.attachmentMimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    return res.sendFile(filePath);
+  } catch (err) {
+    console.error('GET /api/messages/attachments/:messageId error:', err);
+    return res.status(500).json({ error: 'Failed to load attachment.' });
+  }
+});
 
 // Get recent conversations for current user
 router.get('/conversations', verifyToken, async (req, res) => {
@@ -248,7 +322,7 @@ router.post('/:recipientId', verifyToken, (req, res, next) => {
       try {
         const uploadedUrl = await uploadLocalFile(uploadedFile.path, {
           folder: 'messages',
-          resourceType: isImageAttachment ? 'image' : 'auto',
+          resourceType: resolveStoredAttachmentResourceType(uploadedFile),
         });
 
         if (uploadedUrl) {
