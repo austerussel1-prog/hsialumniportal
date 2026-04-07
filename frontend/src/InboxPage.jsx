@@ -70,7 +70,6 @@ export default function InboxPage() {
   const [gifLoading, setGifLoading] = useState(false);
   const [gifError, setGifError] = useState('');
   const [lightboxImage, setLightboxImage] = useState(null);
-  const [attachmentPreview, setAttachmentPreview] = useState(null);
   const chatRef = useRef(null);
   const chatBottomRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -246,30 +245,6 @@ export default function InboxPage() {
     return fallbackName || 'Attachment';
   };
 
-  const getAttachmentPreviewKind = (mimeType, filename) => {
-    const type = String(mimeType || '').toLowerCase();
-    const lowerName = String(filename || '').toLowerCase();
-
-    if (type.startsWith('image/')) return 'image';
-    if (type.includes('pdf') || lowerName.endsWith('.pdf')) return 'pdf';
-    if (
-      type.startsWith('text/')
-      || type.includes('json')
-      || type.includes('csv')
-      || type.includes('xml')
-      || lowerName.endsWith('.txt')
-      || lowerName.endsWith('.csv')
-      || lowerName.endsWith('.json')
-      || lowerName.endsWith('.xml')
-      || lowerName.endsWith('.md')
-      || lowerName.endsWith('.drawio')
-    ) {
-      return 'text';
-    }
-
-    return 'unsupported';
-  };
-
   const getMessageAttachmentEndpoint = (messageId, download = false) => {
     if (typeof apiEndpoints.messageAttachment === 'function') {
       return apiEndpoints.messageAttachment(messageId, download);
@@ -306,31 +281,6 @@ export default function InboxPage() {
     };
   };
 
-  const handleOpenAttachment = async (messageId, fallbackName = 'Attachment') => {
-    try {
-      setError('');
-      const { blob, filename } = await fetchMessageAttachment(messageId, fallbackName, false);
-      const mimeType = (blob.type || '').toLowerCase();
-      const kind = getAttachmentPreviewKind(mimeType, filename);
-      const textContent = kind === 'text' ? await blob.text() : '';
-      const previewUrl = kind === 'unsupported' ? '' : URL.createObjectURL(blob);
-
-      setAttachmentPreview((prev) => {
-        if (prev?.url) URL.revokeObjectURL(prev.url);
-        return {
-          name: filename,
-          mimeType,
-          kind,
-          textContent,
-          url: previewUrl,
-          size: formatFileSize(blob.size),
-        };
-      });
-    } catch (err) {
-      setError(err?.message || 'Failed to open attachment.');
-    }
-  };
-
   const handleDownloadAttachment = async (messageId, fallbackName = 'Attachment') => {
     try {
       setError('');
@@ -346,13 +296,6 @@ export default function InboxPage() {
     } catch (err) {
       setError(err?.message || 'Failed to download attachment.');
     }
-  };
-
-  const closeAttachmentPreview = () => {
-    setAttachmentPreview((prev) => {
-      if (prev?.url) URL.revokeObjectURL(prev.url);
-      return null;
-    });
   };
 
   const getAttachmentMeta = (name, mimeType) => {
@@ -383,10 +326,6 @@ export default function InboxPage() {
     }
     return { label: 'FILE', color: '#374151', background: '#e5e7eb', Icon: File };
   };
-
-  useEffect(() => () => {
-    if (attachmentPreview?.url) URL.revokeObjectURL(attachmentPreview.url);
-  }, [attachmentPreview]);
 
   const extractGifUrlFromText = (value) => {
     const raw = String(value || '').trim();
@@ -1740,28 +1679,12 @@ export default function InboxPage() {
                                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                                       <button
                                         type="button"
-                                        onClick={() => handleOpenAttachment(msg._id, attachmentName)}
-                                        style={{
-                                          border: 'none',
-                                          padding: '6px 10px',
-                                          borderRadius: 999,
-                                          background: '#f3d24f',
-                                          color: '#1f2937',
-                                          fontSize: 12,
-                                          fontWeight: 700,
-                                          cursor: 'pointer',
-                                        }}
-                                      >
-                                        Open
-                                      </button>
-                                      <button
-                                        type="button"
                                         onClick={() => handleDownloadAttachment(msg._id, attachmentName)}
                                         style={{
                                           border: 'none',
                                           padding: '6px 10px',
                                           borderRadius: 999,
-                                          background: '#f3f4f6',
+                                          background: '#f3d24f',
                                           color: '#111827',
                                           fontSize: 12,
                                           fontWeight: 700,
@@ -2389,28 +2312,12 @@ export default function InboxPage() {
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                           <button
                             type="button"
-                            onClick={() => handleOpenAttachment(item.id, item.name)}
-                            style={{
-                              border: 'none',
-                              padding: '6px 10px',
-                              borderRadius: 999,
-                              background: '#f6efe2',
-                              color: '#8a5a00',
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Open
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => handleDownloadAttachment(item.id, item.name)}
                             style={{
                               border: 'none',
                               padding: '6px 10px',
                               borderRadius: 999,
-                              background: '#f3f4f6',
+                              background: '#f3d24f',
                               color: '#111827',
                               fontSize: 12,
                               fontWeight: 700,
@@ -2431,154 +2338,6 @@ export default function InboxPage() {
       </div>
 
       <AnimatePresence>
-        {attachmentPreview && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={closeAttachmentPreview}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(12, 15, 23, 0.66)',
-              zIndex: 11950,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 20,
-            }}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 340, damping: 28 }}
-              onClick={(event) => event.stopPropagation()}
-              style={{
-                width: 'min(960px, 94vw)',
-                maxHeight: '88vh',
-                background: '#fffdf8',
-                borderRadius: 20,
-                boxShadow: '0 28px 70px rgba(0,0,0,0.32)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 16,
-                  padding: '18px 20px',
-                  borderBottom: '1px solid #efe5d4',
-                  background: 'linear-gradient(180deg, #fffaf0 0%, #fffdf8 100%)',
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#111827', wordBreak: 'break-word' }}>
-                    {attachmentPreview.name}
-                  </div>
-                  <div style={{ marginTop: 4, fontSize: 13, color: '#6b7280' }}>
-                    {attachmentPreview.mimeType || 'File'}{attachmentPreview.size ? ` • ${attachmentPreview.size}` : ''}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeAttachmentPreview}
-                  style={{
-                    border: 'none',
-                    background: '#f3f4f6',
-                    color: '#111827',
-                    borderRadius: 999,
-                    padding: '8px 12px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div
-                style={{
-                  padding: 20,
-                  overflow: 'auto',
-                  background: '#fffdf8',
-                }}
-              >
-                {attachmentPreview.kind === 'image' && attachmentPreview.url && (
-                  <img
-                    src={attachmentPreview.url}
-                    alt={attachmentPreview.name}
-                    style={{
-                      display: 'block',
-                      maxWidth: '100%',
-                      maxHeight: '70vh',
-                      margin: '0 auto',
-                      borderRadius: 14,
-                      objectFit: 'contain',
-                      background: '#fff',
-                    }}
-                  />
-                )}
-
-                {attachmentPreview.kind === 'pdf' && attachmentPreview.url && (
-                  <iframe
-                    title={attachmentPreview.name}
-                    src={attachmentPreview.url}
-                    style={{
-                      width: '100%',
-                      minHeight: '70vh',
-                      border: '1px solid #efe5d4',
-                      borderRadius: 14,
-                      background: '#fff',
-                    }}
-                  />
-                )}
-
-                {attachmentPreview.kind === 'text' && (
-                  <pre
-                    style={{
-                      margin: 0,
-                      padding: 18,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      fontSize: 13,
-                      lineHeight: 1.6,
-                      color: '#111827',
-                      background: '#fff',
-                      border: '1px solid #efe5d4',
-                      borderRadius: 14,
-                      overflow: 'auto',
-                    }}
-                  >
-                    {attachmentPreview.textContent || 'This text file is empty.'}
-                  </pre>
-                )}
-
-                {attachmentPreview.kind === 'unsupported' && (
-                  <div
-                    style={{
-                      padding: 24,
-                      border: '1px solid #efe5d4',
-                      borderRadius: 14,
-                      background: '#fff',
-                      color: '#4b5563',
-                      fontSize: 14,
-                    }}
-                  >
-                    Preview is not available for this file type. Use the Download button to open it in its native app.
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
         {lightboxImage && (
           <motion.div
             initial={{ opacity: 0 }}
