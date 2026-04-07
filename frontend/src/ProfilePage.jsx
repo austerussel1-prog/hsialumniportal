@@ -108,36 +108,66 @@ export default function ProfilePage() {
     return Number.isFinite(messageTs) && Number.isFinite(markerTs) && messageTs <= markerTs;
   };
 
-  const handleOpenNotification = (notification) => {
-    const notificationId = typeof notification === 'string' ? notification : notification?.id;
-    if (!notificationId) return;
+  const markNotificationsAsRead = (items = []) => {
+    const nextMap = { ...notificationReadMap };
+    const nextReadIds = { ...notificationReadIds };
+    let hasMapChanges = false;
+    let hasReadIdChanges = false;
 
-    const item = typeof notification === 'object' ? notification : notifications.find((n) => n.id === notificationId);
-    const recipientId = String(item?.action?.recipientId || '').trim();
-    const lastMessageAt = String(item?.lastMessageAt || '').trim();
-    if (recipientId && lastMessageAt) {
-      const nextMap = { ...notificationReadMap, [recipientId]: lastMessageAt };
+    items.forEach((item) => {
+      const notificationId = String(item?.id || '').trim();
+      const recipientId = String(item?.action?.recipientId || '').trim();
+      const lastMessageAt = String(item?.lastMessageAt || '').trim();
+
+      if (notificationId && !nextReadIds[notificationId]) {
+        nextReadIds[notificationId] = true;
+        hasReadIdChanges = true;
+      }
+
+      if (recipientId && lastMessageAt && nextMap[recipientId] !== lastMessageAt) {
+        nextMap[recipientId] = lastMessageAt;
+        hasMapChanges = true;
+      }
+    });
+
+    if (hasMapChanges) {
       setNotificationReadMap(nextMap);
+    }
+    if (hasReadIdChanges) {
+      setNotificationReadIds(nextReadIds);
+    }
+
+    if (hasMapChanges || hasReadIdChanges) {
       try {
         localStorage.setItem(notificationReadMapKey, JSON.stringify(nextMap));
+        localStorage.setItem(notificationReadIdsKey, JSON.stringify(nextReadIds));
       } catch {
         // ignore storage write issues
       }
     }
 
-    const nextReadIds = { ...notificationReadIds, [notificationId]: true };
-    setNotificationReadIds(nextReadIds);
-    try {
-      localStorage.setItem(notificationReadIdsKey, JSON.stringify(nextReadIds));
-    } catch {
-      // ignore storage write issues
+    if (items.length > 0) {
+      const readIdsSet = new Set(items.map((item) => String(item?.id || '').trim()).filter(Boolean));
+      const readRecipientSet = new Set(items.map((item) => String(item?.action?.recipientId || '').trim()).filter(Boolean));
+      setNotifications((prev) => prev.map((item) => {
+        const notificationId = String(item?.id || '').trim();
+        const recipientId = String(item?.action?.recipientId || '').trim();
+        if (readIdsSet.has(notificationId) || (recipientId && readRecipientSet.has(recipientId))) {
+          return { ...item, unread: false };
+        }
+        return item;
+      }));
     }
+  };
 
-    setNotifications((prev) => prev.map((item) => (
-      item.id === notificationId || String(item?.action?.recipientId || '') === recipientId
-        ? { ...item, unread: false }
-        : item
-    )));
+  const handleOpenNotification = (notification) => {
+    const notificationId = typeof notification === 'string' ? notification : notification?.id;
+    if (!notificationId) return;
+
+    const item = typeof notification === 'object' ? notification : notifications.find((n) => n.id === notificationId);
+    if (item) {
+      markNotificationsAsRead([item]);
+    }
 
     if (item?.action?.type === 'message' && item?.action?.recipientId) {
       navigate(`/inbox?recipient=${encodeURIComponent(item.action.recipientId)}`);
@@ -1076,23 +1106,7 @@ export default function ProfilePage() {
                                 textAlign: 'left',
                               }}
                               onClick={() => {
-                                const nextMap = { ...notificationReadMap };
-                                const nextReadIds = { ...notificationReadIds };
-                                notifications.forEach((item) => {
-                                  const rid = String(item?.action?.recipientId || '').trim();
-                                  const ts = String(item?.lastMessageAt || '').trim();
-                                  if (rid && ts) nextMap[rid] = ts;
-                                  if (item?.id) nextReadIds[item.id] = true;
-                                });
-                                setNotificationReadMap(nextMap);
-                                setNotificationReadIds(nextReadIds);
-                                try {
-                                  localStorage.setItem(notificationReadMapKey, JSON.stringify(nextMap));
-                                  localStorage.setItem(notificationReadIdsKey, JSON.stringify(nextReadIds));
-                                } catch {
-                                  // ignore storage write issues
-                                }
-                                setNotifications((prev) => prev.map((item) => ({ ...item, unread: false })));
+                                markNotificationsAsRead(notifications);
                                 setShowNotificationMenu(false);
                               }}
                             >
@@ -1114,6 +1128,7 @@ export default function ProfilePage() {
                                 textAlign: 'left',
                               }}
                               onClick={() => {
+                                markNotificationsAsRead(notifications);
                                 setShowNotificationMenu(false);
                                 setShowNotifications(false);
                                 setNotificationView('all');
@@ -1124,7 +1139,13 @@ export default function ProfilePage() {
                               Open Notifications
                             </button>
                           </motion.div>
-                        )}
+                                setShowNotifications((prev) => {
+                                  const next = !prev;
+                                  if (next) {
+                                    markNotificationsAsRead(notifications);
+                                  }
+                                  return next;
+                                });
                       </AnimatePresence>
                     </div>
                     <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>

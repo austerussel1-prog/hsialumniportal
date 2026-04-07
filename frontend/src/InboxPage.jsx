@@ -1673,9 +1673,6 @@ export default function InboxPage() {
                                     <div style={{ fontWeight: 700, color: '#111827', fontSize: 13, wordBreak: 'break-word' }}>
                                       {buildHighlightedText(attachmentName)}
                                     </div>
-                                    <div style={{ marginTop: 4, color: '#6b7280', fontSize: 12 }}>
-                                      {msg.attachmentMimeType || 'File'}{attachmentSize ? ` â€¢ ${attachmentSize}` : ''}
-                                    </div>
                                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                                       <button
                                         type="button"
