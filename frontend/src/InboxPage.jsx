@@ -22,7 +22,7 @@ import {
 } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints, resolveApiAssetUrl } from './config/api';
+import { API_URL, apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 export default function InboxPage() {
   const navigate = useNavigate();
@@ -245,13 +245,22 @@ export default function InboxPage() {
     return fallbackName || 'Attachment';
   };
 
+  const getMessageAttachmentEndpoint = (messageId, download = false) => {
+    if (typeof apiEndpoints.messageAttachment === 'function') {
+      return apiEndpoints.messageAttachment(messageId, download);
+    }
+
+    const baseUrl = String(API_URL || '').trim().replace(/\/$/, '');
+    return `${baseUrl}/api/messages/attachments/${messageId}${download ? '?download=1' : ''}`;
+  };
+
   const fetchMessageAttachment = async (messageId, fallbackName, download = false) => {
     const token = localStorage.getItem('token');
     if (!token) {
       throw new Error('You must be signed in to access attachments.');
     }
 
-    const response = await fetch(apiEndpoints.messageAttachment(messageId, download), {
+    const response = await fetch(getMessageAttachmentEndpoint(messageId, download), {
       headers: {
         Authorization: `Bearer ${token}`,
       },
