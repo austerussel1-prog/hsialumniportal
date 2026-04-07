@@ -990,7 +990,13 @@ export default function ProfilePage() {
           <div ref={notificationPanelRef} style={{ position: 'relative' }}>
             <button
               onClick={() => {
-                setShowNotifications((prev) => !prev);
+                setShowNotifications((prev) => {
+                  const next = !prev;
+                  if (next) {
+                    markNotificationsAsRead(notifications);
+                  }
+                  return next;
+                });
                 setShowNotificationMenu(false);
                 setNotificationView('all');
                 setShowUserMenu(false);
@@ -1139,13 +1145,7 @@ export default function ProfilePage() {
                               Open Notifications
                             </button>
                           </motion.div>
-                                setShowNotifications((prev) => {
-                                  const next = !prev;
-                                  if (next) {
-                                    markNotificationsAsRead(notifications);
-                                  }
-                                  return next;
-                                });
+                        )}
                       </AnimatePresence>
                     </div>
                     <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
