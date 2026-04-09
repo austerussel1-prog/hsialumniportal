@@ -6,6 +6,8 @@ import Sidebar from './components/Sidebar';
 import { API_URL, apiEndpoints } from './config/api';
 
 const USER_POSTED_JOBS_KEY = 'hsi_user_job_posts';
+const MAX_RESUME_BYTES = 10 * 1024 * 1024;
+const ALLOWED_RESUME_EXTENSIONS = ['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg'];
 
 function getStoredJobs() {
   try {
@@ -22,6 +24,23 @@ function parseJobId(jobId) {
   const numeric = Number(jobId);
   if (Number.isFinite(numeric)) return numeric;
   return jobId;
+}
+
+function validateResumeFile(file) {
+  if (!file) {
+    return 'Resume file is required.';
+  }
+
+  const extension = String(file.name || '').split('.').pop()?.toLowerCase() || '';
+  if (!ALLOWED_RESUME_EXTENSIONS.includes(extension)) {
+    return 'Resume must be a PDF, DOC, DOCX, PNG, JPG, or JPEG file.';
+  }
+
+  if (typeof file.size === 'number' && file.size > MAX_RESUME_BYTES) {
+    return 'Resume file must be 10 MB or smaller.';
+  }
+
+  return '';
 }
 
 export default function JobApplicationForm() {
@@ -120,6 +139,13 @@ export default function JobApplicationForm() {
     setSubmitting(true);
     setSubmitError('');
 
+    const resumeError = validateResumeFile(form.resumeFile);
+    if (resumeError) {
+      setSubmitError(resumeError);
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const payload = new FormData();
       payload.append('name', form.name);
@@ -133,7 +159,7 @@ export default function JobApplicationForm() {
       if (job?.company) payload.append('company', job.company);
       payload.append('resume', form.resumeFile);
 
-      const response = await fetch(`${API_URL}/api/job-applications`, {
+      const response = await fetch(apiEndpoints.submitJobApplication || `${API_URL}/api/job-applications`, {
         method: 'POST',
         body: payload,
       });
@@ -174,7 +200,12 @@ export default function JobApplicationForm() {
       });
       setTouched({});
     } catch (error) {
-      setSubmitError(error.message || 'Failed to submit application.');
+      const isNetworkError = error instanceof TypeError && /failed to fetch/i.test(String(error.message || ''));
+      setSubmitError(
+        isNetworkError
+          ? 'Upload failed before the server responded. Check your internet connection and make sure the resume file is 10 MB or smaller.'
+          : (error.message || 'Failed to submit application.'),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -405,6 +436,7 @@ export default function JobApplicationForm() {
                     const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
                     setForm((p) => ({ ...p, resumeFile: file }));
                     setTouched((p) => ({ ...p, resumeFile: true }));
+                    setSubmitError(file ? validateResumeFile(file) : '');
                   }}
                   style={{
                     ...inputShell,
@@ -413,6 +445,7 @@ export default function JobApplicationForm() {
                     borderColor: touched.resumeFile && requiredMissing.resumeFile ? '#ef4444' : '#d1d5db',
                   }}
                 />
+                <div style={helperStyle}>Accepted: PDF, DOC, DOCX, PNG, JPG, JPEG. Max 10 MB.</div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
