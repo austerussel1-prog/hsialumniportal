@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import { apiEndpoints } from './config/api';
+import { isGoogleAuthConfigured } from './config/auth';
 
 const CONSENT_VERSION = 'v1.0';
 
@@ -430,14 +431,20 @@ export default function RegisterPage() {
           </div>
 
           <div className="w-full flex items-center justify-center mb-2 sm:mb-4">
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => setError('Google sign-in failed. Please try again.')}
-              shape="rectangular"
-              theme="filled_black"
-              size="large"
-              width="100%"
-            />
+            {isGoogleAuthConfigured ? (
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google sign-in failed. Please try again.')}
+                shape="rectangular"
+                theme="filled_black"
+                size="large"
+                width="100%"
+              />
+            ) : (
+              <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
+                Google sign-in is temporarily unavailable because OAuth is not configured for this deployment.
+              </div>
+            )}
           </div>
         </div>
       </div>
