@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { OAuth2Client } = require('google-auth-library');
 
 const emailUser = String(process.env.EMAIL_USER || '').trim();
 const emailPassword = String(process.env.EMAIL_PASSWORD || '').trim();
@@ -9,6 +10,10 @@ const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpSecure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || smtpPort === 465;
 const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
 const resendFrom = String(process.env.RESEND_FROM || process.env.EMAIL_USER || 'onboarding@resend.dev').trim();
+const gmailOauthClientId = String(process.env.GMAIL_OAUTH_CLIENT_ID || '').trim();
+const gmailOauthClientSecret = String(process.env.GMAIL_OAUTH_CLIENT_SECRET || '').trim();
+const gmailOauthRefreshToken = String(process.env.GMAIL_OAUTH_REFRESH_TOKEN || '').trim();
+const gmailSenderEmail = String(process.env.GMAIL_SENDER_EMAIL || process.env.EMAIL_USER || '').trim();
 
 if (!emailUser || !emailPassword) {
   console.warn('[email] Missing SMTP credentials at startup', {
@@ -44,11 +49,109 @@ const assertEmailConfig = () => {
   }
 };
 
+const hasUsableGmailApi = () => Boolean(
+  gmailOauthClientId && gmailOauthClientSecret && gmailOauthRefreshToken && gmailSenderEmail,
+);
 const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
+const activeEmailMode = hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp');
+console.log('[email] Provider mode:', activeEmailMode);
 
-console.log('[email] Provider mode:', hasUsableResend() ? 'resend' : 'smtp');
+const toBase64Url = (input) => Buffer.from(input, 'utf8')
+  .toString('base64')
+  .replace(/\+/g, '-')
+  .replace(/\//g, '_')
+  .replace(/=+$/g, '');
+
+const buildGmailRawMessage = (mailOptions) => {
+  const to = String(mailOptions?.to || '').trim();
+  const replyTo = String(mailOptions?.replyTo || '').trim();
+  const subject = String(mailOptions?.subject || 'HSI Alumni Portal').trim();
+  const html = String(mailOptions?.html || '').trim();
+  const text = String(mailOptions?.text || '').trim() || (html ? html.replace(/<[^>]+>/g, ' ') : '');
+  const attachments = Array.isArray(mailOptions?.attachments) ? mailOptions.attachments : [];
+  const from = String(mailOptions?.from || gmailSenderEmail).trim();
+
+  const commonHeaders = [
+    `From: ${from}`,
+    `To: ${to}`,
+    replyTo ? `Reply-To: ${replyTo}` : '',
+    `Subject: ${subject}`,
+    'MIME-Version: 1.0',
+  ].filter(Boolean);
+
+  if (!attachments.length) {
+    const body = [
+      ...commonHeaders,
+      'Content-Type: text/html; charset="UTF-8"',
+      '',
+      html || text || 'No content',
+    ].join('\r\n');
+    return toBase64Url(body);
+  }
+
+  const boundary = `mixed_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const parts = [
+    ...commonHeaders,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    '',
+    html || text || 'No content',
+  ];
+
+  for (const attachment of attachments) {
+    const filename = String(attachment?.filename || 'attachment').replace(/"/g, '');
+    const contentType = String(attachment?.contentType || 'application/octet-stream');
+    const contentBuffer = Buffer.isBuffer(attachment?.content)
+      ? attachment.content
+      : Buffer.from(String(attachment?.content || ''), 'utf8');
+
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${contentType}; name="${filename}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${filename}"`,
+      '',
+      contentBuffer.toString('base64'),
+    );
+  }
+
+  parts.push(`--${boundary}--`, '');
+  return Buffer.from(parts.join('\r\n'))
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+};
+
+const sendViaGmailApi = async (mailOptions) => {
+  const oauthClient = new OAuth2Client(gmailOauthClientId, gmailOauthClientSecret);
+  oauthClient.setCredentials({ refresh_token: gmailOauthRefreshToken });
+
+  const tokenResponse = await oauthClient.getAccessToken();
+  const accessToken = tokenResponse?.token || '';
+  if (!accessToken) throw new Error('Unable to obtain Gmail API access token');
+
+  const raw = buildGmailRawMessage(mailOptions);
+  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ raw }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Gmail API error (${response.status}): ${body || 'Unknown error'}`);
+  }
+
+  return true;
+};
 
 const sendViaResend = async (mailOptions) => {
   const to = String(mailOptions?.to || '')
@@ -101,6 +204,14 @@ const sendMail = async (mailOptions) => {
       return await sendViaResend(mailOptions);
     } catch (error) {
       throw new Error(`Resend delivery failed: ${error.message}`);
+    }
+  }
+
+  if (hasUsableGmailApi()) {
+    try {
+      return await sendViaGmailApi(mailOptions);
+    } catch (error) {
+      throw new Error(`Gmail API delivery failed: ${error.message}`);
     }
   }
 
