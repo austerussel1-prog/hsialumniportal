@@ -399,21 +399,21 @@ export default function AnnouncementsPage() {
   return (
     <div className="flex min-h-screen">
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      <main className="flex-1 p-6 pt-20 md:pt-6">
+      <main className="flex-1 p-4 pt-20 sm:p-6 sm:pt-20 md:pt-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-4xl font-extrabold text-[#111827] leading-tight mb-2">
+          <h1 className="text-3xl font-extrabold text-[#111827] leading-tight mb-2 sm:text-4xl">
             Announcements <span className="text-[#F2C94C]">&Updates</span>
           </h1>
           <p className="text-sm text-[#6b7280] italic font-normal mb-2">Stay informed with company news, policy changes, and community stories.</p>
         </div>
 
-        <div className="flex flex-row w-full gap-6 mt-4 items-start">
+        <div className="mt-4 flex w-full flex-col gap-6 items-start xl:flex-row">
           {/* Left categories */}
-          <aside className="w-64 flex-shrink-0 sticky top-6 self-start max-h-[calc(100vh-3rem)] overflow-y-auto pr-1">
+          <aside className="w-full flex-shrink-0 self-start overflow-y-auto pr-1 xl:sticky xl:top-6 xl:w-64 xl:max-h-[calc(100vh-3rem)]">
             <div className="bg-white rounded-2xl p-4 border border-gray-200">
               <div className="font-bold text-sm mb-2">Announcements</div>
-              <ul className="space-y-3 text-sm">
+              <ul className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-1">
                 <li>
                   <button onClick={() => setActiveCategory('All')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='All' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
                     All Announcements
@@ -444,20 +444,20 @@ export default function AnnouncementsPage() {
           </aside>
 
           {/* Center feed */}
-          <section className="flex-1">
+          <section className="w-full flex-1">
             {/* Search / sort row */}
-            <div className="bg-white rounded-2xl p-4 flex items-center justify-between mb-4 border border-gray-200 flex-nowrap">
-              <div className="flex-1 mr-4" />
-              <div className="flex items-center gap-3 flex-nowrap">
+            <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="hidden flex-1 sm:block sm:mr-4" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-nowrap">
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   type="text"
                   placeholder="Q Search"
-                  className="px-4 py-2 rounded-lg border border-gray-200 w-40 md:w-64 text-sm min-w-0"
+                  className="min-w-0 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm sm:w-52 md:w-64"
                   style={{ fontFamily: 'inherit' }}
                 />
-                <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="px-4 py-2 rounded-lg border border-gray-200 text-sm flex-shrink-0">
+                <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm sm:w-auto sm:flex-shrink-0">
                   <option>Newest</option>
                   <option>Oldest</option>
                 </select>
@@ -468,20 +468,20 @@ export default function AnnouncementsPage() {
             <div className="bg-white rounded-2xl p-4 mb-4 border border-gray-200">
               {isAdmin ? (
                 <div>
-                  <div className="flex items-center gap-3">
-                    <input type="text" placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} disabled={loading} className="flex-1 px-4 py-3 rounded-lg border border-gray-200 mb-3 text-sm" style={{fontFamily: 'inherit'}} />
-                    <select value={category} onChange={e => setCategory(e.target.value)} className="px-3 py-2 rounded-lg border border-gray-200 text-sm mb-3" disabled={loading}>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                    <input type="text" placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} disabled={loading} className="mb-0 flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm" style={{fontFamily: 'inherit'}} />
+                    <select value={category} onChange={e => setCategory(e.target.value)} className="mb-0 w-full rounded-lg border border-gray-200 px-3 py-3 text-sm md:w-auto md:min-w-[220px]" disabled={loading}>
                       <option>Company News</option>
                       <option>Policy Changes</option>
                       <option>Partnerships & Advocacies</option>
                       <option>Alumni Success Stories</option>
                     </select>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <input type="text" placeholder="Create Announcement" value={content} onChange={e => setContent(e.target.value)} disabled={loading} className="flex-1 px-4 py-3 rounded-lg border border-gray-200 text-sm" style={{fontFamily: 'inherit'}} />
-                    <button className="bg-[#F2C94C] text-[#222] font-bold px-4 py-2 rounded-lg text-sm" onClick={handlePost} disabled={loading}>{loading ? 'Posting...' : 'Post'}</button>
+                  <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
+                    <input type="text" placeholder="Create Announcement" value={content} onChange={e => setContent(e.target.value)} disabled={loading} className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-sm" style={{fontFamily: 'inherit'}} />
+                    <button className="rounded-lg bg-[#F2C94C] px-4 py-3 text-sm font-bold text-[#222] md:px-4 md:py-2" onClick={handlePost} disabled={loading}>{loading ? 'Posting...' : 'Post'}</button>
                   </div>
-                  <div className="flex gap-4 mt-3 text-sm text-[#6b7280] items-center">
+                  <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-[#6b7280]">
                     <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={(e) => {
                       const f = e.target.files && e.target.files[0];
                       if (!f) return;
@@ -546,9 +546,9 @@ export default function AnnouncementsPage() {
                 <div className="bg-white rounded-lg border border-dashed border-gray-300 p-7 text-center text-[#b3b3b3] italic">No announcements yet. Admins will post updates here.</div>
               ) : (
                 displayedAnnouncements.map(a => (
-                  <div key={a._id} onClick={() => setSelectedAnnouncement(a)} className="bg-white rounded-2xl p-6 shadow-sm relative border border-gray-200 cursor-pointer hover:bg-gray-50">
+                  <div key={a._id} onClick={() => setSelectedAnnouncement(a)} className="relative cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm hover:bg-gray-50 sm:p-6">
                     <div className="flex items-start gap-4">
-                      <img src={resolveProfileImage(a.author?.profileImage)} alt="avatar" onClick={() => a.author?._id && navigate(`/directory/profile/${a.author._id}`)} className="w-12 h-12 rounded-full object-cover cursor-pointer" />
+                      <img src={resolveProfileImage(a.author?.profileImage)} alt="avatar" onClick={() => a.author?._id && navigate(`/directory/profile/${a.author._id}`)} className="h-11 w-11 flex-shrink-0 rounded-full object-cover cursor-pointer sm:h-12 sm:w-12" />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <div>
@@ -570,7 +570,7 @@ export default function AnnouncementsPage() {
                           </div>
                         </div>
 
-                        <h3 className="text-xl font-extrabold text-[#111827] mt-3 mb-2">{a.title}</h3>
+                        <h3 className="mt-3 mb-2 text-lg font-extrabold text-[#111827] sm:text-xl">{a.title}</h3>
                         <div className="text-sm text-[#6b7280] mb-4">{a.content}</div>
                         {normalizeAnnouncementAttachments(a).length > 0 && (
                           <div className="mt-3">
@@ -654,7 +654,7 @@ export default function AnnouncementsPage() {
           </section>
 
           {/* Right pinned + spotlight */}
-          <aside className="w-80 flex-shrink-0 sticky top-6 self-start max-h-[calc(100vh-3rem)] overflow-y-auto pr-1">
+          <aside className="w-full flex-shrink-0 self-start overflow-y-auto pr-1 xl:sticky xl:top-6 xl:w-80 xl:max-h-[calc(100vh-3rem)]">
             <div className="bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200">
               <div className="bg-[#6B8A2E] px-5 py-3 text-white font-bold">Recent Announcements</div>
               <div className="p-4 space-y-3">

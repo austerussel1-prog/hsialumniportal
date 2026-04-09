@@ -32,6 +32,9 @@ export default function AccountSettings() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  ));
   const [activeTab, setActiveTab] = useState(TABS.ACCOUNT);
   const [loading, setLoading] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -44,6 +47,13 @@ export default function AccountSettings() {
 
   const userData = localStorage.getItem('user');
   const user = userData ? JSON.parse(userData) : null;
+  const formGridColumns = isMobile ? '1fr' : '180px 1fr';
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const [accountForm, setAccountForm] = useState({
     fullName: user?.fullName || user?.name || '',
@@ -403,16 +413,17 @@ export default function AccountSettings() {
     borderBottom: isActive ? '2px solid #f4b000' : '2px solid transparent',
     background: 'transparent',
     color: isActive ? '#f4b000' : '#4b5563',
-    fontSize: 14,
+    fontSize: isMobile ? 12 : 14,
     fontWeight: isActive ? 700 : 500,
     cursor: 'pointer',
-    padding: '9px 4px 11px',
+    padding: isMobile ? '10px 8px' : '9px 4px 11px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    whiteSpace: 'nowrap',
+    whiteSpace: isMobile ? 'normal' : 'nowrap',
     width: '100%',
+    minHeight: isMobile ? 56 : 'auto',
   });
 
   const openFeedbackTypeModal = (type) => {
@@ -678,7 +689,7 @@ export default function AccountSettings() {
     >
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      <div style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: isMobile ? '16px 12px' : '24px 28px', overflowY: 'auto' }}>
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -700,8 +711,8 @@ export default function AccountSettings() {
         </button>
 
         <div style={{ maxWidth: 980, margin: '0 auto', background: '#f9fafb', border: '1px solid #c5ccd6', borderRadius: 14, paddingTop: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, marginLeft: 26, marginRight: 26, marginTop: 16 }}>
-            <h1 style={{ margin: 0, color: '#111827', fontSize: 34, fontWeight: 800 }}>Settings</h1>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? 12 : 0, marginBottom: 14, marginLeft: isMobile ? 16 : 26, marginRight: isMobile ? 16 : 26, marginTop: 16 }}>
+            <h1 style={{ margin: 0, color: '#111827', fontSize: isMobile ? 28 : 34, fontWeight: 800 }}>Settings</h1>
             <button
               type="button"
               onClick={() => setShowLogoutConfirm(true)}
@@ -718,6 +729,7 @@ export default function AccountSettings() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
+                alignSelf: isMobile ? 'flex-end' : 'auto',
               }}
             >
               <SignOut size={20} weight="bold" />
@@ -754,7 +766,7 @@ export default function AccountSettings() {
                 <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>Manage your personal details and account credentials.</p>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: formGridColumns, gap: 12, alignItems: isMobile ? 'stretch' : 'center', marginBottom: 12 }}>
                 <label style={{ fontWeight: 600, color: '#374151', fontSize: 14 }}>Name</label>
                 <input
                   type="text"
@@ -763,7 +775,7 @@ export default function AccountSettings() {
                   style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 8, padding: 10, fontSize: 13 }}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: formGridColumns, gap: 12, alignItems: isMobile ? 'stretch' : 'center', marginBottom: 12 }}>
                 <label style={{ fontWeight: 600, color: '#374151', fontSize: 14 }}>Email</label>
                 <input
                   type="email"
@@ -773,7 +785,7 @@ export default function AccountSettings() {
                   style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 8, padding: 10, fontSize: 13, background: '#f3f4f6', color: '#6b7280', cursor: 'not-allowed' }}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, alignItems: 'center', marginBottom: 18 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: formGridColumns, gap: 12, alignItems: isMobile ? 'stretch' : 'center', marginBottom: 18 }}>
                 <label style={{ fontWeight: 600, color: '#374151', fontSize: 14 }}>Phone Number</label>
                 <input
                   type="text"
@@ -786,7 +798,7 @@ export default function AccountSettings() {
               <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
                 <h3 style={{ margin: 0, fontSize: 20, color: '#111827' }}>Security</h3>
                 <p style={{ margin: '4px 0 14px', color: '#6b7280', fontSize: 14 }}>Password Management</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: formGridColumns, gap: 12, alignItems: isMobile ? 'stretch' : 'center', marginBottom: 12 }}>
                   <label style={{ fontWeight: 600, color: '#374151', fontSize: 14 }}>Old Password</label>
                   <input
                     type="password"
@@ -795,7 +807,7 @@ export default function AccountSettings() {
                     style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 8, padding: 10, fontSize: 13 }}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: formGridColumns, gap: 12, alignItems: isMobile ? 'stretch' : 'center', marginBottom: 12 }}>
                   <label style={{ fontWeight: 600, color: '#374151', fontSize: 14 }}>New Password</label>
                   <input
                     type="password"
@@ -804,7 +816,7 @@ export default function AccountSettings() {
                     style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 8, padding: 10, fontSize: 13 }}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, alignItems: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: formGridColumns, gap: 12, alignItems: isMobile ? 'stretch' : 'center' }}>
                   <label style={{ fontWeight: 600, color: '#374151', fontSize: 14 }}>Confirm Password</label>
                   <input
                     type="password"
@@ -833,6 +845,7 @@ export default function AccountSettings() {
                     fontWeight: 700,
                     cursor: loading ? 'not-allowed' : 'pointer',
                     opacity: loading ? 0.75 : 1,
+                    width: isMobile ? '100%' : 'auto',
                   }}
                 >
                   {loading ? 'Saving...' : 'Save Changes'}
@@ -951,7 +964,7 @@ export default function AccountSettings() {
               <h2 style={{ margin: 0, fontSize: 26, color: '#111827' }}>Privacy Settings</h2>
               <p style={{ margin: '4px 0 16px', color: '#6b7280', fontSize: 14 }}>Adjust your privacy and security preferences.</p>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f3f4f6', paddingBottom: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? 12 : 0, borderBottom: '1px solid #f3f4f6', paddingBottom: 12, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontWeight: 700, color: '#111827' }}>Two-Factor Authentication</div>
                   <div style={{ color: '#6b7280', fontSize: 13 }}>Add an extra layer of security to your account.</div>
@@ -968,7 +981,7 @@ export default function AccountSettings() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f3f4f6', paddingBottom: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: isMobile ? 12 : 0, borderBottom: '1px solid #f3f4f6', paddingBottom: 12, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontWeight: 700, color: '#111827' }}>Login Alert Notification</div>
                   <div style={{ color: '#6b7280', fontSize: 13 }}>Get notified when your account is accessed from a new device.</div>
@@ -1032,7 +1045,7 @@ export default function AccountSettings() {
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
                   <button
                     type="button"
                     onClick={handleRequestDataRemoval}
@@ -1047,6 +1060,7 @@ export default function AccountSettings() {
                       fontWeight: 700,
                       cursor: privacyActionLoading ? 'not-allowed' : 'pointer',
                       opacity: privacyActionLoading ? 0.75 : 1,
+                      width: isMobile ? '100%' : 'auto',
                     }}
                   >
                     {privacyActionLoading ? 'Processing...' : 'Request Data Removal'}
@@ -1065,6 +1079,7 @@ export default function AccountSettings() {
                       fontWeight: 700,
                       cursor: privacyActionLoading ? 'not-allowed' : 'pointer',
                       opacity: privacyActionLoading ? 0.75 : 1,
+                      width: isMobile ? '100%' : 'auto',
                     }}
                   >
                     {privacyActionLoading ? 'Processing...' : 'Delete My Account'}
@@ -1090,6 +1105,7 @@ export default function AccountSettings() {
                     fontWeight: 700,
                     cursor: loading ? 'not-allowed' : 'pointer',
                     opacity: loading ? 0.75 : 1,
+                    width: isMobile ? '100%' : 'auto',
                   }}
                 >
                   {loading ? 'Saving...' : 'Save Changes'}

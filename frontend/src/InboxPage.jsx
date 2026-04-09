@@ -35,6 +35,9 @@ export default function InboxPage() {
     }
   };
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  ));
   const [users, setUsers] = useState([]);
   const [userLastChats, setUserLastChats] = useState({});
   const [lastReadByUser, setLastReadByUser] = useState(() => {
@@ -198,6 +201,13 @@ export default function InboxPage() {
     }
   }, []);
   const currentUserId = String(currentUser?.id || currentUser?._id || '');
+  const showInfoPanel = !isMobile && isInfoPanelOpen;
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     lastReadByUserRef.current = lastReadByUser;
@@ -1069,12 +1079,12 @@ export default function InboxPage() {
     >
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      <div style={{ flex: 1, padding: '28px 36px' }}>
+      <div style={{ flex: 1, padding: isMobile ? '20px 12px' : '28px 36px' }}>
         <div
           style={{
             marginBottom: '18px',
             display: 'grid',
-            gridTemplateColumns: '320px minmax(0, 1fr)',
+            gridTemplateColumns: isMobile ? '1fr' : '320px minmax(0, 1fr)',
             alignItems: 'start',
             gap: 14,
           }}
@@ -1087,9 +1097,9 @@ export default function InboxPage() {
           </div>
           <div
             style={{
-              width: 358,
+              width: isMobile ? '100%' : 358,
               maxWidth: '100%',
-              justifySelf: 'end',
+              justifySelf: isMobile ? 'stretch' : 'end',
               fontSize: 12,
               lineHeight: 1.45,
               color: '#6b7280',
@@ -1127,12 +1137,14 @@ export default function InboxPage() {
             border: '1px solid #efe5d7',
             boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
             borderRadius: '16px',
-            height: 'calc(100vh - 180px)',
+            height: isMobile ? 'calc(100vh - 170px)' : 'calc(100vh - 180px)',
+            minHeight: isMobile ? 'calc(100vh - 170px)' : 'auto',
             display: 'flex',
             overflow: 'hidden',
           }}
         >
-          <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid #efe5d7', overflowY: 'auto', background: '#faf9f7' }}>
+          {(!isMobile || !selectedRecipientId) && (
+          <div style={{ width: isMobile ? '100%' : 320, flexShrink: 0, borderRight: isMobile ? 'none' : '1px solid #efe5d7', overflowY: 'auto', background: '#faf9f7' }}>
             <div
               style={{
                 position: 'sticky',
@@ -1285,7 +1297,9 @@ export default function InboxPage() {
               </AnimatePresence>
             )}
           </div>
+          )}
 
+          {(!isMobile || selectedRecipientId) && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, height: '100%', overflow: 'hidden' }}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -1308,7 +1322,29 @@ export default function InboxPage() {
                       fontWeight: 700,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                      {isMobile && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRecipientId('')}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 999,
+                            border: '1px solid #e5dccf',
+                            background: '#fff',
+                            color: '#8a5a00',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                          }}
+                          aria-label="Back to conversations"
+                        >
+                          <ArrowDown size={18} weight="bold" style={{ transform: 'rotate(90deg)' }} />
+                        </button>
+                      )}
                       <img
                         src={resolveApiAssetUrl(selectedUser?.profileImage) || DEFAULT_AVATAR}
                         alt={selectedUser?.fullName || selectedUser?.name || 'Conversation avatar'}
@@ -1345,6 +1381,7 @@ export default function InboxPage() {
                         {selectedUser?.fullName || selectedUser?.name || 'Conversation'}
                       </button>
                     </div>
+                    {!isMobile && (
                     <button
                       type="button"
                       onClick={() => setIsInfoPanelOpen((prev) => !prev)}
@@ -1365,6 +1402,7 @@ export default function InboxPage() {
                     >
                       <DotsThreeOutlineVertical size={18} weight="bold" />
                     </button>
+                    )}
                   </div>
                 ) : (
                   <div
@@ -1378,6 +1416,7 @@ export default function InboxPage() {
                       alignItems: 'center',
                     }}
                   >
+                    {!isMobile && (
                     <button
                       type="button"
                       onClick={() => setIsInfoPanelOpen((prev) => !prev)}
@@ -1397,6 +1436,7 @@ export default function InboxPage() {
                     >
                       <DotsThreeOutlineVertical size={18} weight="bold" />
                     </button>
+                    )}
                   </div>
                 )}
 
@@ -2068,13 +2108,14 @@ export default function InboxPage() {
               </div>
             </div>
           </div>
+          )}
 
           <motion.div
             initial={false}
             animate={{
-              width: isInfoPanelOpen ? 390 : 0,
-              opacity: isInfoPanelOpen ? 1 : 0,
-              borderLeftWidth: isInfoPanelOpen ? 1 : 0,
+              width: showInfoPanel ? 390 : 0,
+              opacity: showInfoPanel ? 1 : 0,
+              borderLeftWidth: showInfoPanel ? 1 : 0,
             }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             style={{
@@ -2089,7 +2130,7 @@ export default function InboxPage() {
               minHeight: 0,
               height: '100%',
               overflow: 'hidden',
-              pointerEvents: isInfoPanelOpen ? 'auto' : 'none',
+              pointerEvents: showInfoPanel ? 'auto' : 'none',
             }}
           >
             <div

@@ -16,6 +16,9 @@ export default function ProfilePage() {
     return resolveApiAssetUrl(value);
   };
   const [isEditing, setIsEditing] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  ));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hoverButton, setHoverButton] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState(() => {
@@ -472,6 +475,12 @@ export default function ProfilePage() {
   });
 
   const [formData, setFormData] = useState(profileData);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const updateProfileExtras = async (nextProjects, nextDocuments) => {
     const token = localStorage.getItem('token');
@@ -966,9 +975,9 @@ export default function ProfilePage() {
       >
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
       
-      <div style={{ flex: 1, padding: '24px' }}>
+      <div style={{ flex: 1, padding: isMobile ? '16px 12px' : '24px' }}>
     
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: isMobile ? '14px' : 0, marginBottom: '24px' }}>
         <button
           onClick={() => navigate(-1)}
           style={{
@@ -986,7 +995,7 @@ export default function ProfilePage() {
           <ArrowLeft size={20} />
           Back to Dashboard
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-end', gap: '10px' }}>
           <div ref={notificationPanelRef} style={{ position: 'relative' }}>
             <button
               onClick={() => {
@@ -1398,7 +1407,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '28px', maxWidth: '1400px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '28px', maxWidth: '1400px' }}>
         {/* Main Content */}
         <div>
           {/* Profile Header */}
@@ -1406,7 +1415,7 @@ export default function ProfilePage() {
             className="profile-header"
             style={{
               borderRadius: '16px',
-              padding: '28px',
+              padding: isMobile ? '18px' : '28px',
               color: '#111827',
               marginBottom: '24px',
               display: 'flex',
@@ -1416,13 +1425,13 @@ export default function ProfilePage() {
               boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', gap: '24px', width: '100%' }}>
               <img
                 src={resolveProfileImage(formData.profileImage)}
                 alt="Profile"
                 style={{
-                  width: '120px',
-                  height: '120px',
+                  width: isMobile ? '88px' : '120px',
+                  height: isMobile ? '88px' : '120px',
                   borderRadius: '12px',
                   border: '4px solid white',
                   objectFit: 'cover',
@@ -1466,7 +1475,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div>
-                    <h1 style={{ fontSize: '28px', fontWeight: '800', margin: '0 0 8px 0', color: '#111827' }}>
+                    <h1 style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: '800', margin: '0 0 8px 0', color: '#111827' }}>
                       {profileData.fullName}
                     </h1>
                     <p style={{ fontSize: '16px', margin: 0, color: '#7a5b00', fontWeight: '600' }}>
@@ -1618,7 +1627,7 @@ export default function ProfilePage() {
               </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', alignSelf: 'flex-end', paddingBottom: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', alignSelf: isMobile ? 'stretch' : 'flex-end', width: isMobile ? '100%' : 'auto', paddingBottom: '6px' }}>
                 <button
                 onClick={() => {
                   setFormData(profileData);
@@ -1642,6 +1651,8 @@ export default function ProfilePage() {
                   position: 'relative',
                   overflow: 'hidden',
                   boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center',
                 }}
               >
                 {hoverButton === 'edit' && (
@@ -1678,7 +1689,7 @@ export default function ProfilePage() {
             style={{
               background: 'white',
               borderRadius: '16px',
-              padding: '24px',
+              padding: isMobile ? '18px' : '24px',
               marginBottom: '24px',
               border: '1px solid #efe5d7',
               boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
@@ -1702,12 +1713,12 @@ export default function ProfilePage() {
             style={{
               background: 'white',
               borderRadius: '16px',
-              padding: '24px',
+              padding: isMobile ? '18px' : '24px',
               border: '1px solid #efe5d7',
               boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? '12px' : 0, marginBottom: '16px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', margin: 0, color: '#111827' }}>
                 Project Table
               </h2>
@@ -1730,6 +1741,8 @@ export default function ProfilePage() {
                   position: 'relative',
                   overflow: 'hidden',
                   boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center',
                 }}
               >
                 {hoverButton === 'addProjectBtn' && (
@@ -1818,7 +1831,7 @@ export default function ProfilePage() {
             style={{
               background: 'white',
               borderRadius: '16px',
-              padding: '24px',
+              padding: isMobile ? '18px' : '24px',
               marginBottom: '24px',
               border: '1px solid #efe5d7',
               boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
@@ -1926,7 +1939,7 @@ export default function ProfilePage() {
             style={{
               background: 'white',
               borderRadius: '16px',
-              padding: '24px',
+              padding: isMobile ? '18px' : '24px',
               border: '1px solid #efe5d7',
               boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
             }}
@@ -1945,7 +1958,7 @@ export default function ProfilePage() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '32px',
+                padding: isMobile ? '20px 16px' : '32px',
                 border: isDragging ? '2px dashed #3b82f6' : '2px dashed #d1d5db',
                 borderRadius: '12px',
                 background: isDragging ? '#eff6ff' : '#f9fafb',

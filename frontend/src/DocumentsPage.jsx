@@ -10,6 +10,9 @@ const MAX_DOCUMENT_FILE_SIZE_LABEL = '15MB';
 
 export default function DocumentsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  ));
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyUpload, setBusyUpload] = useState(false);
@@ -37,6 +40,12 @@ export default function DocumentsPage() {
   const [adminRejectRequestId, setAdminRejectRequestId] = useState('');
   const adminUploadInputRef = useRef(null);
   const [adminUploadRequestId, setAdminUploadRequestId] = useState('');
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const formatFileSize = (bytes) => {
     if (!bytes && bytes !== 0) return '0 KB';
@@ -533,10 +542,10 @@ export default function DocumentsPage() {
         }
       `}</style>
 
-      <div style={{ flex: 1, padding: '28px 32px' }}>
+      <div style={{ flex: 1, padding: isMobile ? '20px 12px' : '28px 32px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ marginBottom: '24px' }}>
-            <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#111827', margin: '0 0 6px 0' }}>
+            <h1 style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: '800', color: '#111827', margin: '0 0 6px 0' }}>
               Documents & <span style={{ color: '#e0b245' }}>Records</span>
             </h1>
             <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>
@@ -544,7 +553,7 @@ export default function DocumentsPage() {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', marginBottom: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: '16px', marginBottom: '20px' }}>
             {[
               { label: 'Total Documents', value: String(stats.totalDocuments) },
               { label: 'Certifications', value: String(stats.certifications) },
@@ -571,7 +580,7 @@ export default function DocumentsPage() {
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '18px', marginBottom: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '18px', marginBottom: '20px' }}>
             <div
               style={{
                 background: 'white',
@@ -588,7 +597,7 @@ export default function DocumentsPage() {
                 style={{
                   border: `2px dashed ${isDragging ? '#d1991f' : '#e0b245'}`,
                   borderRadius: '14px',
-                  padding: '40px',
+                  padding: isMobile ? '24px 16px' : '40px',
                   textAlign: 'center',
                   color: '#6b7280',
                   cursor: 'pointer',
@@ -747,7 +756,7 @@ export default function DocumentsPage() {
               <div />
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '12px', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '14px' }}>
               <div style={{ flex: 1, position: 'relative' }}>
                 <MagnifyingGlass size={16} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
@@ -769,6 +778,7 @@ export default function DocumentsPage() {
                 value={sortOrder}
                 onChange={(e) => { setSortOrder(e.target.value); loadAll({ sort: e.target.value }); }}
                 style={{
+                  width: isMobile ? '100%' : 'auto',
                   border: '1px solid #efe4d3',
                   borderRadius: '10px',
                   padding: '9px 12px',
@@ -809,8 +819,10 @@ export default function DocumentsPage() {
                       borderRadius: '12px',
                       padding: '12px 14px',
                       display: 'flex',
-                      alignItems: 'center',
+                      flexDirection: isMobile ? 'column' : 'row',
+                      alignItems: isMobile ? 'flex-start' : 'center',
                       justifyContent: 'space-between',
+                      gap: isMobile ? '12px' : 0,
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -822,7 +834,7 @@ export default function DocumentsPage() {
                         <div style={{ fontSize: '11px', color: '#6b7280' }}>{doc.size} • {doc.time}</div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: isMobile ? 'stretch' : 'center', gap: '10px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
                       <span style={{ fontSize: '11px', color: '#6b7280' }}>{doc.type}</span>
                       <button
                         type="button"
@@ -867,7 +879,7 @@ export default function DocumentsPage() {
       </div>
 
       {error ? (
-        <div style={{ position: 'fixed', bottom: 18, left: 120, right: 18, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 800, maxWidth: 760, zIndex: 90 }}>
+        <div style={{ position: 'fixed', bottom: 18, left: isMobile ? 12 : 120, right: 18, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '10px 12px', borderRadius: 12, fontSize: 12, fontWeight: 800, maxWidth: 760, zIndex: 90 }}>
           {error}
         </div>
       ) : null}
