@@ -965,8 +965,85 @@ export default function ProfilePage() {
         .profile-header {
           background: #d4a017;
         }
+        @media (max-width: 768px) {
+          .profile-page-root {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+          }
+          .profile-main {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+          }
+          .profile-topbar {
+            gap: 14px;
+          }
+          .profile-content-grid {
+            grid-template-columns: 1fr !important;
+            gap: 18px !important;
+            max-width: 100% !important;
+          }
+          .profile-header {
+            padding: 18px 14px !important;
+            overflow: hidden;
+          }
+          .profile-header-stack {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 16px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          .profile-image {
+            width: 72px !important;
+            height: 72px !important;
+            align-self: center !important;
+          }
+          .profile-identity {
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+          .profile-name,
+          .profile-job {
+            text-align: center !important;
+            max-width: 100% !important;
+          }
+          .profile-name {
+            font-size: 20px !important;
+            line-height: 1.15 !important;
+          }
+          .profile-socials {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+            gap: 10px !important;
+          }
+          .profile-socials button {
+            width: 100% !important;
+            min-width: 0 !important;
+            justify-content: center !important;
+          }
+          .profile-edit-wrap {
+            width: 100% !important;
+            align-self: stretch !important;
+            padding-bottom: 0 !important;
+          }
+          .profile-edit-wrap button {
+            width: 100% !important;
+          }
+          .profile-card {
+            padding: 18px 14px !important;
+          }
+          .profile-projects-wrap,
+          .profile-career-docs {
+            overflow-x: auto;
+          }
+        }
       `}</style>
       <motion.div 
+        className="profile-page-root"
         style={{ display: 'flex', minHeight: '100vh', background: '#f6f1e7' }}
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -975,9 +1052,9 @@ export default function ProfilePage() {
       >
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
       
-      <div style={{ flex: 1, padding: isMobile ? '16px 12px' : '24px' }}>
+      <div className="profile-main" style={{ flex: 1, padding: isMobile ? '16px 12px' : '24px' }}>
     
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: isMobile ? '14px' : 0, marginBottom: '24px' }}>
+      <div className="profile-topbar" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: isMobile ? '14px' : 0, marginBottom: '24px' }}>
         <button
           onClick={() => navigate(-1)}
           style={{
@@ -1409,7 +1486,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '28px', maxWidth: '1400px' }}>
+      <div className="profile-content-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '28px', maxWidth: '1400px' }}>
         {/* Main Content */}
         <div>
           {/* Profile Header */}
@@ -1427,8 +1504,9 @@ export default function ProfilePage() {
               boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
             }}
           >
-            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: '24px', width: '100%' }}>
+            <div className="profile-header-stack" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: '24px', width: '100%' }}>
               <img
+                className="profile-image"
                 src={resolveProfileImage(formData.profileImage)}
                 alt="Profile"
                 style={{
@@ -1444,7 +1522,7 @@ export default function ProfilePage() {
                   event.currentTarget.src = fallbackProfileImage;
                 }}
               />
-              <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
+              <div className="profile-identity" style={{ flex: 1, minWidth: 0, width: '100%' }}>
                 {isEditing ? (
                   <div>
                     <input
@@ -1478,15 +1556,15 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div>
-                    <h1 style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: '800', margin: '0 0 8px 0', color: '#111827', wordBreak: 'break-word', textAlign: isMobile ? 'center' : 'left' }}>
+                    <h1 className="profile-name" style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: '800', margin: '0 0 8px 0', color: '#111827', wordBreak: 'break-word', textAlign: isMobile ? 'center' : 'left' }}>
                       {profileData.fullName}
                     </h1>
-                    <p style={{ fontSize: isMobile ? '15px' : '16px', margin: 0, color: '#7a5b00', fontWeight: '600', wordBreak: 'break-word', textAlign: isMobile ? 'center' : 'left' }}>
+                    <p className="profile-job" style={{ fontSize: isMobile ? '15px' : '16px', margin: 0, color: '#7a5b00', fontWeight: '600', wordBreak: 'break-word', textAlign: isMobile ? 'center' : 'left' }}>
                       {profileData.jobTitle}
                     </p>
                   </div>
                 )}
-                <div style={{ marginTop: '12px', display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'none', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
+                <div className="profile-socials" style={{ marginTop: '12px', display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'none', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
               <button
                 onMouseEnter={() => setHoverButton('linkedin')}
                 onMouseLeave={() => setHoverButton(null)}
@@ -1640,7 +1718,7 @@ export default function ProfilePage() {
               </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', alignSelf: isMobile ? 'stretch' : 'flex-end', width: isMobile ? '100%' : 'auto', paddingBottom: '6px' }}>
+              <div className="profile-edit-wrap" style={{ display: 'flex', alignItems: 'center', alignSelf: isMobile ? 'stretch' : 'flex-end', width: isMobile ? '100%' : 'auto', paddingBottom: '6px' }}>
                 <button
                 onClick={() => {
                   setFormData(profileData);
@@ -1699,6 +1777,7 @@ export default function ProfilePage() {
 
           {/* About Me */}
           <div
+            className="profile-card"
             style={{
               background: 'white',
               borderRadius: '16px',
@@ -1723,6 +1802,7 @@ export default function ProfilePage() {
 
           {/* Project Table */}
           <div
+            className="profile-card"
             style={{
               background: 'white',
               borderRadius: '16px',
@@ -1788,7 +1868,7 @@ export default function ProfilePage() {
             {projects.length === 0 ? (
               <p style={{ color: '#9ca3af' }}>No projects added yet.</p>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
+              <div className="profile-projects-wrap" style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #f3f4f6' }}>
@@ -1841,6 +1921,7 @@ export default function ProfilePage() {
         <div>
           {/* More Details */}
           <div
+            className="profile-card"
             style={{
               background: 'white',
               borderRadius: '16px',
@@ -1949,6 +2030,7 @@ export default function ProfilePage() {
 
           {/* Career Documents */}
           <div
+            className="profile-card profile-career-docs"
             style={{
               background: 'white',
               borderRadius: '16px',
