@@ -126,7 +126,11 @@ const verifyAdmin = async (req, res, next) => {
 
 router.get('/pending-users', verifyAdmin, async (req, res) => {
   try {
-    const pendingUsers = await User.find({ status: 'pending', role: 'user' })
+    const pendingUsers = await User.find({
+      status: 'pending',
+      role: 'user',
+      registrationVerifiedAt: { $ne: null },
+    })
       .select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash')
       .sort({ createdAt: -1 })
       .lean();
@@ -347,10 +351,14 @@ router.post('/reject/:userId', verifyAdmin, async (req, res) => {
 
 router.get('/stats', verifyAdmin, async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments({ role: 'user' });
     const approvedUsers = await User.countDocuments({ role: 'user', status: 'approved' });
-    const pendingUsers = await User.countDocuments({ role: 'user', status: 'pending' });
+    const pendingUsers = await User.countDocuments({
+      role: 'user',
+      status: 'pending',
+      registrationVerifiedAt: { $ne: null },
+    });
     const rejectedUsers = await User.countDocuments({ role: 'user', status: 'rejected' });
+    const totalUsers = approvedUsers + pendingUsers + rejectedUsers;
 
     res.json({
       totalUsers,

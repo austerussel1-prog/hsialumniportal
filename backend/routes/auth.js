@@ -7,8 +7,7 @@ const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
 const User = require('../models/User');
 const FeedbackReview = require('../models/FeedbackReview');
-const { sendAccountFeedbackEmail } = require('../services/emailService');
-const sendOTPEmail = require('../utils/sendEmail');
+const { sendAccountFeedbackEmail, sendOTP } = require('../services/emailService');
 const { logAuditEvent, getClientIp } = require('../utils/auditLogger');
 const { touchUserActivity } = require('../utils/userActivity');
 const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
@@ -247,7 +246,11 @@ router.post('/login', async (req, res) => {
 
       if (user.status !== 'approved') {
         if (user.status === 'pending') {
-          return res.status(403).json({ message: 'Your account is pending admin approval' });
+          return res.status(403).json({
+            message: user.registrationVerifiedAt
+              ? 'Your account is pending admin approval'
+              : 'Please verify your email first before logging in.',
+          });
         }
       }
     }
@@ -259,7 +262,7 @@ router.post('/login', async (req, res) => {
       user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
       await user.save();
 
-      await sendOTPEmail(user.email, otp);
+      await sendOTP(user.email, otp);
 
       const twoFactorToken = jwt.sign(
         { id: user._id, email: user.email, purpose: 'login_2fa' },
@@ -462,13 +465,14 @@ router.post('/google', async (req, res) => {
         password: randomPassword,
         role: 'user',
         status: 'pending',
+        registrationVerifiedAt: null,
         otp,
         otpExpiry,
         consent: consentRecord || undefined,
       });
 
       await user.save();
-      await sendOTPEmail(email, otp);
+      await sendOTP(email, otp);
 
       await logAuditEvent({
         req,
@@ -510,11 +514,12 @@ router.post('/google', async (req, res) => {
         user.otp = otp;
         user.otpExpiry = otpExpiry;
         user.status = 'pending';
+        user.registrationVerifiedAt = null;
         user.googleId = googleId;
         user.provider = 'google';
         if (consentRecord) user.consent = consentRecord;
         await user.save();
-        await sendOTPEmail(user.email, otp);
+        await sendOTP(user.email, otp);
 
         await logAuditEvent({
           req,
@@ -1250,7 +1255,7 @@ router.post('/forgot-password', async (req, res) => {
     user.otpExpiry = otpExpiry;
     await user.save();
 
-    await sendOTPEmail(email, otp);
+    await sendOTP(email, otp);
 
     await logAuditEvent({
       req,

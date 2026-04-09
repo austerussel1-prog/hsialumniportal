@@ -97,6 +97,10 @@ const userSchema = new mongoose.Schema({
   approvedAt: {
     type: Date,
   },
+  registrationVerifiedAt: {
+    type: Date,
+    default: null,
+  },
   otp: {
     type: String,
   },

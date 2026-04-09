@@ -153,7 +153,7 @@ export default function RegisterPage() {
       console.log('Response data:', data);
 
       if (response.ok) {
-        setMessage('OTP sent! Check terminal for OTP code.');
+        setMessage(data.message || 'OTP sent to your email.');
         setShowOTPModal(true);
       } else {
         setError(data.message || 'Failed to send OTP');

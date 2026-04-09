@@ -1,6 +1,6 @@
 const express = require('express');
 const User = require('../models/User');
-const sendOTPEmail = require("../utils/sendEmail");
+const { sendOTP } = require('../services/emailService');
 const { logAuditEvent, getClientIp } = require('../utils/auditLogger');
 
 const router = express.Router();
@@ -59,6 +59,7 @@ router.post('/send-otp', async (req, res) => {
       existingUser.otpExpiry = otpExpiry;
       existingUser.username = username;
       existingUser.status = 'pending'; // Reset status to pending for retry
+      existingUser.registrationVerifiedAt = null;
       existingUser.consent = consentRecord;
       await existingUser.save();
     } else {
@@ -70,12 +71,13 @@ router.post('/send-otp', async (req, res) => {
         otp,
         otpExpiry,
         status: 'pending',
+        registrationVerifiedAt: null,
         consent: consentRecord,
       });
       await tempUser.save();
     }
 
-    await sendOTPEmail(email, otp);
+    await sendOTP(email, otp);
 
     await logAuditEvent({
       req,
@@ -135,6 +137,7 @@ router.post('/verify-otp', async (req, res) => {
     user.otp = undefined;
     user.otpExpiry = undefined;
     user.status = 'pending';
+    user.registrationVerifiedAt = new Date();
 
     await user.save();
 
