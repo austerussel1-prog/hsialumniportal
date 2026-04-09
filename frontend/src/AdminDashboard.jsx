@@ -658,12 +658,14 @@ export default function AdminDashboard() {
         },
       });
 
+      const data = await response.json().catch(() => null);
+
       if (response.ok) {
         await fetchPendingUsers();
         await fetchStats();
-        notify('success', 'User approved successfully.');
+        notify('success', data?.message || 'User approved successfully.');
       } else {
-        notify('error', 'Failed to approve user.');
+        notify('error', data?.message || 'Failed to approve user.');
       }
     } catch (err) {
       console.error('Error approving user:', err);
@@ -1045,15 +1047,17 @@ export default function AdminDashboard() {
         body: JSON.stringify({ reason: rejectReason }),
       });
 
+      const data = await response.json().catch(() => null);
+
       if (response.ok) {
         await fetchPendingUsers();
         await fetchStats();
         setShowRejectModal(false);
         setRejectReason('');
         setSelectedUserId(null);
-        notify('success', 'User rejected successfully.');
+        notify('success', data?.message || 'User rejected successfully.');
       } else {
-        notify('error', 'Failed to reject user.');
+        notify('error', data?.message || 'Failed to reject user.');
       }
     } catch (err) {
       console.error('Error rejecting user:', err);

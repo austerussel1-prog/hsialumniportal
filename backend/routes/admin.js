@@ -240,8 +240,13 @@ router.post('/approve/:userId', verifyAdmin, async (req, res) => {
     user.approvedAt = new Date();
     await user.save();
 
-  
-    await sendApprovalEmail(user.email, user.name);
+    let notificationSent = true;
+    try {
+      await sendApprovalEmail(user.email, user.name);
+    } catch (mailErr) {
+      notificationSent = false;
+      console.error('[admin] Failed to send approval email:', mailErr.message);
+    }
 
     await logAuditEvent({
       req,
@@ -251,15 +256,21 @@ router.post('/approve/:userId', verifyAdmin, async (req, res) => {
       entityType: 'User',
       entityId: String(user._id),
       status: 'success',
-      metadata: { approvedEmail: user.email },
+      metadata: { approvedEmail: user.email, notificationSent },
     });
 
-    res.json({ message: 'User approved successfully', user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      status: user.status,
-    }});
+    res.json({
+      message: notificationSent
+        ? 'User approved successfully'
+        : 'User approved successfully, but the approval email could not be sent.',
+      notificationSent,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        status: user.status,
+      },
+    });
   } catch (err) {
     console.error(err);
     await logAuditEvent({
@@ -292,8 +303,13 @@ router.post('/reject/:userId', verifyAdmin, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-   
-    await sendRejectionEmail(user.email, user.name, reason);
+    let notificationSent = true;
+    try {
+      await sendRejectionEmail(user.email, user.name, reason);
+    } catch (mailErr) {
+      notificationSent = false;
+      console.error('[admin] Failed to send rejection email:', mailErr.message);
+    }
 
     await logAuditEvent({
       req,
@@ -303,10 +319,15 @@ router.post('/reject/:userId', verifyAdmin, async (req, res) => {
       entityType: 'User',
       entityId: String(user._id),
       status: 'success',
-      metadata: { rejectedEmail: user.email, reason: reason || '' },
+      metadata: { rejectedEmail: user.email, reason: reason || '', notificationSent },
     });
 
-    res.json({ message: 'User rejected successfully' });
+    res.json({
+      message: notificationSent
+        ? 'User rejected successfully'
+        : 'User rejected successfully, but the rejection email could not be sent.',
+      notificationSent,
+    });
   } catch (err) {
     console.error(err);
     await logAuditEvent({
