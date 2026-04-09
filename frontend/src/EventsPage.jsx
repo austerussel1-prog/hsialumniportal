@@ -656,8 +656,11 @@ export default function EventsPage() {
             padding: 16px 10px !important;
           }
           .eventsRegistrationTitle {
-            font-size: 34px !important;
-            line-height: 1.14 !important;
+            font-size: 24px !important;
+            line-height: 1.12 !important;
+            overflow-wrap: anywhere !important;
+            word-break: break-word !important;
+            max-width: 100% !important;
           }
           .eventsRegistrationForm {
             gap: 10px !important;

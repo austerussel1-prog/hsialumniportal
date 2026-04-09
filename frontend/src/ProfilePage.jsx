@@ -1062,18 +1062,19 @@ export default function ProfilePage() {
                   exit={{ opacity: 0, scale: 0.98, y: 6 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
                   style={{
-                    position: 'absolute',
-                    top: '54px',
-                    right: 0,
-                    width: '390px',
-                    maxWidth: 'calc(100vw - 40px)',
-                    maxHeight: '460px',
+                    position: isMobile ? 'fixed' : 'absolute',
+                    top: isMobile ? '74px' : '54px',
+                    right: isMobile ? '12px' : 0,
+                    left: isMobile ? '12px' : 'auto',
+                    width: isMobile ? 'auto' : '390px',
+                    maxWidth: isMobile ? 'none' : 'calc(100vw - 40px)',
+                    maxHeight: isMobile ? 'min(70vh, 520px)' : '460px',
                     overflowY: 'auto',
                     background: 'white',
                     border: '1px solid #e5e7eb',
                     borderRadius: '16px',
                     boxShadow: '0 20px 45px rgba(2, 6, 23, 0.2)',
-                    zIndex: 30,
+                    zIndex: 80,
                   }}
                 >
                   <div style={{ padding: '16px 16px 10px 16px' }}>
@@ -1334,16 +1335,17 @@ export default function ProfilePage() {
                   exit={{ opacity: 0, scale: 0.98, y: 6 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
                   style={{
-                    position: 'absolute',
-                    top: '54px',
-                    right: 0,
+                    position: isMobile ? 'fixed' : 'absolute',
+                    top: isMobile ? '74px' : '54px',
+                    right: isMobile ? '12px' : 0,
+                    left: isMobile ? 'auto' : 'auto',
                     width: '220px',
                     background: 'white',
                     border: '1px solid #efe4d3',
                     borderRadius: '14px',
                     boxShadow: '0 16px 30px rgba(0,0,0,0.12)',
                     overflow: 'hidden',
-                    zIndex: 20,
+                    zIndex: 80,
                   }}
                 >
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
@@ -1425,7 +1427,7 @@ export default function ProfilePage() {
               boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
             }}
           >
-            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', gap: '24px', width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: '24px', width: '100%' }}>
               <img
                 src={resolveProfileImage(formData.profileImage)}
                 alt="Profile"
@@ -1436,12 +1438,13 @@ export default function ProfilePage() {
                   border: '4px solid white',
                   objectFit: 'cover',
                   boxShadow: '0 6px 18px rgba(0,0,0,0.2)',
+                  alignSelf: isMobile ? 'center' : 'auto',
                 }}
                 onError={(event) => {
                   event.currentTarget.src = fallbackProfileImage;
                 }}
               />
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
                 {isEditing ? (
                   <div>
                     <input
@@ -1475,15 +1478,15 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div>
-                    <h1 style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: '800', margin: '0 0 8px 0', color: '#111827' }}>
+                    <h1 style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: '800', margin: '0 0 8px 0', color: '#111827', wordBreak: 'break-word', textAlign: isMobile ? 'center' : 'left' }}>
                       {profileData.fullName}
                     </h1>
-                    <p style={{ fontSize: '16px', margin: 0, color: '#7a5b00', fontWeight: '600' }}>
+                    <p style={{ fontSize: isMobile ? '15px' : '16px', margin: 0, color: '#7a5b00', fontWeight: '600', wordBreak: 'break-word', textAlign: isMobile ? 'center' : 'left' }}>
                       {profileData.jobTitle}
                     </p>
                   </div>
                 )}
-                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ marginTop: '12px', display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'none', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
               <button
                 onMouseEnter={() => setHoverButton('linkedin')}
                 onMouseLeave={() => setHoverButton(null)}
@@ -1504,6 +1507,9 @@ export default function ProfilePage() {
                   overflow: 'hidden',
                   opacity: profileData.linkedinUrl ? 1 : 0.5,
                   boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center',
+                  minWidth: 0,
                 }}
               >
                 {hoverButton === 'linkedin' && (
@@ -1551,6 +1557,9 @@ export default function ProfilePage() {
                   overflow: 'hidden',
                   opacity: profileData.twitterUrl ? 1 : 0.5,
                   boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center',
+                  minWidth: 0,
                 }}
               >
                 {hoverButton === 'twitter' && (
@@ -1598,6 +1607,10 @@ export default function ProfilePage() {
                   overflow: 'hidden',
                   opacity: profileData.instagramUrl ? 1 : 0.5,
                   boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                  width: isMobile ? '100%' : 'auto',
+                  justifyContent: 'center',
+                  minWidth: 0,
+                  gridColumn: isMobile ? '1 / -1' : 'auto',
                 }}
               >
                 {hoverButton === 'instagram' && (
