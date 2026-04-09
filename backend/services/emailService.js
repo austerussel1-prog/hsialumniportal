@@ -17,19 +17,26 @@ if (!emailUser || !emailPassword) {
   });
 }
 
-const transporter = nodemailer.createTransport({
+const smtpTimeouts = {
+  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 30000),
+  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 30000),
+  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 30000),
+};
+
+const createSmtpTransport = (overrides = {}) => nodemailer.createTransport({
   host: smtpHost,
   port: smtpPort,
   secure: smtpSecure,
   requireTLS: !smtpSecure,
-  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 15000),
-  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 15000),
-  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 20000),
+  ...smtpTimeouts,
   auth: {
     user: emailUser,
     pass: emailPassword,
   },
+  ...overrides,
 });
+
+const transporter = createSmtpTransport();
 
 const assertEmailConfig = () => {
   if (!emailUser || !emailPassword) {
@@ -102,6 +109,26 @@ const sendMail = async (mailOptions) => {
     await transporter.sendMail(mailOptions);
     return true;
   } catch (error) {
+    // Gmail SMTP can be flaky on some hosts; retry with alternate Gmail configs.
+    const retries = [
+      createSmtpTransport({ host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true }),
+      createSmtpTransport({ host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false }),
+      nodemailer.createTransport({
+        service: 'gmail',
+        ...smtpTimeouts,
+        auth: { user: emailUser, pass: emailPassword },
+      }),
+    ];
+
+    for (const candidate of retries) {
+      try {
+        await candidate.sendMail(mailOptions);
+        return true;
+      } catch (_retryError) {
+        // try next transport
+      }
+    }
+
     throw new Error(`SMTP delivery failed: ${error.message}`);
   }
 };
