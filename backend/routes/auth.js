@@ -11,6 +11,7 @@ const { sendAccountFeedbackEmail, sendOTP } = require('../services/emailService'
 const { logAuditEvent, getClientIp } = require('../utils/auditLogger');
 const { touchUserActivity } = require('../utils/userActivity');
 const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
+const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const router = express.Router();
 
@@ -22,6 +23,20 @@ const LOGIN_LOCK_MINUTES = Math.max(1, parseInt(process.env.LOGIN_LOCK_MINUTES |
 
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function displayName(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (!isEncryptedValue(raw)) return raw;
+  return decryptField(raw);
+}
+
+function revealEncrypted(value) {
+  if (value === null || typeof value === 'undefined') return value;
+  const raw = String(value);
+  if (!isEncryptedValue(raw)) return value;
+  return decryptField(raw);
 }
 
 function buildUserPayload(user) {
@@ -979,7 +994,7 @@ router.get('/feedback/alumni-users', verifyToken, async (req, res) => {
     return res.json({
       users: alumniUsers.map((item) => ({
         id: String(item._id),
-        name: item.name || 'User',
+        name: displayName(item.name) || 'User',
         email: item.email || '',
         role: item.role || '',
       })),
@@ -1012,10 +1027,10 @@ router.get('/feedback/reviews', verifyToken, async (req, res) => {
           : null,
         program: item.feedbackType === 'program_evaluation' ? (item.program || '') : '',
         createdAt: item.createdAt,
-        authorName: item.author?.name || 'User',
+        authorName: displayName(item.author?.name) || 'User',
         authorEmail: item.author?.email || '',
-        authorProfileImage: item.author?.profileImage || '',
-        targetUserName: item.feedbackType === 'alumni_feedback' ? (item.targetUser?.name || '') : '',
+        authorProfileImage: revealEncrypted(item.author?.profileImage) || '',
+        targetUserName: item.feedbackType === 'alumni_feedback' ? (displayName(item.targetUser?.name) || '') : '',
         targetUserEmail: item.feedbackType === 'alumni_feedback' ? (item.targetUser?.email || '') : '',
       })),
     });
