@@ -15,8 +15,10 @@ const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const router = express.Router();
 
-const googleClient = process.env.GOOGLE_CLIENT_ID
-  ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+const GOOGLE_CLIENT_ID = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+
+const googleClient = GOOGLE_CLIENT_ID
+  ? new OAuth2Client(GOOGLE_CLIENT_ID)
   : null;
 const LOGIN_MAX_ATTEMPTS = Math.max(1, parseInt(process.env.LOGIN_MAX_ATTEMPTS || '5', 10) || 5);
 const LOGIN_LOCK_MINUTES = Math.max(1, parseInt(process.env.LOGIN_LOCK_MINUTES || '15', 10) || 15);
@@ -76,7 +78,7 @@ function getGoogleAuthErrorResponse(err, idToken) {
   const tokenAuthorizedParty = tokenPayload?.azp || null;
   const tokenIssuer = tokenPayload?.iss || null;
   const tokenExpiry = tokenPayload?.exp || null;
-  const expectedAudience = String(process.env.GOOGLE_CLIENT_ID || '').trim() || null;
+  const expectedAudience = GOOGLE_CLIENT_ID || null;
 
   if (
     message.includes('Wrong recipient')
@@ -130,7 +132,7 @@ function getGoogleAuthErrorResponse(err, idToken) {
 }
 
 function getGoogleClientIdDebugInfo() {
-  const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+  const clientId = GOOGLE_CLIENT_ID;
 
   return {
     configured: Boolean(clientId),
@@ -551,7 +553,7 @@ router.post('/google', async (req, res) => {
 
     const ticket = await googleClient.verifyIdToken({
       idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: GOOGLE_CLIENT_ID,
     });
 
     const payload = ticket.getPayload();
