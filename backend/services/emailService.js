@@ -52,11 +52,17 @@ const assertEmailConfig = () => {
 const hasUsableGmailApi = () => Boolean(
   gmailOauthClientId && gmailOauthClientSecret && gmailOauthRefreshToken && gmailSenderEmail,
 );
+const hasUsableSmtp = () => Boolean(emailUser && emailPassword);
 const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
 const activeEmailMode = hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp');
 console.log('[email] Provider mode:', activeEmailMode);
+
+const shouldFallbackFromResend = (error) => {
+  const message = String(error?.message || '');
+  return /resend api error \(4\d{2}\)|validation_error|verify a domain|testing emails|change the "from" address/i.test(message);
+};
 
 const toBase64Url = (input) => Buffer.from(input, 'utf8')
   .toString('base64')
@@ -203,7 +209,17 @@ const sendMail = async (mailOptions) => {
     try {
       return await sendViaResend(mailOptions);
     } catch (error) {
-      throw new Error(`Resend delivery failed: ${error.message}`);
+      const wrappedError = new Error(`Resend delivery failed: ${error.message}`);
+      const canFallback = hasUsableGmailApi() || hasUsableSmtp();
+
+      if (!canFallback || !shouldFallbackFromResend(error)) {
+        throw wrappedError;
+      }
+
+      console.warn('[email] Resend failed, falling back to alternate provider', {
+        reason: error.message,
+        fallback: hasUsableGmailApi() ? 'gmail_api' : 'smtp',
+      });
     }
   }
 
