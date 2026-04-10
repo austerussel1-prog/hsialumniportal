@@ -25,6 +25,76 @@ function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function buildGoogleUsernameBase(email) {
+  const raw = String(email || '').split('@')[0].trim().toLowerCase();
+  const sanitized = raw.replace(/[^a-z0-9._-]/g, '');
+  return sanitized || 'user';
+}
+
+async function generateUniqueUsername(baseUsername, excludeUserId = null) {
+  const base = String(baseUsername || '').trim() || 'user';
+
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = attempt === 0 ? '' : String(attempt + 1);
+    const candidate = `${base}${suffix}`;
+    const existingUser = await User.findOne({ username: candidate }).select('_id');
+
+    if (!existingUser) {
+      return candidate;
+    }
+
+    if (excludeUserId && String(existingUser._id) === String(excludeUserId)) {
+      return candidate;
+    }
+  }
+
+  return `${base}${Date.now()}`;
+}
+
+function getGoogleAuthErrorResponse(err) {
+  const message = String(err?.message || '').trim();
+  const keyPattern = err?.keyPattern || {};
+
+  if (
+    message.includes('Wrong recipient')
+    || message.includes('payload audience')
+    || message.includes('audience')
+  ) {
+    return {
+      status: 400,
+      message: 'Google OAuth client ID mismatch between frontend and backend deployment. Update VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID to the same web client ID, then redeploy both services.',
+    };
+  }
+
+  if (err?.code === 11000) {
+    if (keyPattern.username) {
+      return {
+        status: 409,
+        message: 'Google account could not be registered because the generated username is already in use. Please try again.',
+      };
+    }
+
+    if (keyPattern.googleId) {
+      return {
+        status: 409,
+        message: 'This Google account is already linked to another user.',
+      };
+    }
+
+    if (keyPattern.emailHash) {
+      return {
+        status: 409,
+        message: 'An account with this email already exists. Try signing in instead.',
+      };
+    }
+  }
+
+  return {
+    status: 400,
+    message: 'Google authentication failed',
+  };
+}
+
 function displayName(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -468,13 +538,14 @@ router.post('/google', async (req, res) => {
       // On registration page, send OTP
       const otp = generateOTP();
       const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-      const baseUsername = email.split('@')[0];
+      const baseUsername = buildGoogleUsernameBase(email);
+      const username = await generateUniqueUsername(baseUsername);
       const randomPassword = crypto.randomBytes(32).toString('hex');
 
       user = new User({
         name: name || baseUsername,
         email,
-        username: baseUsername,
+        username,
         googleId,
         provider: 'google',
         password: randomPassword,
@@ -594,6 +665,15 @@ router.post('/google', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    console.error('Google auth error details:', {
+      message: err?.message,
+      code: err?.code,
+      keyPattern: err?.keyPattern,
+      stack: err?.stack,
+    });
+
+    const errorResponse = getGoogleAuthErrorResponse(err);
+
     await logAuditEvent({
       req,
       actorEmail: req.body?.email || '',
@@ -603,7 +683,7 @@ router.post('/google', async (req, res) => {
       status: 'failure',
       metadata: { error: err.message },
     });
-    res.status(400).json({ message: 'Google authentication failed' });
+    res.status(errorResponse.status).json({ message: errorResponse.message });
   }
 });
 
