@@ -95,6 +95,18 @@ function getGoogleAuthErrorResponse(err) {
   };
 }
 
+function getGoogleClientIdDebugInfo() {
+  const clientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+
+  return {
+    configured: Boolean(clientId),
+    clientId,
+    fingerprint: clientId
+      ? crypto.createHash('sha256').update(clientId).digest('hex').slice(0, 12)
+      : null,
+  };
+}
+
 function displayName(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -478,6 +490,10 @@ router.post('/login/verify-2fa', async (req, res) => {
 // Quick health-check for auth routes
 router.get('/_route_check', (req, res) => {
   res.json({ ok: true, route: '/api/auth' });
+});
+
+router.get('/google/_debug', (req, res) => {
+  res.json(getGoogleClientIdDebugInfo());
 });
 
 
