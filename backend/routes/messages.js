@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const Message = require('../models/Message');
+const User = require('../models/User');
 const { verifyToken } = require('./auth');
 const multer = require('multer');
 const path = require('path');
@@ -87,6 +88,22 @@ function normalizeUserPublic(user) {
     profileImage: revealField(user.profileImage) || '',
     jobTitle: user.jobTitle || '',
   };
+}
+
+const MESSAGING_BYPASS_ROLES = new Set(['super_admin', 'admin', 'hr', 'alumni_officer']);
+
+function canAccessMessaging(user) {
+  if (!user || user.isDeleted || user.isAnonymized) return false;
+  const role = String(user.role || '').trim().toLowerCase();
+  const status = String(user.status || '').trim().toLowerCase();
+  return MESSAGING_BYPASS_ROLES.has(role) || status === 'approved';
+}
+
+async function loadMessagingUser(userId) {
+  if (!mongoose.isValidObjectId(String(userId || ''))) return null;
+  return User.findById(userId)
+    .select('_id role status isDeleted isAnonymized name fullName email profileImage jobTitle')
+    .lean();
 }
 
 const normalizeGifItem = (item, index) => {
@@ -213,12 +230,17 @@ router.get('/attachments/:messageId', verifyToken, async (req, res) => {
 router.get('/conversations', verifyToken, async (req, res) => {
   try {
     const userId = String(req.user.id);
+    const currentUser = await loadMessagingUser(userId);
+    if (!canAccessMessaging(currentUser)) {
+      return res.json({ conversations: [] });
+    }
+
     const messages = await Message.find({
       $or: [{ sender: userId }, { recipient: userId }],
     })
       .sort({ createdAt: -1 })
-      .populate('sender', 'name fullName email profileImage jobTitle')
-      .populate('recipient', 'name fullName email profileImage jobTitle');
+      .populate('sender', 'name fullName email profileImage jobTitle role status isDeleted isAnonymized')
+      .populate('recipient', 'name fullName email profileImage jobTitle role status isDeleted isAnonymized');
 
     const seen = new Set();
     const conversations = [];
@@ -229,7 +251,7 @@ router.get('/conversations', verifyToken, async (req, res) => {
       const otherUser = senderId === userId ? msg.recipient : msg.sender;
       const otherId = senderId === userId ? recipientId : senderId;
 
-      if (!otherUser || seen.has(otherId)) continue;
+      if (!otherUser || seen.has(otherId) || !canAccessMessaging(otherUser)) continue;
       seen.add(otherId);
 
       conversations.push({
@@ -260,6 +282,19 @@ router.get('/:recipientId', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid conversation recipient.' });
     }
 
+    const [currentUser, recipientUser] = await Promise.all([
+      loadMessagingUser(userId),
+      loadMessagingUser(recipientId),
+    ]);
+
+    if (!canAccessMessaging(currentUser)) {
+      return res.status(403).json({ error: 'Inbox is available only for approved accounts.' });
+    }
+
+    if (!canAccessMessaging(recipientUser)) {
+      return res.status(404).json({ error: 'Conversation recipient is unavailable.' });
+    }
+
     const messages = await Message.find({
       $or: [
         { sender: userId, recipient: recipientId },
@@ -268,10 +303,10 @@ router.get('/:recipientId', verifyToken, async (req, res) => {
     }).sort({ createdAt: 1 });
     // populate sender and recipient so frontend can show names and avatars
     const populated = await Message.populate(messages, [
-      { path: 'sender', select: 'name fullName profileImage' },
-      { path: 'recipient', select: 'name fullName profileImage' },
+      { path: 'sender', select: 'name fullName profileImage role status isDeleted isAnonymized' },
+      { path: 'recipient', select: 'name fullName profileImage role status isDeleted isAnonymized' },
     ]);
-    const normalized = populated.map((item) => {
+    const normalized = populated.filter((item) => canAccessMessaging(item?.sender) && canAccessMessaging(item?.recipient)).map((item) => {
       const plain = item?.toObject ? item.toObject() : item;
       return {
         ...plain,
@@ -307,6 +342,19 @@ router.post('/:recipientId', verifyToken, (req, res, next) => {
   try {
     const userId = req.user.id;
     const recipientId = req.params.recipientId;
+    const [currentUser, recipientUser] = await Promise.all([
+      loadMessagingUser(userId),
+      loadMessagingUser(recipientId),
+    ]);
+
+    if (!canAccessMessaging(currentUser)) {
+      return res.status(403).json({ error: 'Inbox is available only for approved accounts.' });
+    }
+
+    if (!canAccessMessaging(recipientUser)) {
+      return res.status(404).json({ error: 'Recipient is unavailable for messaging.' });
+    }
+
     const rawText = typeof req.body?.text === 'string' ? req.body.text : '';
     const normalizedText = rawText.trim();
     const uploadedFile = req.files?.attachment?.[0] || req.files?.image?.[0] || null;
