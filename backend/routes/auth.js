@@ -634,7 +634,7 @@ router.get('/directory', verifyToken, async (req, res) => {
   try {
     const includePrivate = String(req.query?.includePrivate || '').trim() === '1';
     const isAdminViewer = ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(String(req.user?.role || ''));
-    const pendingFilter = { status: { $ne: 'pending' } };
+    const approvedFilter = { status: 'approved' };
     const visibilityFilter = (isAdminViewer || includePrivate)
       ? {}
       : {
@@ -644,7 +644,7 @@ router.get('/directory', verifyToken, async (req, res) => {
           ],
         };
     const query = {
-      ...pendingFilter,
+      ...approvedFilter,
       ...visibilityFilter,
     };
 
@@ -666,6 +666,10 @@ router.get('/directory/:userId', verifyToken, async (req, res) => {
     const user = await User.findById(userId).select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash');
 
     if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (String(user.status || '').trim().toLowerCase() !== 'approved') {
       return res.status(404).json({ message: 'User not found' });
     }
 

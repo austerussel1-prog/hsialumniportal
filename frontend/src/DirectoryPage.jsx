@@ -23,7 +23,7 @@ export default function DirectoryPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
-  const isVisibleDirectoryUser = (user) => String(user?.status || '').trim().toLowerCase() !== 'pending';
+  const isVisibleDirectoryUser = (user) => String(user?.status || '').trim().toLowerCase() === 'approved';
 
   const mapUsersToProfiles = (users) => users.map((user) => {
     const userId = user.id || user._id;
@@ -150,9 +150,9 @@ export default function DirectoryPage() {
 
         setProfiles(mapUsersToProfiles(filteredUsers));
 
-        if (users.length > 0) {
+        if (filteredUsers.length > 0) {
           try {
-            const serialized = JSON.stringify(users);
+            const serialized = JSON.stringify(filteredUsers);
             sessionStorage.setItem('directoryUsers', serialized);
             localStorage.setItem('directoryUsersCache', serialized);
           } catch (err) {
