@@ -53,52 +53,18 @@ async function generateUniqueUsername(baseUsername, excludeUserId = null) {
   return `${base}${Date.now()}`;
 }
 
-function decodeJwtPayloadUnsafe(token) {
-  const rawToken = String(token || '').trim();
-  if (!rawToken) return null;
-
-  const parts = rawToken.split('.');
-  if (parts.length < 2) return null;
-
-  try {
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    const payload = Buffer.from(padded, 'base64').toString('utf8');
-    return JSON.parse(payload);
-  } catch (_err) {
-    return null;
-  }
-}
-
-function getGoogleAuthErrorResponse(err, idToken) {
+function getGoogleAuthErrorResponse(err) {
   const message = String(err?.message || '').trim();
   const keyPattern = err?.keyPattern || {};
-  const tokenPayload = decodeJwtPayloadUnsafe(idToken);
-  const tokenAudience = tokenPayload?.aud || null;
-  const tokenAuthorizedParty = tokenPayload?.azp || null;
-  const tokenIssuer = tokenPayload?.iss || null;
-  const tokenExpiry = tokenPayload?.exp || null;
-  const expectedAudience = GOOGLE_CLIENT_ID || null;
 
   if (
     message.includes('Wrong recipient')
     || message.includes('payload audience')
     || message.includes('audience')
   ) {
-    const details = [
-      'Google OAuth client ID mismatch between frontend and backend deployment.',
-      expectedAudience ? `Expected: ${expectedAudience}.` : null,
-      tokenAudience ? `Token aud: ${tokenAudience}.` : null,
-      tokenAuthorizedParty ? `Token azp: ${tokenAuthorizedParty}.` : null,
-      tokenIssuer ? `Token iss: ${tokenIssuer}.` : null,
-      tokenExpiry ? `Token exp: ${tokenExpiry}.` : null,
-      message ? `Original error: ${message}.` : null,
-      'Update VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID to the same web client ID, then redeploy both services.',
-    ].filter(Boolean);
-
     return {
       status: 400,
-      message: details.join(' '),
+      message: 'Google sign-in configuration is invalid. Please contact support or try again later.',
     };
   }
 
@@ -127,19 +93,7 @@ function getGoogleAuthErrorResponse(err, idToken) {
 
   return {
     status: 400,
-    message: message ? `Google authentication failed. Original error: ${message}` : 'Google authentication failed',
-  };
-}
-
-function getGoogleClientIdDebugInfo() {
-  const clientId = GOOGLE_CLIENT_ID;
-
-  return {
-    configured: Boolean(clientId),
-    clientId,
-    fingerprint: clientId
-      ? crypto.createHash('sha256').update(clientId).digest('hex').slice(0, 12)
-      : null,
+    message: 'Google authentication failed',
   };
 }
 
@@ -528,10 +482,6 @@ router.get('/_route_check', (req, res) => {
   res.json({ ok: true, route: '/api/auth' });
 });
 
-router.get('/google/_debug', (req, res) => {
-  res.json(getGoogleClientIdDebugInfo());
-});
-
 
 router.post('/google', async (req, res) => {
   try {
@@ -724,7 +674,7 @@ router.post('/google', async (req, res) => {
       stack: err?.stack,
     });
 
-    const errorResponse = getGoogleAuthErrorResponse(err, req.body?.idToken);
+    const errorResponse = getGoogleAuthErrorResponse(err);
 
     await logAuditEvent({
       req,
