@@ -51,18 +51,47 @@ async function generateUniqueUsername(baseUsername, excludeUserId = null) {
   return `${base}${Date.now()}`;
 }
 
-function getGoogleAuthErrorResponse(err) {
+function decodeJwtPayloadUnsafe(token) {
+  const rawToken = String(token || '').trim();
+  if (!rawToken) return null;
+
+  const parts = rawToken.split('.');
+  if (parts.length < 2) return null;
+
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const payload = Buffer.from(padded, 'base64').toString('utf8');
+    return JSON.parse(payload);
+  } catch (_err) {
+    return null;
+  }
+}
+
+function getGoogleAuthErrorResponse(err, idToken) {
   const message = String(err?.message || '').trim();
   const keyPattern = err?.keyPattern || {};
+  const tokenPayload = decodeJwtPayloadUnsafe(idToken);
+  const tokenAudience = tokenPayload?.aud || null;
+  const tokenAuthorizedParty = tokenPayload?.azp || null;
+  const expectedAudience = String(process.env.GOOGLE_CLIENT_ID || '').trim() || null;
 
   if (
     message.includes('Wrong recipient')
     || message.includes('payload audience')
     || message.includes('audience')
   ) {
+    const details = [
+      'Google OAuth client ID mismatch between frontend and backend deployment.',
+      expectedAudience ? `Expected: ${expectedAudience}.` : null,
+      tokenAudience ? `Token aud: ${tokenAudience}.` : null,
+      tokenAuthorizedParty ? `Token azp: ${tokenAuthorizedParty}.` : null,
+      'Update VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID to the same web client ID, then redeploy both services.',
+    ].filter(Boolean);
+
     return {
       status: 400,
-      message: 'Google OAuth client ID mismatch between frontend and backend deployment. Update VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID to the same web client ID, then redeploy both services.',
+      message: details.join(' '),
     };
   }
 
@@ -688,7 +717,7 @@ router.post('/google', async (req, res) => {
       stack: err?.stack,
     });
 
-    const errorResponse = getGoogleAuthErrorResponse(err);
+    const errorResponse = getGoogleAuthErrorResponse(err, req.body?.idToken);
 
     await logAuditEvent({
       req,
