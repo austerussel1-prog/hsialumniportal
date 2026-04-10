@@ -74,6 +74,8 @@ function getGoogleAuthErrorResponse(err, idToken) {
   const tokenPayload = decodeJwtPayloadUnsafe(idToken);
   const tokenAudience = tokenPayload?.aud || null;
   const tokenAuthorizedParty = tokenPayload?.azp || null;
+  const tokenIssuer = tokenPayload?.iss || null;
+  const tokenExpiry = tokenPayload?.exp || null;
   const expectedAudience = String(process.env.GOOGLE_CLIENT_ID || '').trim() || null;
 
   if (
@@ -86,6 +88,9 @@ function getGoogleAuthErrorResponse(err, idToken) {
       expectedAudience ? `Expected: ${expectedAudience}.` : null,
       tokenAudience ? `Token aud: ${tokenAudience}.` : null,
       tokenAuthorizedParty ? `Token azp: ${tokenAuthorizedParty}.` : null,
+      tokenIssuer ? `Token iss: ${tokenIssuer}.` : null,
+      tokenExpiry ? `Token exp: ${tokenExpiry}.` : null,
+      message ? `Original error: ${message}.` : null,
       'Update VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID to the same web client ID, then redeploy both services.',
     ].filter(Boolean);
 
@@ -120,7 +125,7 @@ function getGoogleAuthErrorResponse(err, idToken) {
 
   return {
     status: 400,
-    message: 'Google authentication failed',
+    message: message ? `Google authentication failed. Original error: ${message}` : 'Google authentication failed',
   };
 }
 
