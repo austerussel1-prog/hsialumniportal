@@ -3,6 +3,7 @@ const { OAuth2Client } = require('google-auth-library');
 
 const emailUser = String(process.env.EMAIL_USER || '').trim();
 const emailPassword = String(process.env.EMAIL_PASSWORD || '').trim();
+const mailFromName = String(process.env.MAIL_FROM_NAME || 'Highly Succeed Portal').trim();
 
 // Prefer explicit SMTP config in production to avoid provider "service" auto-config issues.
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
@@ -14,6 +15,13 @@ const gmailOauthClientId = String(process.env.GMAIL_OAUTH_CLIENT_ID || '').trim(
 const gmailOauthClientSecret = String(process.env.GMAIL_OAUTH_CLIENT_SECRET || '').trim();
 const gmailOauthRefreshToken = String(process.env.GMAIL_OAUTH_REFRESH_TOKEN || '').trim();
 const gmailSenderEmail = String(process.env.GMAIL_SENDER_EMAIL || process.env.EMAIL_USER || '').trim();
+
+const formatFromAddress = (rawEmail) => {
+  const safeEmail = String(rawEmail || '').trim();
+  if (!safeEmail) return '';
+  if (!mailFromName) return safeEmail;
+  return `${mailFromName} <${safeEmail}>`;
+};
 
 if (!emailUser || !emailPassword) {
   console.warn('[email] Missing SMTP credentials at startup', {
@@ -186,7 +194,7 @@ const sendViaResend = async (mailOptions) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: resendFrom,
+      from: mailOptions?.from || formatFromAddress(resendFrom),
       to,
       reply_to: mailOptions?.replyTo || undefined,
       subject: mailOptions?.subject || 'HSI Alumni Portal',
@@ -281,7 +289,7 @@ const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
   if (company) subjectPieces.push(company);
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: formatFromAddress(process.env.EMAIL_USER),
     to: recipient,
     replyTo: applicantEmail || undefined,
     subject: subjectPieces.join(' | '),
@@ -341,7 +349,7 @@ const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
 const sendOTP = async (email, otp) => {
   assertEmailConfig();
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: formatFromAddress(process.env.EMAIL_USER),
     to: email,
     subject: 'HSI Alumni Portal - Email Verification OTP',
     html: `
@@ -374,7 +382,7 @@ const sendOTP = async (email, otp) => {
 const sendRejectionEmail = async (email, name, reason = '') => {
   assertEmailConfig();
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: formatFromAddress(process.env.EMAIL_USER),
     to: email,
     subject: 'HSI Alumni Portal - Registration Status',
     html: `
@@ -405,7 +413,7 @@ const sendRejectionEmail = async (email, name, reason = '') => {
 const sendApprovalEmail = async (email, name) => {
   assertEmailConfig();
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: formatFromAddress(process.env.EMAIL_USER),
     to: email,
     subject: 'HSI Alumni Portal - Registration Approved!',
     html: `
@@ -442,7 +450,7 @@ const sendReferralInvitationEmail = async (toEmail, jobLink, customMessage = '')
     : 'Hi! I wanted to share this job opportunity with you.';
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: formatFromAddress(process.env.EMAIL_USER),
     to: toEmail,
     subject: 'HSI Alumni Portal - Job Referral Invitation',
     html: `
@@ -539,7 +547,7 @@ const sendDataRemovalDecisionEmail = async ({
   `;
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: formatFromAddress(process.env.EMAIL_USER),
     to: safeEmail,
     subject,
     html: `
@@ -605,7 +613,7 @@ const sendAccountFeedbackEmail = async ({ user, feedback }) => {
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: formatFromAddress(process.env.EMAIL_USER),
     to: companyEmail,
     replyTo: email !== 'N/A' ? email : undefined,
     subject: `HSI Alumni Portal - Account Feedback: ${subject}`,
@@ -670,7 +678,7 @@ const sendEventFeedbackEmail = async ({ event, feedback }) => {
   const comments = String(feedback?.comments || '').trim();
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: formatFromAddress(process.env.EMAIL_USER),
     to: recipientList.join(', '),
     replyTo: senderEmail !== 'N/A' ? senderEmail : undefined,
     subject: `HSI Alumni Portal - Event Feedback: ${eventTitle}`,

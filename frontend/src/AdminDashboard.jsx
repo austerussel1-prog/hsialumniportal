@@ -1095,9 +1095,11 @@ export default function AdminDashboard() {
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
         notify('success', data?.message || 'Data removal request approved.');
-        await fetchDataRemovalRequests(dataRemovalStatus);
-        await fetchAllUsers();
-        await fetchStats();
+        await Promise.allSettled([
+          fetchDataRemovalRequests(dataRemovalStatus),
+          fetchAllUsers(),
+          fetchStats(),
+        ]);
       } else {
         notify('error', data?.message || 'Failed to approve data removal request.');
       }
@@ -1119,11 +1121,15 @@ export default function AdminDashboard() {
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        notify('success', data?.message || 'Data removal request rejected.');
-        await fetchDataRemovalRequests(dataRemovalStatus);
         setShowDataRemovalRejectModal(false);
         setSelectedDataRemovalRequestId(null);
         setDataRemovalRejectNote('');
+        notify('success', data?.message || 'Data removal request rejected.');
+        await Promise.allSettled([
+          fetchDataRemovalRequests(dataRemovalStatus),
+          fetchAllUsers(),
+          fetchStats(),
+        ]);
       } else {
         notify('error', data?.message || 'Failed to reject data removal request.');
       }
@@ -2377,7 +2383,7 @@ export default function AdminDashboard() {
                 disabled={Boolean(dataRemovalActionLoading)}
                 className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-400 text-white font-semibold rounded-md transition"
               >
-                {dataRemovalActionLoading ? 'Rejecting...' : 'Reject Request'}
+                {dataRemovalActionLoading === selectedDataRemovalRequestId ? 'Rejecting...' : 'Reject Request'}
               </button>
             </div>
           </motion.div>
