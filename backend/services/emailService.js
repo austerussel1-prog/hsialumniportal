@@ -202,9 +202,9 @@ const sendViaResend = async (mailOptions) => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: mailOptions?.from || formatFromAddress(resendFrom),
+      from: formatFromAddress(resendFrom),
       to,
-      reply_to: mailOptions?.replyTo || undefined,
+      reply_to: mailOptions?.replyTo || mailOptions?.from || undefined,
       subject: mailOptions?.subject || 'HSI Alumni Portal',
       html: mailOptions?.html || undefined,
       text: mailOptions?.text || undefined,
