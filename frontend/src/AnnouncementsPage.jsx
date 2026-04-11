@@ -433,36 +433,38 @@ export default function AnnouncementsPage() {
 
         <div className="mt-4 flex w-full flex-col items-start gap-6 lg:flex-row lg:items-start">
           {/* Left categories */}
-          <aside className="w-full flex-shrink-0 self-start lg:sticky lg:top-6 lg:w-64 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
-            <div className="bg-white rounded-2xl p-4 border border-gray-200">
-              <div className="font-bold text-sm mb-2">Announcements</div>
-              <ul className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-1">
-                <li>
-                  <button onClick={() => setActiveCategory('All')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='All' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
-                    All Announcements
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => setActiveCategory('Company News')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='Company News' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
-                    Company News
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => setActiveCategory('Policy Changes')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='Policy Changes' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
-                    Policy Changes
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => setActiveCategory('Partnerships & Advocacies')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='Partnerships & Advocacies' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
-                    Partnerships & Advocacies
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => setActiveCategory('Alumni Success Stories')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='Alumni Success Stories' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
-                    Alumni Success Stories
-                  </button>
-                </li>
-              </ul>
+          <aside className="w-full flex-shrink-0 self-start lg:sticky lg:top-6 lg:w-64">
+            <div className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+              <div className="bg-white rounded-2xl p-4 border border-gray-200">
+                <div className="font-bold text-sm mb-2">Announcements</div>
+                <ul className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-1">
+                  <li>
+                    <button onClick={() => setActiveCategory('All')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='All' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
+                      All Announcements
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActiveCategory('Company News')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='Company News' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
+                      Company News
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActiveCategory('Policy Changes')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='Policy Changes' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
+                      Policy Changes
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActiveCategory('Partnerships & Advocacies')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='Partnerships & Advocacies' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
+                      Partnerships & Advocacies
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => setActiveCategory('Alumni Success Stories')} className={`w-full text-left px-3 py-2 rounded-md ${activeCategory==='Alumni Success Stories' ? 'bg-[#F2C94C] text-[#222] font-bold' : 'hover:bg-gray-100'}`}>
+                      Alumni Success Stories
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
           </aside>
 
@@ -677,23 +679,25 @@ export default function AnnouncementsPage() {
           </section>
 
           {/* Right pinned + spotlight */}
-          <aside className="w-full flex-shrink-0 self-start lg:sticky lg:top-6 lg:w-80 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
-            <div className="bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200">
-              <div className="bg-[#6B8A2E] px-5 py-3 text-white font-bold">Recent Announcements</div>
-              <div className="p-4 space-y-3">
-                {(() => {
-                  // show announcements that have pinned=true; otherwise show latest two
-                  const pinned = announcements.filter(a => a.pinned);
-                  const list = (pinned && pinned.length > 0) ? pinned.slice(0, 2) : announcements.slice(0, 2);
-                  if (!list || list.length === 0) return <div className="text-sm text-[#6b7280]">No announcements yet.</div>;
-                  return list.map(a => (
-                    <div key={a._id}>
-                      <div className="font-semibold">{a.title || 'Untitled'}</div>
-                      <div className="text-sm text-[#6b7280] mt-1 line-clamp-3">{a.content}</div>
-                      <div className="text-sm text-[#F2C94C] mt-2 cursor-pointer" onClick={() => setSelectedAnnouncement(a)}>View Post &gt;</div>
-                    </div>
-                  ));
-                })()}
+          <aside className="w-full flex-shrink-0 self-start lg:sticky lg:top-6 lg:w-80">
+            <div className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+              <div className="bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200">
+                <div className="bg-[#6B8A2E] px-5 py-3 text-white font-bold">Recent Announcements</div>
+                <div className="p-4 space-y-3">
+                  {(() => {
+                    // show announcements that have pinned=true; otherwise show latest two
+                    const pinned = announcements.filter(a => a.pinned);
+                    const list = (pinned && pinned.length > 0) ? pinned.slice(0, 2) : announcements.slice(0, 2);
+                    if (!list || list.length === 0) return <div className="text-sm text-[#6b7280]">No announcements yet.</div>;
+                    return list.map(a => (
+                      <div key={a._id}>
+                        <div className="font-semibold">{a.title || 'Untitled'}</div>
+                        <div className="text-sm text-[#6b7280] mt-1 line-clamp-3">{a.content}</div>
+                        <div className="text-sm text-[#F2C94C] mt-2 cursor-pointer" onClick={() => setSelectedAnnouncement(a)}>View Post &gt;</div>
+                      </div>
+                    ));
+                  })()}
+                </div>
               </div>
             </div>
           </aside>
