@@ -1083,7 +1083,7 @@ export default function AdminDashboard() {
       if (response.ok) {
         updateDataRemovalRequestState(userId, 'approved');
         notify('success', data?.message || 'Data removal request approved.');
-        await Promise.allSettled([
+        Promise.allSettled([
           fetchDataRemovalRequests(dataRemovalStatus, { silent: true }),
           fetchAllUsers(),
           fetchStats(),
@@ -1112,7 +1112,7 @@ export default function AdminDashboard() {
         updateDataRemovalRequestState(userId, 'rejected');
         closeRejectDataRemovalModal();
         notify('success', data?.message || 'Data removal request rejected.');
-        await Promise.allSettled([
+        Promise.allSettled([
           fetchDataRemovalRequests(dataRemovalStatus, { silent: true }),
           fetchAllUsers(),
           fetchStats(),
