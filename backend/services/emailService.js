@@ -64,7 +64,15 @@ const hasUsableSmtp = () => Boolean(emailUser && emailPassword);
 const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
-const activeEmailMode = hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp');
+const assertEmailDeliveryConfig = () => {
+  if (!hasUsableResend() && !hasUsableGmailApi() && !hasUsableSmtp()) {
+    throw new Error('Server email config missing: configure Resend, Gmail API, or SMTP credentials');
+  }
+};
+
+const activeEmailMode = hasUsableResend()
+  ? 'resend'
+  : (hasUsableGmailApi() ? 'gmail_api' : (hasUsableSmtp() ? 'smtp' : 'unconfigured'));
 console.log('[email] Provider mode:', activeEmailMode);
 
 const shouldFallbackFromResend = (error) => {
@@ -269,7 +277,7 @@ const sendMail = async (mailOptions) => {
 };
 
 const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
-  assertEmailConfig();
+  assertEmailDeliveryConfig();
   const recipient = process.env.APPLICATION_RECEIVER_EMAIL || process.env.EMAIL_USER;
 
   const safe = (value) => (value ? String(value) : '').trim();
@@ -347,7 +355,7 @@ const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
 
 // Send OTP email
 const sendOTP = async (email, otp) => {
-  assertEmailConfig();
+  assertEmailDeliveryConfig();
   const mailOptions = {
     from: formatFromAddress(process.env.EMAIL_USER),
     to: email,
@@ -380,7 +388,7 @@ const sendOTP = async (email, otp) => {
 
 // Send rejection notification
 const sendRejectionEmail = async (email, name, reason = '') => {
-  assertEmailConfig();
+  assertEmailDeliveryConfig();
   const mailOptions = {
     from: formatFromAddress(process.env.EMAIL_USER),
     to: email,
@@ -411,7 +419,7 @@ const sendRejectionEmail = async (email, name, reason = '') => {
 
 // Send approval notification
 const sendApprovalEmail = async (email, name) => {
-  assertEmailConfig();
+  assertEmailDeliveryConfig();
   const mailOptions = {
     from: formatFromAddress(process.env.EMAIL_USER),
     to: email,
@@ -444,7 +452,7 @@ const sendApprovalEmail = async (email, name) => {
 
 // Send referral invitation
 const sendReferralInvitationEmail = async (toEmail, jobLink, customMessage = '') => {
-  assertEmailConfig();
+  assertEmailDeliveryConfig();
   const messageBody = customMessage && customMessage.trim()
     ? customMessage.trim()
     : 'Hi! I wanted to share this job opportunity with you.';
@@ -513,7 +521,7 @@ const sendDataRemovalDecisionEmail = async ({
   scheduledDeletionAt = null,
   finalAction = 'delete',
 }) => {
-  assertEmailConfig();
+  assertEmailDeliveryConfig();
   const safeEmail = String(email || '').trim();
   if (!safeEmail) throw new Error('Recipient email is required');
 
@@ -568,7 +576,7 @@ const sendDataRemovalDecisionEmail = async ({
 };
 
 const sendAccountFeedbackEmail = async ({ user, feedback }) => {
-  assertEmailConfig();
+  assertEmailDeliveryConfig();
   const companyEmail = pickEmailRecipient(
     process.env.COMPANY_FEEDBACK_EMAIL,
     process.env.ACCOUNT_FEEDBACK_RECEIVER_EMAIL,
@@ -654,7 +662,7 @@ const sendAccountFeedbackEmail = async ({ user, feedback }) => {
 };
 
 const sendEventFeedbackEmail = async ({ event, feedback }) => {
-  assertEmailConfig();
+  assertEmailDeliveryConfig();
   const primaryRecipient = pickEmailRecipient(
     process.env.EVENT_FEEDBACK_RECEIVER_EMAIL,
     process.env.COMPANY_FEEDBACK_EMAIL,
