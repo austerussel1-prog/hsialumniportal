@@ -557,8 +557,8 @@ export default function ProfilePage() {
             const existingIndex = prev.findIndex((item) => item.id === decisionId);
             const nextItem = {
               id: decisionId,
-              name: 'System',
-              avatar: '',
+              name: 'Highly Succeed Portal',
+              avatar: '/Lion.png',
               message: fullText,
               time: 'Now',
               lastMessageAt: reviewedAtRaw,

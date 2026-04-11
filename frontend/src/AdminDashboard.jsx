@@ -1149,7 +1149,12 @@ export default function AdminDashboard() {
 
   const submitDataRemovalRejection = async () => {
     if (!selectedDataRemovalRequestId) return;
-    await rejectDataRemovalRequest(selectedDataRemovalRequestId, dataRemovalRejectNote);
+    const requestId = selectedDataRemovalRequestId;
+    const rejectionNote = dataRemovalRejectNote;
+    setShowDataRemovalRejectModal(false);
+    setSelectedDataRemovalRequestId(null);
+    setDataRemovalRejectNote('');
+    await rejectDataRemovalRequest(requestId, rejectionNote);
   };
 
   const canViewUserSections = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr' || user?.role === 'alumni_officer';
