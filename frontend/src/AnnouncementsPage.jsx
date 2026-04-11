@@ -433,8 +433,8 @@ export default function AnnouncementsPage() {
 
         <div className="mt-4 grid w-full grid-cols-1 items-start gap-6 xl:grid-cols-[16rem_minmax(0,1fr)_20rem]">
           {/* Left categories */}
-          <aside className="w-full self-start">
-            <div className="announcements-fixed-left bg-white rounded-2xl p-4 border border-gray-200">
+          <aside className="w-full self-start xl:sticky xl:top-6 xl:self-start">
+            <div className="bg-white rounded-2xl p-4 border border-gray-200">
               <div className="font-bold text-sm mb-2">Announcements</div>
               <ul className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-1">
                 <li>
@@ -677,8 +677,8 @@ export default function AnnouncementsPage() {
           </section>
 
           {/* Right pinned + spotlight */}
-          <aside className="w-full self-start">
-            <div className="announcements-fixed-right bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200">
+          <aside className="w-full self-start xl:sticky xl:top-6 xl:self-start">
+            <div className="bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200">
               <div className="bg-[#6B8A2E] px-5 py-3 text-white font-bold">Recent Announcements</div>
               <div className="p-4 space-y-3">
                 {(() => {
