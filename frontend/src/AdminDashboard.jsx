@@ -13,7 +13,6 @@ import {
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import Sidebar from './components/Sidebar';
-import Toast from './components/Toast';
 import { apiEndpoints } from './config/api';
 
 export default function AdminDashboard() {
@@ -22,15 +21,10 @@ export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Global toast (same pattern as Events page)
-  const [toast, setToast] = useState(null);
-  const toastTimerRef = useRef(null);
-  const TOAST_CENTER_OFFSET_PX = 0;
   const notify = (type, text) => {
-    const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    setToast({ id, type, text });
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+    window.dispatchEvent(new CustomEvent('hsi-toast', {
+      detail: { type, text },
+    }));
   };
   const [pendingUsers, setPendingUsers] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
@@ -1171,9 +1165,6 @@ export default function AdminDashboard() {
     >
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      <Toast toast={toast} centerOffsetPx={TOAST_CENTER_OFFSET_PX} />
-
-  
       <div className="flex-1 flex flex-col">
        
         <header className="bg-[#DAB619] shadow-sm z-10">

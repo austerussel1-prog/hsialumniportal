@@ -99,6 +99,23 @@ async function normalizeLegacyDataRemovalRequests() {
   );
 }
 
+const DATA_REMOVAL_EMAIL_TIMEOUT_MS = 8000;
+
+async function sendDataRemovalDecisionEmailWithTimeout(payload) {
+  try {
+    await Promise.race([
+      sendDataRemovalDecisionEmail(payload),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(`Timed out after ${DATA_REMOVAL_EMAIL_TIMEOUT_MS}ms`)), DATA_REMOVAL_EMAIL_TIMEOUT_MS);
+      }),
+    ]);
+    return true;
+  } catch (mailErr) {
+    console.error('[admin] Failed to send data removal decision email:', mailErr.message);
+    return false;
+  }
+}
+
 
 const verifyAdmin = async (req, res, next) => {
   try {
@@ -471,20 +488,14 @@ router.post('/data-removal-requests/:userId/approve', verifyAdmin, async (req, r
     user.clearLoginFailures();
     await user.save();
 
-    let notificationSent = true;
-    try {
-      await sendDataRemovalDecisionEmail({
-        email: user.email,
-        name: displayName(user.name) || 'User',
-        status: 'approved',
-        note: decisionNote,
-        scheduledDeletionAt,
-        finalAction,
-      });
-    } catch (mailErr) {
-      notificationSent = false;
-      console.error('[admin] Failed to send data removal approval email:', mailErr.message);
-    }
+    const notificationSent = await sendDataRemovalDecisionEmailWithTimeout({
+      email: user.email,
+      name: displayName(user.name) || 'User',
+      status: 'approved',
+      note: decisionNote,
+      scheduledDeletionAt,
+      finalAction,
+    });
 
     await logAuditEvent({
       req,
@@ -529,18 +540,12 @@ router.post('/data-removal-requests/:userId/reject', verifyAdmin, async (req, re
     user.dataRemovalRequestDecisionNote = decisionNote;
     await user.save();
 
-    let notificationSent = true;
-    try {
-      await sendDataRemovalDecisionEmail({
-        email: user.email,
-        name: displayName(user.name) || 'User',
-        status: 'rejected',
-        note: decisionNote,
-      });
-    } catch (mailErr) {
-      notificationSent = false;
-      console.error('[admin] Failed to send data removal rejection email:', mailErr.message);
-    }
+    const notificationSent = await sendDataRemovalDecisionEmailWithTimeout({
+      email: user.email,
+      name: displayName(user.name) || 'User',
+      status: 'rejected',
+      note: decisionNote,
+    });
 
     await logAuditEvent({
       req,
