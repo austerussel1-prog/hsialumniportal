@@ -1110,6 +1110,7 @@ export default function AdminDashboard() {
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
         updateDataRemovalRequestState(userId, 'rejected');
+        closeRejectDataRemovalModal();
         notify('success', data?.message || 'Data removal request rejected.');
         await Promise.allSettled([
           fetchDataRemovalRequests(dataRemovalStatus, { silent: true }),
@@ -1133,13 +1134,16 @@ export default function AdminDashboard() {
     setShowDataRemovalRejectModal(true);
   };
 
+  const closeRejectDataRemovalModal = () => {
+    setShowDataRemovalRejectModal(false);
+    setSelectedDataRemovalRequestId(null);
+    setDataRemovalRejectNote('');
+  };
+
   const submitDataRemovalRejection = async () => {
     if (!selectedDataRemovalRequestId) return;
     const requestId = selectedDataRemovalRequestId;
     const rejectionNote = dataRemovalRejectNote;
-    setShowDataRemovalRejectModal(false);
-    setSelectedDataRemovalRequestId(null);
-    setDataRemovalRejectNote('');
     await rejectDataRemovalRequest(requestId, rejectionNote);
   };
 
@@ -2322,11 +2326,7 @@ export default function AdminDashboard() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setShowDataRemovalRejectModal(false);
-                  setSelectedDataRemovalRequestId(null);
-                  setDataRemovalRejectNote('');
-                }}
+                onClick={closeRejectDataRemovalModal}
                 disabled={Boolean(dataRemovalActionLoading)}
                 className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-60 transition"
               >
