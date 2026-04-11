@@ -431,10 +431,10 @@ export default function AnnouncementsPage() {
           <p className="text-sm text-[#6b7280] italic font-normal mb-2">Stay informed with company news, policy changes, and community stories.</p>
         </div>
 
-        <div className="mt-4 grid w-full grid-cols-1 items-start gap-6 lg:grid-cols-[16rem_minmax(0,1fr)_20rem]">
+        <div className="mt-4 grid w-full grid-cols-1 items-start gap-6 md:grid-cols-[14rem_minmax(0,1fr)_18rem] lg:grid-cols-[16rem_minmax(0,1fr)_20rem]">
           {/* Left categories */}
           <aside className="w-full self-start">
-            <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+            <div className="announcements-side-sticky">
               <div className="bg-white rounded-2xl p-4 border border-gray-200">
                 <div className="font-bold text-sm mb-2">Announcements</div>
                 <ul className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-1">
@@ -680,7 +680,7 @@ export default function AnnouncementsPage() {
 
           {/* Right pinned + spotlight */}
           <aside className="w-full self-start">
-            <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+            <div className="announcements-side-sticky">
               <div className="bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200">
                 <div className="bg-[#6B8A2E] px-5 py-3 text-white font-bold">Recent Announcements</div>
                 <div className="p-4 space-y-3">

@@ -131,3 +131,15 @@
     scrollbar-width: none; 
   }
 }
+
+@media (min-width: 768px) {
+  .announcements-side-sticky {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    padding-right: 0.25rem;
+    align-self: start;
+  }
+}
