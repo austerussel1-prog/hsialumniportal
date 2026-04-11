@@ -15,6 +15,8 @@ import {
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
+const ALUMNI_PAGE_SIZE = 10;
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const fallbackProfileImage = '/Logo.jpg';
@@ -67,6 +69,7 @@ export default function AdminDashboard() {
   const [addAlumniLoading, setAddAlumniLoading] = useState(false);
   const [addAlumniError, setAddAlumniError] = useState('');
   const [alumniSearchQuery, setAlumniSearchQuery] = useState('');
+  const [alumniPage, setAlumniPage] = useState(1);
   
 
   const [showEditAlumniModal, setShowEditAlumniModal] = useState(false);
@@ -979,6 +982,11 @@ export default function AdminDashboard() {
     (a.company || '').toLowerCase().includes(alumniSearchQuery.toLowerCase()) ||
     (a.jobTitle || '').toLowerCase().includes(alumniSearchQuery.toLowerCase())
   );
+  const totalAlumniPages = Math.max(1, Math.ceil(filteredAlumni.length / ALUMNI_PAGE_SIZE));
+  const paginatedAlumni = filteredAlumni.slice(
+    (alumniPage - 1) * ALUMNI_PAGE_SIZE,
+    alumniPage * ALUMNI_PAGE_SIZE,
+  );
 
   const filteredPendingUsers = pendingUsers.filter((u) =>
     u.role === 'user' &&
@@ -995,6 +1003,14 @@ export default function AdminDashboard() {
       (u.name || '').toLowerCase().includes(searchQuery.toLowerCase())) &&
     (roleFilter === '' || u.role === roleFilter)
   );
+
+  useEffect(() => {
+    setAlumniPage(1);
+  }, [alumniSearchQuery]);
+
+  useEffect(() => {
+    setAlumniPage((prev) => Math.min(prev, totalAlumniPages));
+  }, [totalAlumniPages]);
 
   const handleReject = async () => {
     if (!selectedUserId) return;
@@ -1635,40 +1651,68 @@ export default function AdminDashboard() {
                     <p className="text-gray-500">No alumni members added yet</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-[#f7f4ee]">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Graduation Year</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Major</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
-                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredAlumni.map((alumniMember) => (
-                          <tr key={alumniMember._id} className="border-b border-[#efe4d3] hover:bg-[#fbf7ee]">
-                            <td className="px-6 py-4 text-sm text-gray-800">{alumniMember.name || '-'}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{alumniMember.email}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{alumniMember.graduationYear || '-'}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{alumniMember.major || '-'}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{alumniMember.company || '-'}</td>
-                            <td className="px-6 py-4 text-sm flex gap-3">
-                              <button
-                                onClick={() => handleDeleteAlumni(alumniMember._id)}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
-                                title="Delete"
-                              >
-                                <TrashIcon className="w-5 h-5" />
-                              </button>
-                            </td>
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-[#f7f4ee]">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+                            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Graduation Year</th>
+                            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Major</th>
+                            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
+                            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Action</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {paginatedAlumni.map((alumniMember) => (
+                            <tr key={alumniMember._id} className="border-b border-[#efe4d3] hover:bg-[#fbf7ee]">
+                              <td className="px-6 py-4 text-sm text-gray-800">{alumniMember.name || '-'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{alumniMember.email}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{alumniMember.graduationYear || '-'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{alumniMember.major || '-'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{alumniMember.company || '-'}</td>
+                              <td className="px-6 py-4 text-sm flex gap-3">
+                                <button
+                                  onClick={() => handleDeleteAlumni(alumniMember._id)}
+                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                                  title="Delete"
+                                >
+                                  <TrashIcon className="w-5 h-5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {filteredAlumni.length > ALUMNI_PAGE_SIZE && (
+                      <div className="mt-4 flex flex-col gap-3 border-t border-[#efe4d3] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-gray-600">
+                          Showing {((alumniPage - 1) * ALUMNI_PAGE_SIZE) + 1}-{Math.min(alumniPage * ALUMNI_PAGE_SIZE, filteredAlumni.length)} of {filteredAlumni.length}
+                        </p>
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <button
+                            onClick={() => setAlumniPage((prev) => Math.max(1, prev - 1))}
+                            disabled={alumniPage === 1}
+                            className="px-3 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Previous
+                          </button>
+                          <span className="text-sm font-medium text-gray-700">
+                            Page {alumniPage} of {totalAlumniPages}
+                          </span>
+                          <button
+                            onClick={() => setAlumniPage((prev) => Math.min(totalAlumniPages, prev + 1))}
+                            disabled={alumniPage === totalAlumniPages}
+                            className="px-3 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </section>
