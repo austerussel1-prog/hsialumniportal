@@ -18,6 +18,9 @@ export default function DirectoryProfileView() {
     return value;
   };
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= 900 : false
+  ));
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [profileState, setProfileState] = useState('ok');
@@ -39,6 +42,12 @@ export default function DirectoryProfileView() {
     }
     navigate('/directory');
   };
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -96,7 +105,7 @@ export default function DirectoryProfileView() {
 
   return (
     <motion.div
-      style={{ display: 'flex', minHeight: '100vh', background: '#f6f2ea' }}
+      style={{ display: 'flex', minHeight: '100vh', background: '#f6f2ea', overflowX: 'hidden' }}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
@@ -114,7 +123,7 @@ export default function DirectoryProfileView() {
       `}</style>
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      <div style={{ flex: 1, padding: '28px 36px' }}>
+      <div style={{ flex: 1, padding: isMobile ? '16px 12px' : '28px 36px' }}>
         <button
           onClick={handleBack}
           style={{
@@ -122,8 +131,10 @@ export default function DirectoryProfileView() {
             border: 'none',
             color: '#8a5a00',
             fontWeight: 600,
+            fontSize: isMobile ? '14px' : '15px',
             cursor: 'pointer',
             marginBottom: '18px',
+            textAlign: 'left',
           }}
         >
           {isFromAchievementsBadges
@@ -184,29 +195,31 @@ export default function DirectoryProfileView() {
               maxWidth: '1400px',
             }}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '28px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: isMobile ? '18px' : '28px' }}>
               <div>
                 <div
                   style={{
                     borderRadius: '16px',
-                    padding: '28px',
+                    padding: isMobile ? '18px 14px' : '28px',
                     color: '#111827',
                     marginBottom: '24px',
                     display: 'flex',
-                    gap: '24px',
+                    gap: isMobile ? '16px' : '24px',
                     alignItems: 'center',
                     border: '1px solid #d49a00',
                     boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
                     background: '#d9a520',
+                    overflow: 'hidden',
+                    boxSizing: 'border-box',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '24px', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'center' : 'center', gap: isMobile ? '16px' : '24px', width: '100%' }}>
                     <img
                       src={profileData.profileImage}
                       alt="Profile"
                       style={{
-                        width: '120px',
-                        height: '120px',
+                        width: isMobile ? '86px' : '120px',
+                        height: isMobile ? '86px' : '120px',
                         borderRadius: '12px',
                         border: '4px solid white',
                         objectFit: 'cover',
@@ -216,15 +229,15 @@ export default function DirectoryProfileView() {
                         event.currentTarget.src = fallbackProfileImage;
                       }}
                     />
-                    <div style={{ flex: 1 }}>
-                      <h1 style={{ fontSize: '28px', fontWeight: '800', margin: '0 0 8px 0', color: '#111827' }}>
+                    <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
+                      <h1 style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: '800', margin: '0 0 8px 0', color: '#111827', textAlign: isMobile ? 'center' : 'left', overflowWrap: 'anywhere' }}>
                         {profileData.fullName}
                       </h1>
-                      <p style={{ fontSize: '16px', margin: 0, color: '#7a5b00', fontWeight: '600' }}>
+                      <p style={{ fontSize: isMobile ? '15px' : '16px', margin: 0, color: '#7a5b00', fontWeight: '600', textAlign: isMobile ? 'center' : 'left', overflowWrap: 'anywhere' }}>
                         {profileData.jobTitle}
                       </p>
-                      <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ marginTop: '12px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
+                        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
                           <button
                             onMouseEnter={() => setHoverButton('linkedin')}
                             onMouseLeave={() => setHoverButton(null)}
@@ -245,6 +258,9 @@ export default function DirectoryProfileView() {
                               overflow: 'hidden',
                               opacity: profileData.linkedinUrl ? 1 : 0.5,
                               boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                              width: isMobile ? '100%' : 'auto',
+                              minWidth: 0,
+                              justifyContent: 'center',
                             }}
                           >
                             {hoverButton === 'linkedin' && (
@@ -285,6 +301,9 @@ export default function DirectoryProfileView() {
                               overflow: 'hidden',
                               opacity: profileData.twitterUrl ? 1 : 0.5,
                               boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                              width: isMobile ? '100%' : 'auto',
+                              minWidth: 0,
+                              justifyContent: 'center',
                             }}
                           >
                             {hoverButton === 'twitter' && (
@@ -325,6 +344,9 @@ export default function DirectoryProfileView() {
                               overflow: 'hidden',
                               opacity: profileData.instagramUrl ? 1 : 0.5,
                               boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                              width: isMobile ? '100%' : 'auto',
+                              minWidth: 0,
+                              justifyContent: 'center',
                             }}
                           >
                             {hoverButton === 'instagram' && (
@@ -368,6 +390,9 @@ export default function DirectoryProfileView() {
                             position: 'relative',
                             overflow: 'hidden',
                             flexShrink: 0,
+                            width: isMobile ? '100%' : 'auto',
+                            minWidth: 0,
+                            justifyContent: 'center',
                           }}
                         >
                                 <style>{`
@@ -409,9 +434,10 @@ export default function DirectoryProfileView() {
                                     className="chat-popup-bar-animate"
                                     style={{
                                       position: 'fixed',
-                                      bottom: '32px',
-                                      right: '32px',
-                                      width: '220px',
+                                      bottom: isMobile ? '16px' : '32px',
+                                      right: isMobile ? '12px' : '32px',
+                                      left: isMobile ? '12px' : 'auto',
+                                      width: isMobile ? 'auto' : '220px',
                                       height: '48px',
                                       background: '#fff',
                                       borderRadius: '18px',
@@ -471,7 +497,7 @@ export default function DirectoryProfileView() {
                   style={{
                     background: 'white',
                     borderRadius: '16px',
-                    padding: '24px',
+                    padding: isMobile ? '18px 14px' : '24px',
                     marginBottom: '24px',
                     border: '1px solid #efe5d7',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
@@ -496,7 +522,7 @@ export default function DirectoryProfileView() {
                   style={{
                     background: 'white',
                     borderRadius: '16px',
-                    padding: '24px',
+                    padding: isMobile ? '18px 14px' : '24px',
                     border: '1px solid #efe5d7',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
                   }}
@@ -511,7 +537,7 @@ export default function DirectoryProfileView() {
                     <p style={{ color: '#9ca3af' }}>No projects added yet.</p>
                   ) : (
                     <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <table style={{ width: '100%', minWidth: isMobile ? '560px' : '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ borderBottom: '2px solid #f3f4f6' }}>
                             <th style={{ textAlign: 'left', padding: '12px 8px', fontSize: '12px', fontWeight: '700', color: '#d97706', textTransform: 'uppercase' }}>Project</th>
@@ -547,7 +573,7 @@ export default function DirectoryProfileView() {
                   style={{
                     background: 'white',
                     borderRadius: '16px',
-                    padding: '24px',
+                    padding: isMobile ? '18px 14px' : '24px',
                     marginBottom: '24px',
                     border: '1px solid #efe5d7',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
@@ -628,7 +654,7 @@ export default function DirectoryProfileView() {
                   style={{
                     background: 'white',
                     borderRadius: '16px',
-                    padding: '24px',
+                    padding: isMobile ? '18px 14px' : '24px',
                     border: '1px solid #efe5d7',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
                   }}

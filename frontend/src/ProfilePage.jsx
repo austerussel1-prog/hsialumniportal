@@ -17,7 +17,7 @@ export default function ProfilePage() {
   };
   const [isEditing, setIsEditing] = useState(false);
   const [isMobile, setIsMobile] = useState(() => (
-    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+    typeof window !== 'undefined' ? window.innerWidth <= 900 : false
   ));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hoverButton, setHoverButton] = useState(null);
@@ -477,7 +477,7 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState(profileData);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -965,7 +965,7 @@ export default function ProfilePage() {
         .profile-header {
           background: #d4a017;
         }
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
           .profile-page-root {
             width: 100%;
             max-width: 100vw;
