@@ -727,7 +727,11 @@ router.get('/directory', verifyToken, async (req, res) => {
   try {
     const includePrivate = String(req.query?.includePrivate || '').trim() === '1';
     const isAdminViewer = ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(String(req.user?.role || ''));
-    const approvedFilter = { status: 'approved' };
+    const approvedFilter = {
+      status: 'approved',
+      isDeleted: { $ne: true },
+      isAnonymized: { $ne: true },
+    };
     const visibilityFilter = (isAdminViewer || includePrivate)
       ? {}
       : {
@@ -759,6 +763,10 @@ router.get('/directory/:userId', verifyToken, async (req, res) => {
     const user = await User.findById(userId).select('-password -otp -otpExpiry -failedLoginAttempts -lastFailedLoginAt -lockUntil -emailHash');
 
     if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.isDeleted || user.isAnonymized) {
       return res.status(404).json({ message: 'User not found' });
     }
 
@@ -1082,6 +1090,8 @@ router.get('/feedback/alumni-users', verifyToken, async (req, res) => {
     const alumniUsers = await User.find({
       role: { $in: ['alumni', 'user'] },
       status: { $ne: 'rejected' },
+      isDeleted: { $ne: true },
+      isAnonymized: { $ne: true },
       _id: { $ne: req.user.id },
     })
       .select('_id name email role')

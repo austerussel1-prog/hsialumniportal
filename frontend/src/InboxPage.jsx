@@ -23,6 +23,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { API_URL, apiEndpoints, resolveApiAssetUrl } from './config/api';
+import { createProfileBackLink } from './config/profileNavigation';
 
 export default function InboxPage() {
   const navigate = useNavigate();
@@ -50,6 +51,14 @@ export default function InboxPage() {
     }
   });
   const [selectedRecipientId, setSelectedRecipientId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const recipientFromQuery = String(params.get('recipient') || '').trim();
+      if (recipientFromQuery) {
+        return recipientFromQuery;
+      }
+    }
+
     const saved = localStorage.getItem(SELECTED_RECIPIENT_STORAGE_KEY);
     return typeof saved === 'string' ? saved : '';
   });
@@ -919,7 +928,11 @@ export default function InboxPage() {
   const openUserProfile = (userId) => {
     const normalizedId = String(userId || '').trim();
     if (!normalizedId) return;
-    navigate(`/directory/profile/${normalizedId}`);
+    navigate(`/directory/profile/${normalizedId}`, {
+      state: createProfileBackLink('/inbox', 'Inbox', {
+        search: `?recipient=${encodeURIComponent(normalizedId)}`,
+      }),
+    });
   };
 
   const openOwnProfile = () => {

@@ -1,3 +1,4 @@
+import { createProfileBackLink } from './config/profileNavigation';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -484,7 +485,7 @@ export default function DirectoryPage() {
 
               <div style={{ marginTop: 'auto', paddingTop: isMobile ? '10px' : '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <button
-                  onClick={() => navigate(`/directory/profile/${profile.id}`)}
+                  onClick={() => navigate(`/directory/profile/${profile.id}`, { state: createProfileBackLink('/directory', 'Directory') })}
                   style={{
                     background: '#f4b400',
                     border: 'none',

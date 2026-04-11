@@ -2215,6 +2215,7 @@ export default function ProfilePage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98, y: 6 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="modal-no-scrollbar"
               style={{
                 width: '100%',
                 maxWidth: '760px',
@@ -2224,6 +2225,7 @@ export default function ProfilePage() {
                 boxShadow: '0 20px 50px rgba(2, 6, 23, 0.25)',
                 maxHeight: '88vh',
                 overflowY: 'auto',
+                scrollbarWidth: 'none',
               }}
               onClick={(event) => event.stopPropagation()}
             >
@@ -2294,9 +2296,32 @@ export default function ProfilePage() {
                           fontWeight: '700',
                           fontSize: '18px',
                           position: 'relative',
+                          overflow: 'hidden',
                         }}
                       >
-                        {item.name.charAt(0)}
+                        {item.avatar ? (
+                          <img
+                            src={item.avatar}
+                            alt={item.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const next = e.currentTarget.nextSibling;
+                              if (next && next.style) next.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <span
+                          style={{
+                            display: item.avatar ? 'none' : 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            height: '100%',
+                          }}
+                        >
+                          {item.name.charAt(0)}
+                        </span>
                       </div>
                       <div>
                         <div style={{ color: '#111827', fontSize: '15px', lineHeight: 1.35 }}>

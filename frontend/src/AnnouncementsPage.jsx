@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createProfileBackLink } from './config/profileNavigation';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
@@ -14,6 +15,28 @@ const VideoIcon = () => (
 );
 const EventIcon = () => (
   <svg className="inline align-middle mr-1" width="18" height="18" fill="none" stroke="#6b7280" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+);
+
+const ReactionHeartIcon = ({ liked, size = 18 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill={liked ? '#ff173d' : 'none'}
+    stroke={liked ? '#ff173d' : '#f472b6'}
+    strokeWidth={liked ? '1.2' : '1.9'}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    style={{
+      display: 'block',
+      filter: liked ? 'drop-shadow(0 2px 4px rgba(255, 23, 61, 0.28))' : 'none',
+      transition: 'fill 160ms ease, stroke 160ms ease, transform 160ms ease',
+      transform: liked ? 'scale(1.02)' : 'scale(1)',
+    }}
+  >
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+  </svg>
 );
 
 const resolveProfileImage = (value) => {
@@ -548,11 +571,11 @@ export default function AnnouncementsPage() {
                 displayedAnnouncements.map(a => (
                   <div key={a._id} onClick={() => setSelectedAnnouncement(a)} className="relative cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm hover:bg-gray-50 sm:p-6">
                     <div className="flex items-start gap-4">
-                      <img src={resolveProfileImage(a.author?.profileImage)} alt="avatar" onClick={() => a.author?._id && navigate(`/directory/profile/${a.author._id}`)} className="h-11 w-11 flex-shrink-0 rounded-full object-cover cursor-pointer sm:h-12 sm:w-12" />
+                      <img src={resolveProfileImage(a.author?.profileImage)} alt="avatar" onClick={() => a.author?._id && navigate(`/directory/profile/${a.author._id}`, { state: createProfileBackLink('/announcements', 'Announcements') })} className="h-11 w-11 flex-shrink-0 rounded-full object-cover cursor-pointer sm:h-12 sm:w-12" />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <div>
-                            <div onClick={() => a.author?._id && navigate(`/directory/profile/${a.author._id}`)} className="text-sm font-semibold cursor-pointer hover:underline">{resolveDisplayName(a.author, 'Admin')}</div>
+                            <div onClick={() => a.author?._id && navigate(`/directory/profile/${a.author._id}`, { state: createProfileBackLink('/announcements', 'Announcements') })} className="text-sm font-semibold cursor-pointer hover:underline">{resolveDisplayName(a.author, 'Admin')}</div>
                             <div className="text-xs text-[#888]">{new Date(a.createdAt).toLocaleString()}</div>
                           </div>
                           <div className="relative">
@@ -588,8 +611,8 @@ export default function AnnouncementsPage() {
                         <div className="flex items-center text-sm text-[#6b7280]">
                           <div className="flex items-center gap-4">
                             <button onClick={(e) => { e.stopPropagation(); handleToggleHeart(a._id); }} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-pink-500"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                              {a.hearts?.length > 0 && <span>({a.hearts.length})</span>}
+                              <ReactionHeartIcon liked={(a.hearts || []).some((h) => String(h) === String(currentUserId))} />
+                              {a.hearts?.length > 0 && <span>{a.hearts.length}</span>}
                             </button>
 
                             <button onClick={(e) => { e.stopPropagation(); handleOpenComment(a._id); }} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
@@ -677,7 +700,7 @@ export default function AnnouncementsPage() {
         </div>
       </main>
       {selectedAnnouncement && (
-        <FullPostModal post={selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)} onHeart={handleToggleHeart} onCommentSubmit={submitComment} />
+        <FullPostModal post={selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)} onHeart={handleToggleHeart} onCommentSubmit={submitComment} currentUserId={currentUserId} />
       )}
       {confirmDeleteId && (
         <motion.div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -695,9 +718,10 @@ export default function AnnouncementsPage() {
   );
 }
 
-function FullPostModal({ post, onClose, onHeart, onCommentSubmit }) {
+function FullPostModal({ post, onClose, onHeart, onCommentSubmit, currentUserId }) {
   const commentRef = useRef(null);
   const navigate = useNavigate();
+  const liked = (post?.hearts || []).some((heartId) => String(heartId) === String(currentUserId || ''));
   useEffect(() => { if (commentRef.current) commentRef.current.focus(); }, [post]);
   if (!post) return null;
   return (
@@ -715,7 +739,7 @@ function FullPostModal({ post, onClose, onHeart, onCommentSubmit }) {
           <div className="flex-1">
             <div className="flex items-center justify-between">
               <div>
-                <div onClick={() => post.author?._id && navigate(`/directory/profile/${post.author._id}`)} className="font-semibold cursor-pointer hover:underline">{resolveDisplayName(post.author, 'Admin')}</div>
+                <div onClick={() => post.author?._id && navigate(`/directory/profile/${post.author._id}`, { state: createProfileBackLink('/announcements', 'Announcements') })} className="font-semibold cursor-pointer hover:underline">{resolveDisplayName(post.author, 'Admin')}</div>
                 <div className="text-xs text-[#888]">{new Date(post.createdAt).toLocaleString()}</div>
               </div>
             </div>
@@ -738,8 +762,8 @@ function FullPostModal({ post, onClose, onHeart, onCommentSubmit }) {
 
             <div className="flex items-center gap-4 mb-4">
               <button onClick={() => onHeart(post._id)} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-pink-500"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                {post.hearts?.length > 0 && <span>({post.hearts.length})</span>}
+                <ReactionHeartIcon liked={liked} />
+                {post.hearts?.length > 0 && <span>{post.hearts.length}</span>}
               </button>
               <div className="text-sm text-[#6b7280]">Comments {post.comments?.length ? `({post.comments.length})` : ''}</div>
             </div>

@@ -30,17 +30,19 @@ export default function DirectoryProfileView() {
 
   const isFromAchievementsBadges = location?.state?.from === 'achievements-badges';
   const isFromAchievementsFeatured = location?.state?.from === 'achievements-featured';
+  const explicitBackLink = location?.state?.backLink && typeof location.state.backLink === 'object'
+    ? location.state.backLink
+    : null;
+
+  const resolvedBackLink = explicitBackLink || (isFromAchievementsBadges
+    ? { pathname: '/achievements', label: 'Alumni Badges', state: { activeTab: 'badges' } }
+    : isFromAchievementsFeatured
+      ? { pathname: '/achievements', label: 'Featured Alumni', state: { activeTab: 'featured' } }
+      : { pathname: '/directory', label: 'Directory' });
 
   const handleBack = () => {
-    if (isFromAchievementsBadges) {
-      navigate('/achievements', { state: { activeTab: 'badges' } });
-      return;
-    }
-    if (isFromAchievementsFeatured) {
-      navigate('/achievements', { state: { activeTab: 'featured' } });
-      return;
-    }
-    navigate('/directory');
+    const targetPath = `${resolvedBackLink.pathname || '/directory'}${resolvedBackLink.search || ''}`;
+    navigate(targetPath, resolvedBackLink.state ? { state: resolvedBackLink.state } : undefined);
   };
 
   useEffect(() => {
@@ -137,11 +139,7 @@ export default function DirectoryProfileView() {
             textAlign: 'left',
           }}
         >
-          {isFromAchievementsBadges
-            ? '<- Back to Alumni Badges'
-            : isFromAchievementsFeatured
-              ? '<- Back to Featured Alumni'
-              : '<- Back to Directory'}
+          {`<- Back to ${resolvedBackLink.label || 'Directory'}`}
         </button>
 
         {loading && (
@@ -180,7 +178,7 @@ export default function DirectoryProfileView() {
                 cursor: 'pointer',
               }}
             >
-              Back to Directory
+              {`Back to ${resolvedBackLink.label || 'Directory'}`}
             </button>
           </div>
         )}

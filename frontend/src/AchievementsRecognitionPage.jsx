@@ -29,6 +29,7 @@ import {
 } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
 import { API_URL, apiEndpoints } from './config/api';
+import { createProfileBackLink } from './config/profileNavigation';
 
 const tabItems = [
   { id: 'overview', label: 'Overview', icon: Star },
@@ -85,6 +86,28 @@ const emptyAchievements = {
     },
   },
 };
+
+const ReactionHeartIcon = ({ liked, size = 18 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill={liked ? '#ff173d' : 'none'}
+    stroke={liked ? '#ff173d' : '#f472b6'}
+    strokeWidth={liked ? '1.2' : '1.9'}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    style={{
+      display: 'block',
+      filter: liked ? 'drop-shadow(0 2px 4px rgba(255, 23, 61, 0.28))' : 'none',
+      transition: 'fill 160ms ease, stroke 160ms ease, transform 160ms ease',
+      transform: liked ? 'scale(1.02)' : 'scale(1)',
+    }}
+  >
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+  </svg>
+);
 
 const normalizeAchievements = (body) => ({
   featured: body?.featured || null,
@@ -2544,6 +2567,9 @@ export default function AchievementsRecognitionPage() {
                           if (holder.profileId) {
                             navigate(`/directory/profile/${holder.profileId}`, {
                               state: {
+                                ...createProfileBackLink('/achievements', 'Alumni Badges', {
+                                  state: { activeTab: 'badges' },
+                                }),
                                 from: 'achievements-badges',
                                 returnToTab: 'badges',
                               },
@@ -2600,6 +2626,9 @@ export default function AchievementsRecognitionPage() {
                               if (holder.profileId) {
                                 navigate(`/directory/profile/${holder.profileId}`, {
                                   state: {
+                                    ...createProfileBackLink('/achievements', 'Alumni Badges', {
+                                      state: { activeTab: 'badges' },
+                                    }),
                                     from: 'achievements-badges',
                                     returnToTab: 'badges',
                                   },
@@ -2828,19 +2857,24 @@ export default function AchievementsRecognitionPage() {
                             </button>
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              {(() => {
+                                const isLiked = Array.isArray(post.likedBy) && String(user?.id || user?._id || '')
+                                  ? post.likedBy.map((id) => String(id)).includes(String(user?.id || user?._id || ''))
+                                  : false;
+                                return (
                               <button type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleTogglePostLike(post, post._idx);
                                 }}
                                 disabled={likeBusyPostId === String(post?._id || post._idx)}
-                                style={{ border: 'none', background: 'transparent', color: '#e44d93', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0 }}
+                                style={{ border: 'none', background: 'transparent', color: isLiked ? '#b91c1c' : '#f472b6', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0 }}
                               >
-                                <Heart size={16} weight={Array.isArray(post.likedBy) && String(user?.id || user?._id || '')
-                                  ? post.likedBy.map((id) => String(id)).includes(String(user?.id || user?._id || '')) ? 'fill' : 'regular'
-                                  : 'regular'} />
+                                <ReactionHeartIcon liked={isLiked} size={16} />
                                 {post.likes || 0}
                               </button>
+                                );
+                              })()}
                               {isAdmin ? (
                                 <button type="button"
                                   onClick={(e) => {
@@ -2938,6 +2972,9 @@ export default function AchievementsRecognitionPage() {
                             if (activeFeaturedProfile?.id) {
                               navigate(`/directory/profile/${activeFeaturedProfile.id}`, {
                                 state: {
+                                  ...createProfileBackLink('/achievements', 'Featured Alumni', {
+                                    state: { activeTab: 'featured' },
+                                  }),
                                   from: 'achievements-featured',
                                   returnToTab: 'featured',
                                 },
@@ -3384,15 +3421,20 @@ export default function AchievementsRecognitionPage() {
 
               <div className="hsi-ach-post-view-actions" style={{ padding: '0 18px 14px', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {(() => {
+                    const isLiked = Array.isArray(selectedPostDisplay?.post?.likedBy) && String(user?.id || user?._id || '')
+                      ? selectedPostDisplay.post.likedBy.map((id) => String(id)).includes(String(user?.id || user?._id || ''))
+                      : false;
+                    return (
                   <button type="button"
                     onClick={() => handleTogglePostLike(selectedPostDisplay?.post, selectedPost?.index)}
-                    style={{ border: 'none', background: 'transparent', color: '#e44d93', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}
+                    style={{ border: 'none', background: 'transparent', color: isLiked ? '#b91c1c' : '#f472b6', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, padding: 0 }}
                   >
-                    <Heart size={17} weight={Array.isArray(selectedPostDisplay?.post?.likedBy) && String(user?.id || user?._id || '')
-                      ? selectedPostDisplay.post.likedBy.map((id) => String(id)).includes(String(user?.id || user?._id || '')) ? 'fill' : 'regular'
-                      : 'regular'} />
+                    <ReactionHeartIcon liked={isLiked} size={17} />
                     {selectedPostDisplay?.post?.likes || 0}
                   </button>
+                    );
+                  })()}
                 </div>
 
                 <div style={{ display: 'flex', gap: 10 }}>
