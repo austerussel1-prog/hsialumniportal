@@ -131,3 +131,25 @@
     scrollbar-width: none; 
   }
 }
+
+@media (min-width: 1280px) {
+  .announcements-fixed-left {
+    position: fixed;
+    top: 1.5rem;
+    left: calc(6rem + 1.5rem);
+    width: 16rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    z-index: 20;
+  }
+
+  .announcements-fixed-right {
+    position: fixed;
+    top: 1.5rem;
+    right: 1.5rem;
+    width: 20rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    z-index: 20;
+  }
+}
