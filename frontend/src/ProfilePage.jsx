@@ -47,6 +47,7 @@ export default function ProfilePage() {
   const [profileImagePreview, setProfileImagePreview] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationMenu, setShowNotificationMenu] = useState(false);
+  const [openNotificationItemMenuId, setOpenNotificationItemMenuId] = useState(null);
   const [showAllNotificationsModal, setShowAllNotificationsModal] = useState(false);
   const [notificationView, setNotificationView] = useState('all');
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -81,6 +82,10 @@ export default function ProfilePage() {
     const emailKey = String(user?.email || '').trim().toLowerCase();
     return emailKey ? `profileNotifications_${emailKey}` : 'profileNotifications';
   }, [user?.email]);
+  const notificationDismissedIdsKey = useMemo(() => {
+    const emailKey = String(user?.email || '').trim().toLowerCase();
+    return emailKey ? `profileNotificationDismissedIds_${emailKey}` : 'profileNotificationDismissedIds';
+  }, [user?.email]);
   const legacyNotificationReadMapKeys = useMemo(() => {
     const keys = [];
     const idKey = String(user?.id || '').trim();
@@ -94,6 +99,7 @@ export default function ProfilePage() {
   const [notifications, setNotifications] = useState([]);
   const [notificationReadMap, setNotificationReadMap] = useState({});
   const [notificationReadIds, setNotificationReadIds] = useState({});
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState({});
   const notificationExamples = [
     'Fiona has sent a message.',
     'Admin approved your mentor application.',
@@ -199,6 +205,23 @@ export default function ProfilePage() {
     }
   };
 
+  const handleDeleteNotification = (notificationId) => {
+    const id = String(notificationId || '').trim();
+    if (!id) return;
+
+    setNotifications((prev) => prev.filter((item) => String(item?.id || '').trim() !== id));
+    setDismissedNotificationIds((prev) => {
+      const next = { ...prev, [id]: true };
+      try {
+        localStorage.setItem(notificationDismissedIdsKey, JSON.stringify(next));
+      } catch {
+        // ignore storage write issues
+      }
+      return next;
+    });
+    setOpenNotificationItemMenuId((current) => (current === id ? null : current));
+  };
+
   useEffect(() => {
     const parseMap = (raw) => {
       if (!raw) return {};
@@ -232,19 +255,23 @@ export default function ProfilePage() {
     }
 
     const nextReadIds = parseMap(localStorage.getItem(notificationReadIdsKey));
+    const nextDismissedIds = parseMap(localStorage.getItem(notificationDismissedIdsKey));
     setNotificationReadMap(mergedMap);
     setNotificationReadIds(nextReadIds);
+    setDismissedNotificationIds(nextDismissedIds);
     const storedNotifications = parseMap(localStorage.getItem(notificationItemsKey));
     const notificationList = Array.isArray(storedNotifications?.items)
       ? storedNotifications.items
       : (Array.isArray(storedNotifications) ? storedNotifications : []);
     setNotifications(
-      notificationList.map((item) => ({
-        ...item,
-        unread: !isNotificationMarkedRead(item, nextReadIds, mergedMap),
-      }))
+      notificationList
+        .filter((item) => !nextDismissedIds?.[String(item?.id || '').trim()])
+        .map((item) => ({
+          ...item,
+          unread: !isNotificationMarkedRead(item, nextReadIds, mergedMap),
+        }))
     );
-  }, [legacyNotificationReadMapKeys, notificationItemsKey, notificationReadIdsKey, notificationReadMapKey]);
+  }, [legacyNotificationReadMapKeys, notificationDismissedIdsKey, notificationItemsKey, notificationReadIdsKey, notificationReadMapKey]);
 
   useEffect(() => {
     localStorage.setItem(notificationReadMapKey, JSON.stringify(notificationReadMap));
@@ -418,7 +445,8 @@ export default function ProfilePage() {
           };
         }));
 
-        const nextNotifications = [...messageNotifications, ...announcementNotifications];
+        const nextNotifications = [...messageNotifications, ...announcementNotifications]
+          .filter((item) => !dismissedNotificationIds?.[String(item?.id || '').trim()]);
 
         if (mounted) {
           setNotifications((prev) => {
@@ -450,7 +478,7 @@ export default function ProfilePage() {
       mounted = false;
       clearInterval(intervalId);
     };
-  }, [notificationReadIds, notificationReadMap]);
+  }, [dismissedNotificationIds, notificationReadIds, notificationReadMap]);
   const profileStorageKey = user?.email ? `profileData_${user.email}` : null;
   const savedProfileData = profileStorageKey ? localStorage.getItem(profileStorageKey) : null;
   const savedProfile = savedProfileData ? JSON.parse(savedProfileData) : null;
@@ -555,6 +583,9 @@ export default function ProfilePage() {
 
           setNotifications((prev) => {
             const existingIndex = prev.findIndex((item) => item.id === decisionId);
+            if (dismissedNotificationIds?.[decisionId]) {
+              return prev;
+            }
             const nextItem = {
               id: decisionId,
               name: 'Highly Succeed Portal',
@@ -655,7 +686,7 @@ export default function ProfilePage() {
     };
 
     loadProfile();
-  }, [notificationReadIdsKey, notificationReadMapKey]);
+  }, [dismissedNotificationIds, notificationReadIdsKey, notificationReadMapKey]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -665,6 +696,10 @@ export default function ProfilePage() {
       if (notificationPanelRef.current && !notificationPanelRef.current.contains(event.target)) {
         setShowNotifications(false);
         setShowNotificationMenu(false);
+        setOpenNotificationItemMenuId(null);
+      }
+      if (!(event.target instanceof Element) || !event.target.closest('[data-notification-item-menu]')) {
+        setOpenNotificationItemMenuId(null);
       }
     };
 
@@ -1341,7 +1376,7 @@ export default function ProfilePage() {
                           onClick={() => handleOpenNotification(item)}
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: '52px 1fr 10px',
+                            gridTemplateColumns: '52px 1fr auto 10px',
                             gap: '10px',
                             alignItems: 'center',
                             padding: '10px 6px',
@@ -1396,6 +1431,70 @@ export default function ProfilePage() {
                             <div style={{ marginTop: '4px', color: '#2563eb', fontWeight: item.unread ? '600' : '400', fontSize: '14px' }}>
                               {item.time} • {item.context}
                             </div>
+                          </div>
+                          <div data-notification-item-menu style={{ position: 'relative' }}>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenNotificationItemMenuId((current) => (current === item.id ? null : item.id));
+                              }}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#6b7280',
+                                cursor: 'pointer',
+                                fontSize: '18px',
+                                lineHeight: 1,
+                                padding: '4px 6px',
+                                borderRadius: '999px',
+                              }}
+                              aria-label={`Open options for ${item.name} notification`}
+                            >
+                              •••
+                            </button>
+                            <AnimatePresence>
+                              {openNotificationItemMenuId === item.id && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: 4 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: 2 }}
+                                  transition={{ duration: 0.12 }}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '34px',
+                                    right: 0,
+                                    minWidth: '120px',
+                                    borderRadius: '12px',
+                                    background: 'white',
+                                    border: '1px solid #e5e7eb',
+                                    boxShadow: '0 14px 30px rgba(15, 23, 42, 0.18)',
+                                    overflow: 'hidden',
+                                    zIndex: 45,
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleDeleteNotification(item.id);
+                                    }}
+                                    style={{
+                                      width: '100%',
+                                      border: 'none',
+                                      background: 'white',
+                                      padding: '10px 12px',
+                                      fontSize: '14px',
+                                      color: '#b91c1c',
+                                      cursor: 'pointer',
+                                      textAlign: 'left',
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                           <div
                             style={{
@@ -2275,7 +2374,7 @@ export default function ProfilePage() {
                       onClick={() => handleOpenNotification(item)}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '52px 1fr 10px',
+                        gridTemplateColumns: '52px 1fr auto 10px',
                         gap: '10px',
                         alignItems: 'center',
                         padding: '10px 6px',
@@ -2330,6 +2429,70 @@ export default function ProfilePage() {
                         <div style={{ marginTop: '4px', color: '#2563eb', fontWeight: item.unread ? '600' : '400', fontSize: '14px' }}>
                           {item.time} • {item.context}
                         </div>
+                      </div>
+                      <div data-notification-item-menu style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenNotificationItemMenuId((current) => (current === item.id ? null : item.id));
+                          }}
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#6b7280',
+                            cursor: 'pointer',
+                            fontSize: '18px',
+                            lineHeight: 1,
+                            padding: '4px 6px',
+                            borderRadius: '999px',
+                          }}
+                          aria-label={`Open options for ${item.name} notification`}
+                        >
+                          •••
+                        </button>
+                        <AnimatePresence>
+                          {openNotificationItemMenuId === item.id && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 4 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 2 }}
+                              transition={{ duration: 0.12 }}
+                              style={{
+                                position: 'absolute',
+                                top: '34px',
+                                right: 0,
+                                minWidth: '120px',
+                                borderRadius: '12px',
+                                background: 'white',
+                                border: '1px solid #e5e7eb',
+                                boxShadow: '0 14px 30px rgba(15, 23, 42, 0.18)',
+                                overflow: 'hidden',
+                                zIndex: 45,
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDeleteNotification(item.id);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  border: 'none',
+                                  background: 'white',
+                                  padding: '10px 12px',
+                                  fontSize: '14px',
+                                  color: '#b91c1c',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                       <div
                         style={{
