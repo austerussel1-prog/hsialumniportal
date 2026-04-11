@@ -5,6 +5,19 @@ import { ArrowLeft, LinkedinLogo, TwitterLogo, InstagramLogo, PencilSimple, Uplo
 import Sidebar from './components/Sidebar';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
+const formatRelativeNotificationTime = (iso) => {
+  if (!iso) return 'Now';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'Now';
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return 'Now';
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d`;
+};
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const fallbackProfileImage = '/Logo.jpg';
@@ -282,19 +295,6 @@ export default function ProfilePage() {
       return resolveApiAssetUrl(value);
     };
 
-    const formatRelativeTime = (iso) => {
-      if (!iso) return 'Now';
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return 'Now';
-      const mins = Math.floor((Date.now() - d.getTime()) / 60000);
-      if (mins < 1) return 'Now';
-      if (mins < 60) return `${mins}m`;
-      const hrs = Math.floor(mins / 60);
-      if (hrs < 24) return `${hrs}h`;
-      const days = Math.floor(hrs / 24);
-      return `${days}d`;
-    };
-
     const normalizeAnnouncementNotification = (announcement) => {
       const postId = String(announcement?._id || '').trim();
       if (!postId) return null;
@@ -313,7 +313,7 @@ export default function ProfilePage() {
         name: authorName,
         avatar: normalizeAvatarUrl(announcement?.author?.profileImage || ''),
         message: `posted "${title}".` ,
-        time: formatRelativeTime(createdAt),
+        time: formatRelativeNotificationTime(createdAt),
         lastMessageAt: createdAt,
         sortTs: Number.isFinite(sortTs) ? sortTs : Date.now(),
         context: 'Announcements',
@@ -408,7 +408,7 @@ export default function ProfilePage() {
             name: fullName,
             avatar,
             message: isIncoming ? 'sent you a message.' : 'received your message.',
-            time: formatRelativeTime(conv?.lastMessageAt),
+            time: formatRelativeNotificationTime(conv?.lastMessageAt),
             lastMessageAt,
             sortTs: Number.isFinite(messageTs) ? messageTs : Date.now(),
             context: 'Inbox',
@@ -560,7 +560,7 @@ export default function ProfilePage() {
               name: 'Highly Succeed Portal',
               avatar: '/Lion.png',
               message: fullText,
-              time: 'Now',
+              time: formatRelativeNotificationTime(reviewedAtRaw),
               lastMessageAt: reviewedAtRaw,
               sortTs: safeTs,
               context: 'Privacy',

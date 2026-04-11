@@ -597,15 +597,17 @@ export default function AnnouncementsPage() {
                 <div className="bg-white rounded-lg border border-dashed border-gray-300 p-7 text-center text-[#b3b3b3] italic">Loading announcements...</div>
               ) : announcements.length === 0 ? (
                 <div className="bg-white rounded-lg border border-dashed border-gray-300 p-7 text-center text-[#b3b3b3] italic">No announcements yet. Admins will post updates here.</div>
+              ) : displayedAnnouncements.length === 0 ? (
+                <div className="bg-white rounded-lg border border-dashed border-gray-300 p-7 text-center text-[#b3b3b3] italic">No announcements match your current search or category filter.</div>
               ) : (
                 displayedAnnouncements.map(a => (
                   <div key={a._id} onClick={() => setSelectedAnnouncement(a)} className="relative cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm hover:bg-gray-50 sm:p-6">
                     <div className="flex items-start gap-4">
-                      <img src={resolveProfileImage(a.author?.profileImage)} alt="avatar" onClick={() => a.author?._id && navigate(`/directory/profile/${a.author._id}`, { state: createProfileBackLink('/announcements', 'Announcements') })} className="h-11 w-11 flex-shrink-0 rounded-full object-cover cursor-pointer sm:h-12 sm:w-12" />
+                      <img src={resolveProfileImage(a.author?.profileImage)} alt="avatar" onClick={(e) => { e.stopPropagation(); a.author?._id && navigate(`/directory/profile/${a.author._id}`, { state: createProfileBackLink('/announcements', 'Announcements') }); }} className="h-11 w-11 flex-shrink-0 rounded-full object-cover cursor-pointer sm:h-12 sm:w-12" />
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <div>
-                            <div onClick={() => a.author?._id && navigate(`/directory/profile/${a.author._id}`, { state: createProfileBackLink('/announcements', 'Announcements') })} className="text-sm font-semibold cursor-pointer hover:underline">{resolveDisplayName(a.author, 'Admin')}</div>
+                            <div onClick={(e) => { e.stopPropagation(); a.author?._id && navigate(`/directory/profile/${a.author._id}`, { state: createProfileBackLink('/announcements', 'Announcements') }); }} className="text-sm font-semibold cursor-pointer hover:underline">{resolveDisplayName(a.author, 'Admin')}</div>
                             <div className="text-xs text-[#888]">{new Date(a.createdAt).toLocaleString()}</div>
                           </div>
                           <div className="relative">

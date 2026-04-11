@@ -126,12 +126,16 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
 // Hide announcements for regular users until an admin-created announcement exists
 router.get('/', verifyUser, async (req, res) => {
   try {
-    // Check if any announcement was created by an admin/super_admin
-    const items = await Announcement.find().populate('author', 'role').limit(50).lean();
-    const hasAdminCreated = items.some(a => a.author && (a.author.role === 'admin' || a.author.role === 'super_admin'));
+    // Check if any staff-authored announcement exists before exposing the feed to regular users.
+    const staffRoles = ['super_admin', 'admin', 'hr', 'alumni_officer'];
+    const staffUsers = await User.find({ role: { $in: staffRoles } }).select('_id').lean();
+    const staffUserIds = staffUsers.map((user) => user._id);
+    const hasAdminCreated = staffUserIds.length > 0
+      ? await Announcement.exists({ author: { $in: staffUserIds } })
+      : false;
 
     // If no admin-created announcement exists, return empty array to non-admin users
-    if (!hasAdminCreated && !['admin', 'super_admin', 'hr', 'alumni_officer'].includes(req.user.role)) {
+    if (!hasAdminCreated && !staffRoles.includes(req.user.role)) {
       return res.json([]);
     }
 
