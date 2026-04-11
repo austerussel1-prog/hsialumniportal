@@ -1686,32 +1686,30 @@ export default function AdminDashboard() {
                         </tbody>
                       </table>
                     </div>
-                    {filteredAlumni.length > ALUMNI_PAGE_SIZE && (
-                      <div className="mt-4 flex flex-col gap-3 border-t border-[#efe4d3] pt-4 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-gray-600">
-                          Showing {((alumniPage - 1) * ALUMNI_PAGE_SIZE) + 1}-{Math.min(alumniPage * ALUMNI_PAGE_SIZE, filteredAlumni.length)} of {filteredAlumni.length}
-                        </p>
-                        <div className="flex items-center gap-2 self-end sm:self-auto">
-                          <button
-                            onClick={() => setAlumniPage((prev) => Math.max(1, prev - 1))}
-                            disabled={alumniPage === 1}
-                            className="px-3 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Previous
-                          </button>
-                          <span className="text-sm font-medium text-gray-700">
-                            Page {alumniPage} of {totalAlumniPages}
-                          </span>
-                          <button
-                            onClick={() => setAlumniPage((prev) => Math.min(totalAlumniPages, prev + 1))}
-                            disabled={alumniPage === totalAlumniPages}
-                            className="px-3 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Next
-                          </button>
-                        </div>
+                    <div className="mt-4 flex flex-col gap-3 border-t border-[#efe4d3] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-gray-600">
+                        Showing {filteredAlumni.length === 0 ? 0 : ((alumniPage - 1) * ALUMNI_PAGE_SIZE) + 1}-{Math.min(alumniPage * ALUMNI_PAGE_SIZE, filteredAlumni.length)} of {filteredAlumni.length}
+                      </p>
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <button
+                          onClick={() => setAlumniPage((prev) => Math.max(1, prev - 1))}
+                          disabled={alumniPage === 1}
+                          className="px-3 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-sm font-medium text-gray-700">
+                          Page {alumniPage} of {totalAlumniPages}
+                        </span>
+                        <button
+                          onClick={() => setAlumniPage((prev) => Math.min(totalAlumniPages, prev + 1))}
+                          disabled={alumniPage === totalAlumniPages}
+                          className="px-3 py-2 rounded-md border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Next
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </>
                 )}
               </div>
