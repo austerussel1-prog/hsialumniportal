@@ -139,12 +139,39 @@ export default function AnnouncementsPage() {
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [mediaPreview, setMediaPreview] = useState('');
   const [mediaType, setMediaType] = useState('');
+  const [sideRailTop, setSideRailTop] = useState(16);
+  const [useFixedRails, setUseFixedRails] = useState(false);
   const fileInputRef = useRef(null);
+  const searchRowRef = useRef(null);
 
   useEffect(() => {
     const u = localStorage.getItem('user');
     if (u) setUser(JSON.parse(u));
     fetchAnnouncements();
+  }, []);
+
+  useEffect(() => {
+    const updateRails = () => {
+      if (typeof window === 'undefined') return;
+      const wide = window.matchMedia('(min-width: 1024px)').matches;
+      setUseFixedRails(wide);
+
+      if (!wide || !searchRowRef.current) {
+        setSideRailTop(16);
+        return;
+      }
+
+      const searchTop = searchRowRef.current.getBoundingClientRect().top;
+      setSideRailTop(Math.max(16, Math.round(searchTop)));
+    };
+
+    updateRails();
+    window.addEventListener('scroll', updateRails, { passive: true });
+    window.addEventListener('resize', updateRails);
+    return () => {
+      window.removeEventListener('scroll', updateRails);
+      window.removeEventListener('resize', updateRails);
+    };
   }, []);
 
   // If a query param 'post' is present (e.g. /announcements?post=<id>), open that announcement after load
@@ -433,8 +460,11 @@ export default function AnnouncementsPage() {
 
         <div className="mt-4 grid w-full grid-cols-1 items-start gap-6 lg:grid-cols-[16rem_minmax(0,1fr)_20rem]">
           {/* Left categories */}
-          <aside className="w-full self-start lg:sticky lg:top-6 lg:self-start">
-            <div className="bg-white rounded-2xl p-4 border border-gray-200">
+          <aside className="w-full self-start">
+            <div
+              className={`bg-white rounded-2xl p-4 border border-gray-200 ${useFixedRails ? 'announcements-rail-fixed announcements-rail-left' : ''}`}
+              style={useFixedRails ? { top: `${sideRailTop}px`, '--rail-top': `${sideRailTop}px` } : undefined}
+            >
               <div className="font-bold text-sm mb-2">Announcements</div>
               <ul className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-1">
                 <li>
@@ -469,7 +499,7 @@ export default function AnnouncementsPage() {
           {/* Center feed */}
           <section className="min-w-0 w-full">
             {/* Search / sort row */}
-            <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div ref={searchRowRef} className="mb-4 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="hidden flex-1 sm:block sm:mr-4" />
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-nowrap">
                 <input
@@ -677,8 +707,11 @@ export default function AnnouncementsPage() {
           </section>
 
           {/* Right pinned + spotlight */}
-          <aside className="w-full self-start lg:sticky lg:top-6 lg:self-start">
-            <div className="bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200">
+          <aside className="w-full self-start">
+            <div
+              className={`bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200 ${useFixedRails ? 'announcements-rail-fixed announcements-rail-right' : ''}`}
+              style={useFixedRails ? { top: `${sideRailTop}px`, '--rail-top': `${sideRailTop}px` } : undefined}
+            >
               <div className="bg-[#6B8A2E] px-5 py-3 text-white font-bold">Recent Announcements</div>
               <div className="p-4 space-y-3">
                 {(() => {
