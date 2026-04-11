@@ -13,6 +13,7 @@ import {
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import Sidebar from './components/Sidebar';
+import Toast from './components/Toast';
 import { apiEndpoints } from './config/api';
 
 export default function AdminDashboard() {
@@ -30,37 +31,6 @@ export default function AdminDashboard() {
     setToast({ id, type, text });
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(null), 3000);
-  };
-  const toastTheme = (type) => {
-    if (type === 'error') return { bg: '#fee2e2', border: '#fecaca', iconBg: '#ef4444', text: '#7f1d1d' };
-    if (type === 'warning') return { bg: '#fef3c7', border: '#fde68a', iconBg: '#f59e0b', text: '#7c2d12' };
-    if (type === 'info') return { bg: '#cffafe', border: '#a5f3fc', iconBg: '#06b6d4', text: '#0e7490' };
-    return { bg: '#dcfce7', border: '#bbf7d0', iconBg: '#22c55e', text: '#065f46' };
-  };
-  const ToastIcon = ({ type }) => {
-    const common = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' };
-    if (type === 'success') {
-      return (
-        <svg {...common}>
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
-      );
-    }
-    if (type === 'info') {
-      return (
-        <svg {...common}>
-          <path d="M12 16v-6" />
-          <path d="M12 8h.01" />
-          <circle cx="12" cy="12" r="10" stroke="none" fill="rgba(255,255,255,0.22)" />
-        </svg>
-      );
-    }
-    return (
-      <svg {...common}>
-        <path d="M12 9v5" />
-        <path d="M12 17h.01" />
-      </svg>
-    );
   };
   const [pendingUsers, setPendingUsers] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
@@ -1085,6 +1055,23 @@ export default function AdminDashboard() {
     }
   };
 
+  const updateDataRemovalRequestState = (userId, nextStatus) => {
+    setDataRemovalRequests((prev) => {
+      if (dataRemovalStatus === 'pending') {
+        return prev.filter((item) => item._id !== userId);
+      }
+
+      return prev.map((item) => {
+        if (item._id !== userId) return item;
+        return {
+          ...item,
+          dataRemovalRequestStatus: nextStatus,
+          dataRemovalRequestReviewedAt: new Date().toISOString(),
+        };
+      });
+    });
+  };
+
   const approveDataRemovalRequest = async (userId) => {
     setDataRemovalActionLoading(userId);
     try {
@@ -1094,9 +1081,10 @@ export default function AdminDashboard() {
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
+        updateDataRemovalRequestState(userId, 'approved');
         notify('success', data?.message || 'Data removal request approved.');
         await Promise.allSettled([
-          fetchDataRemovalRequests(dataRemovalStatus),
+          fetchDataRemovalRequests(dataRemovalStatus, { silent: true }),
           fetchAllUsers(),
           fetchStats(),
         ]);
@@ -1121,12 +1109,10 @@ export default function AdminDashboard() {
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        setShowDataRemovalRejectModal(false);
-        setSelectedDataRemovalRequestId(null);
-        setDataRemovalRejectNote('');
+        updateDataRemovalRequestState(userId, 'rejected');
         notify('success', data?.message || 'Data removal request rejected.');
         await Promise.allSettled([
-          fetchDataRemovalRequests(dataRemovalStatus),
+          fetchDataRemovalRequests(dataRemovalStatus, { silent: true }),
           fetchAllUsers(),
           fetchStats(),
         ]);
@@ -1181,50 +1167,7 @@ export default function AdminDashboard() {
     >
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      {/* Global toast (fixed at top of viewport) */}
-      <AnimatePresence initial={false}>
-        {toast && (() => {
-          const t = toastTheme(toast.type);
-          return (
-            <div
-              style={{
-                position: 'fixed',
-                top: 16,
-                left: `calc(50% + ${TOAST_CENTER_OFFSET_PX}px)`,
-                transform: 'translateX(-50%)',
-                zIndex: 9999,
-                pointerEvents: 'none',
-              }}
-            >
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, y: -14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -14 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
-              style={{
-                width: 'fit-content',
-                maxWidth: 'min(680px, calc(100vw - 24px))',
-                padding: '8px 12px',
-                borderRadius: 10,
-                background: t.bg,
-                border: `1px solid ${t.border}`,
-                boxShadow: '0 10px 30px rgba(17,24,39,0.12)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 20, height: 20, borderRadius: 999, background: t.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <ToastIcon type={toast.type} />
-                </div>
-                <div style={{ color: t.text, fontWeight: 700, fontSize: 13, lineHeight: 1.25, whiteSpace: 'nowrap' }}>
-                  {toast.text}
-                </div>
-              </div>
-            </motion.div>
-            </div>
-          );
-        })()}
-      </AnimatePresence>
+      <Toast toast={toast} centerOffsetPx={TOAST_CENTER_OFFSET_PX} />
 
   
       <div className="flex-1 flex flex-col">
@@ -2350,14 +2293,21 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {showDataRemovalRejectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <AnimatePresence>
+        {showDataRemovalRejectModal && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="bg-white rounded-xl md:rounded-2xl shadow-xl w-full max-w-[90vw] md:max-w-xl p-4 md:p-8 relative"
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="bg-white rounded-xl md:rounded-2xl shadow-xl w-full max-w-[90vw] md:max-w-xl p-4 md:p-8 relative"
+            >
             <h3 className="text-2xl font-bold mb-4">Reject Data Removal Request</h3>
             <p className="text-gray-600 mb-4">Add an optional note for rejection:</p>
 
@@ -2391,9 +2341,10 @@ export default function AdminDashboard() {
                 {dataRemovalActionLoading === selectedDataRemovalRequestId ? 'Rejecting...' : 'Reject Request'}
               </button>
             </div>
+            </motion.div>
           </motion.div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Add Alumni Modal */}
       {showAddAlumniModal && (
