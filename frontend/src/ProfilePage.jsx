@@ -986,12 +986,16 @@ export default function ProfilePage() {
           }
           .profile-header {
             padding: 18px 14px !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 16px !important;
             overflow: hidden;
+            box-sizing: border-box !important;
           }
           .profile-header-stack {
             display: flex !important;
             flex-direction: column !important;
-            align-items: stretch !important;
+            align-items: center !important;
             gap: 16px !important;
             width: 100% !important;
             max-width: 100% !important;
@@ -1004,11 +1008,15 @@ export default function ProfilePage() {
           .profile-identity {
             width: 100% !important;
             min-width: 0 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
           }
           .profile-name,
           .profile-job {
             text-align: center !important;
             max-width: 100% !important;
+            overflow-wrap: anywhere !important;
           }
           .profile-name {
             font-size: 20px !important;
@@ -1020,10 +1028,13 @@ export default function ProfilePage() {
             width: 100% !important;
             gap: 10px !important;
           }
+          .profile-social-button,
+          .profile-edit-button,
           .profile-socials button {
             width: 100% !important;
             min-width: 0 !important;
             justify-content: center !important;
+            box-sizing: border-box !important;
           }
           .profile-edit-wrap {
             width: 100% !important;
@@ -1039,6 +1050,31 @@ export default function ProfilePage() {
           .profile-projects-wrap,
           .profile-career-docs {
             overflow-x: auto;
+          }
+        }
+        @media (max-width: 480px) {
+          .profile-main {
+            padding: 14px 10px !important;
+          }
+          .profile-topbar button {
+            font-size: 14px !important;
+          }
+          .profile-header {
+            padding: 16px 12px !important;
+            border-radius: 14px !important;
+          }
+          .profile-image {
+            width: 68px !important;
+            height: 68px !important;
+          }
+          .profile-name {
+            font-size: 18px !important;
+          }
+          .profile-job {
+            font-size: 14px !important;
+          }
+          .profile-card {
+            padding: 16px 12px !important;
           }
         }
       `}</style>
@@ -1502,9 +1538,12 @@ export default function ProfilePage() {
               alignItems: 'center',
               border: '1px solid #f0d27a',
               boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
+              width: '100%',
+              maxWidth: '100%',
+              boxSizing: 'border-box',
             }}
           >
-            <div className="profile-header-stack" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: '24px', width: '100%' }}>
+            <div className="profile-header-stack" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'center' : 'center', gap: isMobile ? '18px' : '24px', width: '100%', maxWidth: '100%' }}>
               <img
                 className="profile-image"
                 src={resolveProfileImage(formData.profileImage)}
@@ -1564,8 +1603,9 @@ export default function ProfilePage() {
                     </p>
                   </div>
                 )}
-                <div className="profile-socials" style={{ marginTop: '12px', display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'none', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
+                <div className="profile-socials" style={{ marginTop: '12px', display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? '1fr' : 'none', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%' }}>
               <button
+                className="profile-social-button"
                 onMouseEnter={() => setHoverButton('linkedin')}
                 onMouseLeave={() => setHoverButton(null)}
                 onClick={() => profileData.linkedinUrl && window.open(profileData.linkedinUrl, '_blank')}
@@ -1616,6 +1656,7 @@ export default function ProfilePage() {
                 </span>
               </button>
               <button
+                className="profile-social-button"
                 onMouseEnter={() => setHoverButton('twitter')}
                 onMouseLeave={() => setHoverButton(null)}
                 onClick={() => profileData.twitterUrl && window.open(profileData.twitterUrl, '_blank')}
@@ -1666,6 +1707,7 @@ export default function ProfilePage() {
                 </span>
               </button>
               <button
+                className="profile-social-button"
                 onMouseEnter={() => setHoverButton('instagram')}
                 onMouseLeave={() => setHoverButton(null)}
                 onClick={() => profileData.instagramUrl && window.open(profileData.instagramUrl, '_blank')}
@@ -1725,6 +1767,7 @@ export default function ProfilePage() {
                   setProfileImagePreview(null);
                   setShowEditModal(true);
                 }}
+                className="profile-edit-button"
                 onMouseEnter={() => setHoverButton('edit')}
                 onMouseLeave={() => setHoverButton(null)}
                 style={{

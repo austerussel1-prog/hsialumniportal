@@ -161,6 +161,17 @@ function getAccountDeletionConfig() {
   return { graceDays, finalAction };
 }
 
+function getScheduledDeletionDisabledMessage() {
+  const { graceDays } = getAccountDeletionConfig();
+  const dayLabel = graceDays === 1 ? 'day' : 'days';
+  return `This account is scheduled for deletion in ${graceDays} ${dayLabel} and can no longer be used.`;
+}
+
+function getScheduledDeletionSuccessMessage(graceDays) {
+  const dayLabel = graceDays === 1 ? 'day' : 'days';
+  return `Account scheduled for deletion. Final processing will happen in ${graceDays} ${dayLabel}.`;
+}
+
 async function verifyToken(req, res, next) {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -174,7 +185,7 @@ async function verifyToken(req, res, next) {
       return res.status(401).json({ message: 'Invalid token user' });
     }
     if (user.isDeleted) {
-      return res.status(403).json({ message: 'This account is scheduled for deletion and can no longer be used.' });
+      return res.status(403).json({ message: getScheduledDeletionDisabledMessage() });
     }
 
     req.user = { ...decoded, role: user.role };
@@ -212,7 +223,7 @@ router.post('/login', async (req, res) => {
 
     if (user.isDeleted) {
       return res.status(403).json({
-        message: 'This account is scheduled for deletion and can no longer be used.',
+        message: getScheduledDeletionDisabledMessage(),
       });
     }
 
@@ -581,7 +592,7 @@ router.post('/google', async (req, res) => {
       // Existing user
       if (user.isDeleted) {
         return res.status(403).json({
-          message: 'This account is scheduled for deletion and can no longer be used.',
+          message: getScheduledDeletionDisabledMessage(),
         });
       }
       
@@ -984,7 +995,7 @@ router.post('/me/delete-account', verifyToken, async (req, res) => {
     });
 
     return res.json({
-      message: 'Account scheduled for deletion.',
+      message: getScheduledDeletionSuccessMessage(graceDays),
       graceDays,
       finalAction,
       scheduledDeletionAt,
