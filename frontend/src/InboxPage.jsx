@@ -61,6 +61,7 @@ export default function InboxPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(true);
+  const [isMobileInfoOpen, setIsMobileInfoOpen] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
@@ -347,6 +348,15 @@ export default function InboxPage() {
     () => users.find((item) => String(item.id || item._id) === selectedRecipientId) || null,
     [users, selectedRecipientId]
   );
+
+  const openConversationInfo = () => {
+    if (!selectedRecipientId) return;
+    if (isMobile) {
+      setIsMobileInfoOpen(true);
+      return;
+    }
+    setIsInfoPanelOpen(true);
+  };
 
   const sortedUsers = useMemo(() => {
     const list = [...users];
@@ -680,20 +690,12 @@ export default function InboxPage() {
       if (!loadingUsers && !hasInitializedSelectionRef.current) {
         setSelectedRecipientId('');
         setMessages([]);
+        hasInitializedSelectionRef.current = true;
       }
       return;
     }
 
     setSelectedRecipientId((prevSelected) => {
-      const savedSelection = localStorage.getItem(SELECTED_RECIPIENT_STORAGE_KEY) || '';
-      if (
-        savedSelection &&
-        sortedUsers.some((user) => String(user.id || user._id || '') === savedSelection)
-      ) {
-        hasInitializedSelectionRef.current = true;
-        return savedSelection;
-      }
-
       if (
         prevSelected &&
         sortedUsers.some((user) => String(user.id || user._id || '') === prevSelected)
@@ -701,11 +703,32 @@ export default function InboxPage() {
         return prevSelected;
       }
 
+      if (!hasInitializedSelectionRef.current) {
+        const savedSelection = localStorage.getItem(SELECTED_RECIPIENT_STORAGE_KEY) || '';
+        if (
+          savedSelection &&
+          sortedUsers.some((user) => String(user.id || user._id || '') === savedSelection)
+        ) {
+          hasInitializedSelectionRef.current = true;
+          return savedSelection;
+        }
+
+        hasInitializedSelectionRef.current = true;
+        if (isMobile) {
+          return '';
+        }
+
+        return String(sortedUsers[0].id || sortedUsers[0]._id || '');
+      }
+
+      if (isMobile) {
+        return '';
+      }
+
       const nextSelected = String(sortedUsers[0].id || sortedUsers[0]._id || '');
-      hasInitializedSelectionRef.current = true;
       return nextSelected;
     });
-  }, [sortedUsers, loadingUsers]);
+  }, [sortedUsers, loadingUsers, isMobile]);
 
   useEffect(() => {
     if (!selectedRecipientId) return;
@@ -773,6 +796,7 @@ export default function InboxPage() {
     setChatSearchMatchCount(0);
     setActiveChatMatchIndex(-1);
     setShowScrollToLatest(false);
+    setIsMobileInfoOpen(false);
   }, [selectedRecipientId]);
 
   useLayoutEffect(() => {
@@ -1349,7 +1373,13 @@ export default function InboxPage() {
                         src={resolveApiAssetUrl(selectedUser?.profileImage) || DEFAULT_AVATAR}
                         alt={selectedUser?.fullName || selectedUser?.name || 'Conversation avatar'}
                         onError={applyAvatarFallback}
-                        onClick={() => openUserProfile(selectedRecipientId)}
+                        onClick={() => {
+                          if (isMobile) {
+                            openConversationInfo();
+                            return;
+                          }
+                          openUserProfile(selectedRecipientId);
+                        }}
                         style={{
                           width: 32,
                           height: 32,
@@ -1363,7 +1393,13 @@ export default function InboxPage() {
                       />
                       <button
                         type="button"
-                        onClick={() => openUserProfile(selectedRecipientId)}
+                        onClick={() => {
+                          if (isMobile) {
+                            openConversationInfo();
+                            return;
+                          }
+                          openUserProfile(selectedRecipientId);
+                        }}
                         disabled={!selectedRecipientId}
                         style={{
                           border: 'none',
@@ -2376,6 +2412,302 @@ export default function InboxPage() {
       </div>
 
       <AnimatePresence>
+        {isMobile && isMobileInfoOpen && selectedUser && (
+          <motion.div
+            key="mobile-chat-info"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 18 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 11500,
+              background: 'linear-gradient(180deg, #f8f4ec 0%, #ffffff 40%)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                padding: '18px 16px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setIsMobileInfoOpen(false)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  border: '1px solid #e5dccf',
+                  background: '#fff',
+                  color: '#8a5a00',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+                aria-label="Close chat info"
+              >
+                <ArrowDown size={18} weight="bold" style={{ transform: 'rotate(-90deg)' }} />
+              </button>
+              <div style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 800, color: '#8a5a00', letterSpacing: '0.04em' }}>
+                Chat Info
+              </div>
+              <div style={{ width: 36, flexShrink: 0 }} />
+            </div>
+
+            <div style={{ padding: '4px 16px 20px', overflowY: 'auto', minHeight: 0 }}>
+              <div
+                style={{
+                  padding: '6px 0 18px',
+                  borderBottom: '1px solid #f1e6d6',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <img
+                  src={resolveApiAssetUrl(selectedUser?.profileImage) || DEFAULT_AVATAR}
+                  alt={selectedUser?.fullName || selectedUser?.name || 'Conversation user'}
+                  onError={applyAvatarFallback}
+                  style={{
+                    width: 92,
+                    height: 92,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: '3px solid #f5e7c9',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                    background: '#fff',
+                  }}
+                />
+                <div style={{ marginTop: 16, fontSize: 24, fontWeight: 800, color: '#111827', lineHeight: 1.15, textAlign: 'center' }}>
+                  {selectedUser?.fullName || selectedUser?.name || 'Conversation'}
+                </div>
+                <div style={{ marginTop: 8, color: '#6b7280', fontSize: 14, textAlign: 'center' }}>
+                  {selectedUser?.jobTitle || 'Alumni Member'}
+                </div>
+                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => openUserProfile(selectedRecipientId)}
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: '#f6efe2',
+                      color: '#8a5a00',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                    title="Open profile"
+                  >
+                    <UserCircle size={22} weight="fill" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileInfoOpen(false);
+                      chatRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: '#f6efe2',
+                      color: '#8a5a00',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                    title="Go to latest"
+                  >
+                    <ClockCounterClockwise size={20} weight="fill" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileInfoOpen(false);
+                      setShowGifPicker(false);
+                      setShowEmojiPicker(false);
+                      setChatSearchOpen((prev) => {
+                        const next = !prev;
+                        if (!next) {
+                          setChatSearchQuery('');
+                          setChatSearchMatchCount(0);
+                          setActiveChatMatchIndex(-1);
+                        }
+                        return next;
+                      });
+                    }}
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: '#f6efe2',
+                      color: '#8a5a00',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                    title={chatSearchOpen ? 'Close chat search' : 'Search chat'}
+                  >
+                    <MagnifyingGlass size={19} weight="bold" />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ paddingTop: 20 }}>
+                <div
+                  style={{
+                    border: '1px solid #f1e6d6',
+                    borderRadius: 16,
+                    background: '#fff',
+                    padding: 14,
+                    boxShadow: '0 10px 24px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', color: '#a16207', textTransform: 'uppercase' }}>
+                    Chat Info
+                  </div>
+                  <div style={{ marginTop: 12, color: '#111827', fontWeight: 700 }}>
+                    {selectedUser?.fullName || selectedUser?.name || 'Conversation'}
+                  </div>
+                  <div style={{ marginTop: 4, color: '#6b7280', fontSize: 14, wordBreak: 'break-word' }}>
+                    {selectedUser?.email || 'No email available'}
+                  </div>
+                  <div style={{ marginTop: 10, color: '#6b7280', fontSize: 14 }}>
+                    {selectedUser?.jobTitle || 'No role provided'}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#111827', fontWeight: 800 }}>
+                      <ImagesSquare size={18} color="#a16207" weight="fill" />
+                      Media
+                    </div>
+                    <div style={{ color: '#9ca3af', fontSize: 12 }}>{sharedMedia.length}</div>
+                  </div>
+                  {sharedMedia.length === 0 ? (
+                    <div style={{ color: '#9ca3af', fontSize: 13, padding: '8px 2px' }}>No shared media yet.</div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      {sharedMedia.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setLightboxImage({ src: item.url, alt: item.alt, layoutId: `mobile-side-${item.id}` })}
+                          style={{
+                            border: 'none',
+                            padding: 0,
+                            background: '#f3f4f6',
+                            borderRadius: 12,
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                            aspectRatio: '1 / 1',
+                          }}
+                        >
+                          <img
+                            src={item.url}
+                            alt={item.alt}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#111827', fontWeight: 800 }}>
+                      <FolderSimple size={18} color="#a16207" weight="fill" />
+                      Files
+                    </div>
+                    <div style={{ color: '#9ca3af', fontSize: 12 }}>{sharedFiles.length}</div>
+                  </div>
+                  {sharedFiles.length === 0 ? (
+                    <div style={{ color: '#9ca3af', fontSize: 13, padding: '8px 2px' }}>No shared files yet.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {sharedFiles.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            border: '1px solid #ece5d8',
+                            borderRadius: 14,
+                            background: '#fff',
+                            padding: 12,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div
+                              style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 10,
+                                background: item.meta.background,
+                                color: item.meta.color,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <item.meta.Icon size={18} weight="fill" />
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', wordBreak: 'break-word' }}>
+                                {item.name}
+                              </div>
+                              <div style={{ marginTop: 3, color: '#6b7280', fontSize: 12 }}>
+                                {item.meta.label}{item.size ? ` • ${item.size}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadAttachment(item.id, item.name)}
+                              style={{
+                                border: 'none',
+                                padding: '6px 10px',
+                                borderRadius: 999,
+                                background: '#f3d24f',
+                                color: '#111827',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {lightboxImage && (
           <motion.div
             initial={{ opacity: 0 }}
