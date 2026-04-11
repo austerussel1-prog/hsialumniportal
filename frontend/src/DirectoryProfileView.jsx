@@ -123,7 +123,7 @@ export default function DirectoryProfileView() {
       `}</style>
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      <div style={{ flex: 1, padding: isMobile ? '16px 12px' : '28px 36px' }}>
+      <div style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%', overflowX: 'hidden', padding: isMobile ? '16px 12px' : '28px 36px' }}>
         <button
           onClick={handleBack}
           style={{
@@ -196,7 +196,7 @@ export default function DirectoryProfileView() {
             }}
           >
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: isMobile ? '18px' : '28px' }}>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div
                   style={{
                     borderRadius: '16px',
@@ -568,7 +568,7 @@ export default function DirectoryProfileView() {
                 </div>
               </div>
 
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div
                   style={{
                     background: 'white',

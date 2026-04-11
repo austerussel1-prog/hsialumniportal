@@ -147,7 +147,7 @@ function AppShell() {
   }, [toast]);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
       <Toast toast={toast} centerOffsetPx={toastCenterOffsetPx} />
       <div className="pt-16 md:pt-0" style={{ flex: 1 }}>
         <AnimatedRoutes />

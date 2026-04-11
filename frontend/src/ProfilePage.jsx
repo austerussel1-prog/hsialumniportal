@@ -966,6 +966,12 @@ export default function ProfilePage() {
           background: #d4a017;
         }
         @media (max-width: 900px) {
+          html,
+          body,
+          #root {
+            max-width: 100vw !important;
+            overflow-x: hidden !important;
+          }
           .profile-page-root {
             width: 100%;
             max-width: 100vw;
@@ -1080,7 +1086,7 @@ export default function ProfilePage() {
       `}</style>
       <motion.div 
         className="profile-page-root"
-        style={{ display: 'flex', minHeight: '100vh', background: '#f6f1e7' }}
+        style={{ display: 'flex', minHeight: '100vh', background: '#f6f1e7', overflowX: 'hidden', width: '100%', maxWidth: '100vw' }}
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: 20 }}
@@ -1088,7 +1094,7 @@ export default function ProfilePage() {
       >
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
       
-      <div className="profile-main" style={{ flex: 1, padding: isMobile ? '16px 12px' : '24px' }}>
+      <div className="profile-main" style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%', overflowX: 'hidden', padding: isMobile ? '16px 12px' : '24px' }}>
     
       <div className="profile-topbar" style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: isMobile ? '14px' : 0, marginBottom: '24px' }}>
         <button
@@ -1522,9 +1528,9 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="profile-content-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: '28px', maxWidth: '1400px' }}>
+      <div className="profile-content-grid" style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap: isMobile ? '18px' : '28px', maxWidth: '1400px', width: '100%', minWidth: 0 }}>
         {/* Main Content */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           {/* Profile Header */}
           <div
             className="profile-header"
@@ -1534,12 +1540,14 @@ export default function ProfilePage() {
               color: '#111827',
               marginBottom: '24px',
               display: 'flex',
-              gap: '24px',
-              alignItems: 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: isMobile ? '16px' : '24px',
+              alignItems: isMobile ? 'stretch' : 'center',
               border: '1px solid #f0d27a',
               boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
               width: '100%',
               maxWidth: '100%',
+              overflow: 'hidden',
               boxSizing: 'border-box',
             }}
           >
@@ -1911,8 +1919,8 @@ export default function ProfilePage() {
             {projects.length === 0 ? (
               <p style={{ color: '#9ca3af' }}>No projects added yet.</p>
             ) : (
-              <div className="profile-projects-wrap" style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="profile-projects-wrap" style={{ overflowX: 'auto', maxWidth: '100%' }}>
+                <table style={{ width: '100%', minWidth: isMobile ? '560px' : '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #f3f4f6' }}>
                       <th style={{ textAlign: 'left', padding: '12px 8px', fontSize: '12px', fontWeight: '700', color: '#d97706', textTransform: 'uppercase' }}>PROJECT</th>
@@ -1929,7 +1937,7 @@ export default function ProfilePage() {
                           <span style={{ fontSize: '14px', fontWeight: '500', color: '#111827' }}>{project.name}</span>
                         </td>
                         <td style={{ padding: '16px 8px' }}>
-                          <a href={project.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '14px', color: '#3b82f6', textDecoration: 'none' }}>
+                          <a href={project.link} target="_blank" rel="noopener noreferrer" style={{ fontSize: '14px', color: '#3b82f6', textDecoration: 'none', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                             {project.link}
                           </a>
                         </td>
@@ -1961,7 +1969,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Right Sidebar */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           {/* More Details */}
           <div
             className="profile-card"
