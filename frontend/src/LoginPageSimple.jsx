@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { apiEndpoints } from './config/api';
 
 export default function LoginPageSimple() {
   const [email, setEmail] = useState('');
@@ -14,7 +15,7 @@ export default function LoginPageSimple() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch(apiEndpoints.login, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
