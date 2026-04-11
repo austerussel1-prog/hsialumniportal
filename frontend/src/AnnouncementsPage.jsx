@@ -431,10 +431,10 @@ export default function AnnouncementsPage() {
           <p className="text-sm text-[#6b7280] italic font-normal mb-2">Stay informed with company news, policy changes, and community stories.</p>
         </div>
 
-        <div className="mt-4 flex w-full flex-col items-start gap-6 lg:flex-row lg:items-start">
+        <div className="mt-4 grid w-full grid-cols-1 items-start gap-6 lg:grid-cols-[16rem_minmax(0,1fr)_20rem]">
           {/* Left categories */}
-          <aside className="w-full flex-shrink-0 self-start lg:sticky lg:top-6 lg:w-64">
-            <div className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+          <aside className="w-full self-start">
+            <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
               <div className="bg-white rounded-2xl p-4 border border-gray-200">
                 <div className="font-bold text-sm mb-2">Announcements</div>
                 <ul className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-1">
@@ -469,7 +469,7 @@ export default function AnnouncementsPage() {
           </aside>
 
           {/* Center feed */}
-          <section className="w-full flex-1">
+          <section className="min-w-0 w-full">
             {/* Search / sort row */}
             <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="hidden flex-1 sm:block sm:mr-4" />
@@ -679,8 +679,8 @@ export default function AnnouncementsPage() {
           </section>
 
           {/* Right pinned + spotlight */}
-          <aside className="w-full flex-shrink-0 self-start lg:sticky lg:top-6 lg:w-80">
-            <div className="lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
+          <aside className="w-full self-start">
+            <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
               <div className="bg-white rounded-2xl overflow-hidden mb-4 border border-gray-200">
                 <div className="bg-[#6B8A2E] px-5 py-3 text-white font-bold">Recent Announcements</div>
                 <div className="p-4 space-y-3">
