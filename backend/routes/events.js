@@ -120,6 +120,60 @@ router.get('/_route_check', (req, res) => {
   res.json({ ok: true, router: 'events', hasDelete: true });
 });
 
+router.get('/me/registrations', verifyUser, async (req, res) => {
+  try {
+    const accountEmail = String(req.user?.email || '').trim().toLowerCase();
+    const eventFilter = {
+      registrations: {
+        $elemMatch: {
+          $or: [
+            { user: req.user._id },
+            ...(accountEmail ? [{ email: accountEmail }] : []),
+          ],
+        },
+      },
+    };
+
+    const events = await Event.find(eventFilter)
+      .select('title startDate endDate imageUrl registrations')
+      .lean();
+
+    const registrations = events.flatMap((event) => {
+      const rows = Array.isArray(event?.registrations) ? event.registrations : [];
+      return rows
+        .filter((registration) => {
+          const registrationUserId = String(registration?.user || '').trim();
+          const registrationEmail = String(registration?.email || '').trim().toLowerCase();
+          return registrationUserId === String(req.user._id)
+            || (accountEmail && registrationEmail === accountEmail);
+        })
+        .map((registration) => ({
+          eventId: String(event._id),
+          eventTitle: String(event.title || 'Event').trim() || 'Event',
+          eventImageUrl: String(event.imageUrl || '').trim(),
+          startDate: event.startDate,
+          endDate: event.endDate,
+          registrationId: String(registration._id),
+          status: String(registration.status || 'pending').trim().toLowerCase(),
+          registeredAt: registration.registeredAt || null,
+          decisionAt: registration.decisionAt || null,
+          rejectionReason: String(registration.rejectionReason || '').trim(),
+        }));
+    });
+
+    registrations.sort((a, b) => {
+      const leftTs = new Date(a.decisionAt || a.registeredAt || 0).getTime();
+      const rightTs = new Date(b.decisionAt || b.registeredAt || 0).getTime();
+      return rightTs - leftTs;
+    });
+
+    return res.json({ registrations });
+  } catch (err) {
+    console.error('GET /api/events/me/registrations error', err);
+    return res.status(500).json({ message: 'Failed to load your event registrations' });
+  }
+});
+
 // Get a single event
 router.get('/:id', async (req, res) => {
   try {
