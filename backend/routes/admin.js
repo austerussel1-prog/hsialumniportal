@@ -126,7 +126,14 @@ function mapCreateAdminDuplicateKeyError(err) {
 
 function canReuseUserForAdminCreation(user) {
   if (!user) return false;
-  return user.isDeleted || user.status === 'rejected';
+  if (user.isDeleted || user.status === 'rejected') return true;
+
+  const isPendingUnverifiedAdminInvite =
+    ADMIN_CREATABLE_ROLES.has(String(user.role || '').trim().toLowerCase())
+    && String(user.status || '').trim().toLowerCase() === 'pending'
+    && !user.registrationVerifiedAt;
+
+  return isPendingUnverifiedAdminInvite;
 }
 
 function buildExistingAccountMessage(user) {

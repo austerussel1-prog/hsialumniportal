@@ -64,6 +64,7 @@ const hasUsableSmtp = () => Boolean(emailUser && emailPassword);
 const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
+const isUsingResendTestSender = () => /@resend\.dev$/i.test(resendFrom);
 const activeEmailMode = hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp');
 console.log('[email] Provider mode:', activeEmailMode);
 
@@ -72,10 +73,53 @@ const getEmailDeliveryDiagnostics = () => ({
   hasUsableResend: hasUsableResend(),
   hasUsableGmailApi: hasUsableGmailApi(),
   hasUsableSmtp: hasUsableSmtp(),
+  isUsingResendTestSender: isUsingResendTestSender(),
   resendFrom,
   smtpHost,
   smtpPort,
 });
+
+const sendViaSmtpWithFallback = async (mailOptions, transportConfigs = []) => {
+  assertEmailConfig();
+
+  const candidates = [
+    ...transportConfigs,
+    { host: smtpHost, port: smtpPort, secure: smtpSecure, requireTLS: !smtpSecure },
+    { host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true },
+    { host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false },
+  ];
+
+  const attemptedKeys = new Set();
+  let lastError = null;
+
+  for (const candidate of candidates) {
+    const key = JSON.stringify(candidate);
+    if (attemptedKeys.has(key)) continue;
+    attemptedKeys.add(key);
+
+    try {
+      const transport = createSmtpTransport(candidate);
+      await transport.sendMail(mailOptions);
+      return true;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  try {
+    const serviceTransport = nodemailer.createTransport({
+      service: 'gmail',
+      ...smtpTimeouts,
+      auth: { user: emailUser, pass: emailPassword },
+    });
+    await serviceTransport.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    lastError = error;
+  }
+
+  throw new Error(`SMTP delivery failed: ${lastError?.message || 'Unknown SMTP error'}`);
+};
 
 const shouldFallbackFromResend = (error) => {
   const message = String(error?.message || '');
@@ -249,33 +293,7 @@ const sendMail = async (mailOptions) => {
     }
   }
 
-  assertEmailConfig();
-  try {
-    await transporter.sendMail(mailOptions);
-    return true;
-  } catch (error) {
-    // Gmail SMTP can be flaky on some hosts; retry with alternate Gmail configs.
-    const retries = [
-      createSmtpTransport({ host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true }),
-      createSmtpTransport({ host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false }),
-      nodemailer.createTransport({
-        service: 'gmail',
-        ...smtpTimeouts,
-        auth: { user: emailUser, pass: emailPassword },
-      }),
-    ];
-
-    for (const candidate of retries) {
-      try {
-        await candidate.sendMail(mailOptions);
-        return true;
-      } catch (_retryError) {
-        // try next transport
-      }
-    }
-
-    throw new Error(`SMTP delivery failed: ${error.message}`);
-  }
+  return sendViaSmtpWithFallback(mailOptions);
 };
 
 const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
@@ -553,7 +571,10 @@ const sendAdminVerificationEmail = async ({
     `,
   };
 
-  await sendMail(mailOptions);
+  await sendViaSmtpWithFallback(mailOptions, [
+    { host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true },
+    { host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false },
+  ]);
   return true;
 };
 
