@@ -91,6 +91,17 @@ const resolveOptionalAuthenticatedUser = async (req) => {
   }
 };
 
+const resolveRegistrationRecipient = async (registration) => {
+  const existingUserId = String(registration?.user || '').trim();
+  if (existingUserId) return existingUserId;
+
+  const email = String(registration?.email || '').trim();
+  if (!email) return '';
+
+  const matchedUser = await User.findByEmail(email);
+  return matchedUser?._id ? String(matchedUser._id) : '';
+};
+
 // List all events
 router.get('/', async (req, res) => {
   try {
@@ -229,15 +240,35 @@ router.post('/:id/register', async (req, res) => {
       return res.status(410).json({ message: 'This event is already done and has been removed.' });
     }
 
+    const activeRegistrations = event.registrations.filter((registration) => String(registration?.status || 'pending').toLowerCase() !== 'rejected');
+
     // basic capacity check
-    if (event.capacity && event.registrations.length >= event.capacity) {
+    if (event.capacity && activeRegistrations.length >= event.capacity) {
       return res.status(400).json({ message: 'Event capacity reached' });
     }
 
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    const hasExisting = event.registrations.some((r) => String(r?.email || '').trim().toLowerCase() === normalizedEmail);
-    if (hasExisting) {
+    const existingRegistration = event.registrations.find((registration) => String(registration?.email || '').trim().toLowerCase() === normalizedEmail);
+    const existingStatus = String(existingRegistration?.status || '').trim().toLowerCase();
+
+    if (existingRegistration && existingStatus !== 'rejected') {
       return res.status(409).json({ message: 'You already registered for this event' });
+    }
+
+    if (existingRegistration && existingStatus === 'rejected') {
+      existingRegistration.user = authUser._id;
+      existingRegistration.name = name;
+      existingRegistration.email = email;
+      existingRegistration.phone = phone;
+      existingRegistration.status = 'pending';
+      existingRegistration.attended = false;
+      existingRegistration.decisionAt = undefined;
+      existingRegistration.decisionBy = undefined;
+      existingRegistration.rejectionReason = '';
+      existingRegistration.registeredAt = new Date();
+
+      await event.save();
+      return res.json({ message: 'Registration resubmitted and pending admin approval', registrations: event.registrations });
     }
 
     event.registrations.push({ user: authUser?._id, name, email, phone, status: 'pending' });
@@ -286,22 +317,29 @@ router.patch('/:id/registrations/:registrationId/approve', verifyUser, verifyAdm
     const registration = event.registrations.id(req.params.registrationId);
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
 
+    const recipientUserId = await resolveRegistrationRecipient(registration);
+    if (recipientUserId && !registration.user) {
+      registration.user = recipientUserId;
+    }
+
     registration.status = 'approved';
     registration.rejectionReason = '';
     registration.decisionAt = new Date();
     registration.decisionBy = req.user._id;
     await event.save();
 
-    await createUserNotification({
-      recipient: registration.user,
-      kind: 'event-registration-approved',
-      source: 'Events',
-      title: 'Event registration approved',
-      message: `Admin approved your registration for ${event.title || 'the event'}.`,
-      level: 'success',
-      actionPath: '/events',
-      metadata: { eventId: String(event._id), registrationId: String(registration._id) },
-    });
+    if (recipientUserId) {
+      await createUserNotification({
+        recipient: recipientUserId,
+        kind: 'event-registration-approved',
+        source: 'Events',
+        title: 'Event registration approved',
+        message: `Admin approved your registration for ${event.title || 'the event'}.`,
+        level: 'success',
+        actionPath: '/events',
+        metadata: { eventId: String(event._id), registrationId: String(registration._id) },
+      });
+    }
 
     return res.json({ message: 'Registration approved', registration });
   } catch (err) {
@@ -324,24 +362,31 @@ router.patch('/:id/registrations/:registrationId/reject', verifyUser, verifyAdmi
     const registration = event.registrations.id(req.params.registrationId);
     if (!registration) return res.status(404).json({ message: 'Registration not found' });
 
+    const recipientUserId = await resolveRegistrationRecipient(registration);
+    if (recipientUserId && !registration.user) {
+      registration.user = recipientUserId;
+    }
+
     registration.status = 'rejected';
     registration.rejectionReason = reason;
     registration.decisionAt = new Date();
     registration.decisionBy = req.user._id;
     await event.save();
 
-    await createUserNotification({
-      recipient: registration.user,
-      kind: 'event-registration-rejected',
-      source: 'Events',
-      title: 'Event registration rejected',
-      message: reason
-        ? `Admin rejected your registration for ${event.title || 'the event'}. Reason: ${reason}`
-        : `Admin rejected your registration for ${event.title || 'the event'}.`,
-      level: 'error',
-      actionPath: '/events',
-      metadata: { eventId: String(event._id), registrationId: String(registration._id), reason },
-    });
+    if (recipientUserId) {
+      await createUserNotification({
+        recipient: recipientUserId,
+        kind: 'event-registration-rejected',
+        source: 'Events',
+        title: 'Event registration rejected',
+        message: reason
+          ? `Admin rejected your registration for ${event.title || 'the event'}. Reason: ${reason}`
+          : `Admin rejected your registration for ${event.title || 'the event'}.`,
+        level: 'error',
+        actionPath: '/events',
+        metadata: { eventId: String(event._id), registrationId: String(registration._id), reason },
+      });
+    }
 
     return res.json({ message: 'Registration rejected', registration });
   } catch (err) {

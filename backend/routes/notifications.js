@@ -7,7 +7,12 @@ const router = express.Router();
 router.get('/', verifyToken, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 100);
-    const notifications = await Notification.find({ recipient: req.user.id })
+    const recipientId = String(req.user?.id || req.user?._id || '').trim();
+    if (!recipientId) {
+      return res.status(401).json({ message: 'Invalid token user' });
+    }
+
+    const notifications = await Notification.find({ recipient: recipientId })
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
