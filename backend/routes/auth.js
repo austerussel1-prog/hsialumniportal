@@ -27,24 +27,6 @@ function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-function isOtpDeliveryError(err) {
-  const message = String(err?.message || '').toLowerCase();
-
-  return [
-    'server email config missing',
-    'error sending otp email',
-    'delivery failed',
-    'gmail api error',
-    'resend api error',
-    'smtp',
-    'invalid login',
-    'authentication unsuccessful',
-    'connection timeout',
-    'socket timeout',
-    'greeting never received',
-  ].some((token) => message.includes(token));
-}
-
 function buildGoogleUsernameBase(email) {
   const raw = String(email || '').split('@')[0].trim().toLowerCase();
   const sanitized = raw.replace(/[^a-z0-9._-]/g, '');
@@ -71,16 +53,9 @@ async function generateUniqueUsername(baseUsername, excludeUserId = null) {
   return `${base}${Date.now()}`;
 }
 
-function getGoogleAuthErrorResponse(err, source) {
+function getGoogleAuthErrorResponse(err) {
   const message = String(err?.message || '').trim();
   const keyPattern = err?.keyPattern || {};
-
-  if (source === 'register' && isOtpDeliveryError(err)) {
-    return {
-      status: 502,
-      message: 'Google sign-in succeeded, but we could not send the verification OTP email. Please try again later.',
-    };
-  }
 
   if (
     message.includes('Wrong recipient')
@@ -710,7 +685,7 @@ router.post('/google', async (req, res) => {
       stack: err?.stack,
     });
 
-    const errorResponse = getGoogleAuthErrorResponse(err, req.body?.source);
+    const errorResponse = getGoogleAuthErrorResponse(err);
 
     await logAuditEvent({
       req,

@@ -14,7 +14,6 @@ export default function EventsPage() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [query, setQuery] = useState('');
-  const [registrationMessage, setRegistrationMessage] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [adminRegistrations, setAdminRegistrations] = useState([]);
   const [adminRegStatusFilter, setAdminRegStatusFilter] = useState('pending');
@@ -305,10 +304,49 @@ export default function EventsPage() {
     }
   };
 
+  const handleRegistrationSubmit = async (form, { closeModal = false } = {}) => {
+    if (!selectedEvent?._id) {
+      notify('warning', 'Please select an event to register.');
+      return false;
+    }
+
+    try {
+      const res = await fetch(apiEndpoints.registerEvent(selectedEvent._id), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const json = await res.json().catch(() => ({}));
+      const message = json?.message || 'Registration failed';
+
+      if (res.ok) {
+        if (closeModal) setShowRegister(false);
+        notify('success', message);
+        return true;
+      }
+
+      if (res.status === 409) {
+        if (closeModal) setShowRegister(false);
+        notify('info', message || 'You already registered for this event');
+        return true;
+      }
+
+      throw new Error(message || `Failed to register (HTTP ${res.status})`);
+    } catch (err) {
+      console.error(err);
+      notify('error', err.message || 'Registration failed');
+      return false;
+    }
+  };
+
   const openEventDetails = (ev) => {
     setSelectedEvent(ev);
-    setRegistrationMessage('');
     setShowEventDetails(true);
+  };
+
+  const openRegisterModal = (ev) => {
+    setSelectedEvent(ev);
+    setShowRegister(true);
   };
 
   const loadAdminRegistrations = async (eventId, status = adminRegStatusFilter) => {
@@ -1016,7 +1054,7 @@ export default function EventsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setSelectedEvent(ev); setShowRegister(true); setRegistrationMessage(''); }}
+                        onClick={() => openRegisterModal(ev)}
                         className="eventActionLink eventActionLink--register"
                       >
                         Register
@@ -1166,7 +1204,6 @@ export default function EventsPage() {
                     const next = (regPickIndex + 1) % registrationFilteredEvents.length;
                     setRegPickIndex(next);
                     setSelectedEvent(registrationFilteredEvents[next]);
-                    setRegistrationMessage('');
                   }}
                   style={{
                     background: 'transparent',
@@ -1193,7 +1230,7 @@ export default function EventsPage() {
                   <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
                     <button
                       type="button"
-                      onClick={() => { setSelectedEvent(ev); setRegistrationMessage(''); }}
+                      onClick={() => { setSelectedEvent(ev); }}
                       style={{
                         flex: 1,
                         textAlign: 'left',
@@ -1243,7 +1280,7 @@ export default function EventsPage() {
                       type="radio"
                       name="registrationEventPick"
                       checked={!!checked}
-                      onChange={() => { setSelectedEvent(ev); setRegistrationMessage(''); }}
+                      onChange={() => { setSelectedEvent(ev); }}
                       aria-label={`Select event ${ev?.title || 'event'}`}
                       style={{ width: 18, height: 18 }}
                     />
@@ -1263,14 +1300,7 @@ export default function EventsPage() {
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   const form = Object.fromEntries(new FormData(e.target).entries());
-                  if (!selectedEvent) { setRegistrationMessage('Please select an event to register.'); return; }
-                  try {
-                    const res = await fetch(apiEndpoints.registerEvent(selectedEvent._id), {
-                      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form)
-                    });
-                    const json = await res.json(); if (!res.ok) throw new Error(json.message || 'Failed');
-                    setRegistrationMessage('Registration submitted. Awaiting admin approval.');
-                  } catch (err) { console.error(err); setRegistrationMessage(err.message || 'Registration failed'); }
+                  await handleRegistrationSubmit(form);
                 }}>
                   <div style={{ marginTop: 18, display: 'grid', gap: 18 }}>
                     <div style={{ display: 'grid', gap: 8 }}>
@@ -1342,7 +1372,6 @@ export default function EventsPage() {
                       Register
                     </button>
                   </div>
-                  {registrationMessage && <div style={{ marginTop: 14, color: '#065f46', fontWeight: 700 }}>{registrationMessage}</div>}
                 </form>
               </div>
 
@@ -1832,8 +1861,7 @@ export default function EventsPage() {
                       type="button"
                       onClick={() => {
                         setShowEventDetails(false);
-                        setShowRegister(true);
-                        setRegistrationMessage('');
+                        openRegisterModal(selectedEvent);
                       }}
                       style={{
                         padding: '11px 18px',
@@ -2129,13 +2157,7 @@ export default function EventsPage() {
                   <form onSubmit={async (e) => {
                     e.preventDefault();
                     const form = Object.fromEntries(new FormData(e.target).entries());
-                    try {
-                      const res = await fetch(apiEndpoints.registerEvent(selectedEvent._id), {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
-                      });
-                      const json = await res.json(); if (!res.ok) throw new Error(json.message || 'Failed');
-                      setRegistrationMessage('Registration submitted. Awaiting admin approval.');
-                    } catch (err) { console.error(err); setRegistrationMessage(err.message || 'Registration failed'); }
+                    await handleRegistrationSubmit(form, { closeModal: true });
                   }}>
                     <div style={{ marginTop: 18, display: 'grid', gap: 18 }}>
                       <div style={{ display: 'grid', gap: 8 }}>
@@ -2210,7 +2232,6 @@ export default function EventsPage() {
                         Register
                       </button>
                     </div>
-                    {registrationMessage && <div style={{ marginTop: 14, color: '#065f46', fontWeight: 800 }}>{registrationMessage}</div>}
                   </form>
                 </div>
               </motion.div>
