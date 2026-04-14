@@ -344,6 +344,12 @@ export default function EventsPage() {
     }
   };
 
+  const registrationDefaults = useMemo(() => ({
+    name: String(user?.name || user?.fullName || '').trim(),
+    email: String(user?.email || '').trim(),
+    phone: String(user?.contactNumber || user?.phone || '').trim(),
+  }), [user]);
+
   const openEventDetails = (ev) => {
     setSelectedEvent(ev);
     setShowEventDetails(true);
@@ -1321,6 +1327,7 @@ export default function EventsPage() {
                         name="name"
                         placeholder="Full Name"
                         required
+                        defaultValue={registrationDefaults.name}
                         style={{
                           padding: '12px 14px',
                           borderRadius: 8,
@@ -1337,6 +1344,7 @@ export default function EventsPage() {
                       <input
                         name="phone"
                         placeholder="(123) 456-7890"
+                        defaultValue={registrationDefaults.phone}
                         style={{
                           padding: '12px 14px',
                           borderRadius: 8,
@@ -1355,6 +1363,8 @@ export default function EventsPage() {
                         placeholder="your@email.com"
                         required
                         type="email"
+                        defaultValue={registrationDefaults.email}
+                        readOnly
                         style={{
                           padding: '12px 14px',
                           borderRadius: 8,
@@ -1362,6 +1372,7 @@ export default function EventsPage() {
                           background: '#f3f4f6',
                           fontSize: 14,
                           outline: 'none',
+                          cursor: 'not-allowed',
                         }}
                       />
                     </div>
@@ -2258,6 +2269,7 @@ export default function EventsPage() {
                           name="name"
                           placeholder="Full Name"
                           required
+                          defaultValue={registrationDefaults.name}
                           style={{
                             width: '100%',
                             padding: '12px 14px',
@@ -2275,6 +2287,7 @@ export default function EventsPage() {
                         <input
                           name="phone"
                           placeholder="(123) 456-7890"
+                          defaultValue={registrationDefaults.phone}
                           style={{
                             width: '100%',
                             padding: '12px 14px',
@@ -2294,6 +2307,8 @@ export default function EventsPage() {
                           placeholder="your@email.com"
                           required
                           type="email"
+                          defaultValue={registrationDefaults.email}
+                          readOnly
                           style={{
                             width: '100%',
                             padding: '12px 14px',
@@ -2302,6 +2317,7 @@ export default function EventsPage() {
                             background: '#f3f4f6',
                             fontSize: 14,
                             outline: 'none',
+                            cursor: 'not-allowed',
                           }}
                         />
                       </div>
