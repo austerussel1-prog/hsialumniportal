@@ -1,5 +1,5 @@
-﻿import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+﻿import React, { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import { apiEndpoints } from './config/api';
@@ -36,6 +36,7 @@ export default function LoginPage() {
   const [twoFactorToken, setTwoFactorToken] = useState('');
   
   const navigate = useNavigate();
+  const location = useLocation();
 
   const setSuccessLoginToast = () => {
     sessionStorage.setItem('hsi_toast', JSON.stringify({
@@ -49,6 +50,45 @@ export default function LoginPage() {
       detail: { type, text },
     }));
   };
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const adminVerificationStatus = searchParams.get('adminVerification');
+
+    if (!adminVerificationStatus) {
+      return;
+    }
+
+    const statusConfig = {
+      success: {
+        type: 'success',
+        text: 'Admin email verified. You can now log in.',
+      },
+      'already-verified': {
+        type: 'info',
+        text: 'This admin account has already been verified.',
+      },
+      expired: {
+        type: 'warning',
+        text: 'The verification link has expired. Ask a super admin to create the account again.',
+      },
+      invalid: {
+        type: 'error',
+        text: 'The verification link is invalid.',
+      },
+      error: {
+        type: 'error',
+        text: 'The admin account could not be verified. Please try again or contact support.',
+      },
+    };
+
+    const next = statusConfig[adminVerificationStatus];
+    if (next) {
+      showToast(next.type, next.text);
+    }
+
+    navigate('/login', { replace: true });
+  }, [location.search, navigate]);
 
   const setLoginError = (text) => {
     const message = String(text || 'Login failed.');

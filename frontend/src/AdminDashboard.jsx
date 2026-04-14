@@ -16,6 +16,28 @@ import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
 const ALUMNI_PAGE_SIZE = 10;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+const ALLOWED_ADMIN_EMAIL_DOMAINS = String(import.meta.env.VITE_ADMIN_ALLOWED_EMAIL_DOMAINS || '')
+  .split(',')
+  .map((domain) => domain.trim().toLowerCase())
+  .filter(Boolean);
+
+function normalizeEmailInput(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getAdminEmailValidationError(email) {
+  const normalizedEmail = normalizeEmailInput(email);
+  if (!normalizedEmail) return 'Email address is required.';
+  if (!EMAIL_REGEX.test(normalizedEmail)) return 'Enter a valid email address.';
+
+  if (!ALLOWED_ADMIN_EMAIL_DOMAINS.length) return '';
+
+  const domain = normalizedEmail.split('@')[1] || '';
+  if (ALLOWED_ADMIN_EMAIL_DOMAINS.includes(domain)) return '';
+
+  return `Only these email domains are allowed: ${ALLOWED_ADMIN_EMAIL_DOMAINS.join(', ')}`;
+}
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -50,7 +72,6 @@ export default function AdminDashboard() {
     contactNumber: '',
     address: '',
     role: '',
-    tempPassword: '',
   });
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [addUserError, setAddUserError] = useState('');
@@ -662,7 +683,7 @@ export default function AdminDashboard() {
     const { name, value } = e.target;
     setAddUserForm((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: name === 'email' ? normalizeEmailInput(value) : value,
     }));
   };
 
@@ -670,6 +691,14 @@ export default function AdminDashboard() {
     e.preventDefault();
     setAddUserLoading(true);
     setAddUserError('');
+
+    const normalizedEmail = normalizeEmailInput(addUserForm.email);
+    const emailValidationError = getAdminEmailValidationError(normalizedEmail);
+    if (emailValidationError) {
+      setAddUserError(emailValidationError);
+      setAddUserLoading(false);
+      return;
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -680,17 +709,17 @@ export default function AdminDashboard() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          fullName: addUserForm.fullName,
-          employeeId: addUserForm.employeeId,
-          email: addUserForm.email,
-          contactNumber: addUserForm.contactNumber,
-          address: addUserForm.address,
+          fullName: addUserForm.fullName.trim(),
+          employeeId: addUserForm.employeeId.trim(),
+          email: normalizedEmail,
+          contactNumber: addUserForm.contactNumber.trim(),
+          address: addUserForm.address.trim(),
           role: addUserForm.role,
-          tempPassword: addUserForm.tempPassword,
         }),
       });
 
       if (response.ok) {
+        const data = await response.json().catch(() => ({}));
         await fetchAllUsers();
         await fetchStats();
         setShowAddUserModal(false);
@@ -701,8 +730,8 @@ export default function AdminDashboard() {
           contactNumber: '',
           address: '',
           role: '',
-          tempPassword: '',
         });
+        notify('success', data?.message || 'Admin account created and verification email sent.');
       } else {
         const text = await response.text().catch(() => '');
         let message = 'Failed to create admin user';
@@ -2175,7 +2204,7 @@ export default function AdminDashboard() {
             className="bg-white rounded-xl md:rounded-2xl shadow-xl w-full max-w-[90vw] md:max-w-md p-3 md:p-8 relative max-h-[92vh] overflow-y-auto scrollbar-hide"
           >
             <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Add Admin User</h3>
-            <p className="text-gray-600 mb-3 md:mb-4 text-sm md:text-base">Fill in the details to create an admin account.</p>
+            <p className="text-gray-600 mb-3 md:mb-4 text-sm md:text-base">Fill in the details to create an admin account. A temporary password and verification link will be emailed automatically.</p>
 
             {addUserError && (
               <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
@@ -2216,6 +2245,11 @@ export default function AdminDashboard() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
                   required
                 />
+                {ALLOWED_ADMIN_EMAIL_DOMAINS.length > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Allowed domains: {ALLOWED_ADMIN_EMAIL_DOMAINS.join(', ')}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
@@ -2254,16 +2288,8 @@ export default function AdminDashboard() {
                   <option value="alumni_officer">Alumni Officer</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-                <input
-                  name="tempPassword"
-                  value={addUserForm.tempPassword}
-                  onChange={handleAddUserChange}
-                  type="password"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  required
-                />
+              <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
+                A secure temporary password will be generated automatically and included in the verification email.
               </div>
 
               <div className="flex gap-3 pt-2">

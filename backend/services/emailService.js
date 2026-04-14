@@ -484,6 +484,69 @@ const escapeHtml = (value) => String(value || '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
+const sendAdminVerificationEmail = async ({
+  email,
+  name,
+  role,
+  temporaryPassword,
+  verificationUrl,
+  expiresAt,
+}) => {
+  assertEmailConfig();
+
+  const recipient = String(email || '').trim();
+  if (!recipient) {
+    throw new Error('Recipient email is required');
+  }
+
+  const safeName = String(name || '').trim() || 'Admin User';
+  const safeRole = String(role || 'admin').trim().replace(/_/g, ' ');
+  const safeTemporaryPassword = String(temporaryPassword || '').trim();
+  const safeVerificationUrl = String(verificationUrl || '').trim();
+
+  if (!safeTemporaryPassword || !safeVerificationUrl) {
+    throw new Error('Temporary password and verification URL are required');
+  }
+
+  const expiryLabel = formatDateTime(expiresAt) || 'within 24 hours';
+  const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`;
+
+  const mailOptions = {
+    from: formatFromAddress(process.env.EMAIL_USER),
+    to: recipient,
+    subject: 'HSI Alumni Portal - Verify Your Admin Account',
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 640px; margin: 0 auto;">
+        <h2 style="color: #EAB308;">HSI Alumni Portal</h2>
+        <p>Dear ${escapeHtml(safeName)},</p>
+        <p>An administrator created a new ${escapeHtml(safeRole)} account for you.</p>
+        <p>Your account will remain pending until you verify this email address.</p>
+
+        <div style="margin: 18px 0; padding: 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #ffffff;">
+          <div style="margin-bottom: 8px;"><strong>Email:</strong> ${escapeHtml(recipient)}</div>
+          <div style="margin-bottom: 8px;"><strong>Role:</strong> ${escapeHtml(safeRole)}</div>
+          <div><strong>Temporary Password:</strong> ${escapeHtml(safeTemporaryPassword)}</div>
+        </div>
+
+        <a href="${escapeHtml(safeVerificationUrl)}"
+           style="display: inline-block; background: #EAB308; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 12px 0 18px;">
+          Verify Admin Account
+        </a>
+
+        <p>This verification link expires ${escapeHtml(expiryLabel)}.</p>
+        <p>After verification, you can sign in here:</p>
+        <p><a href="${escapeHtml(loginUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(loginUrl)}</a></p>
+        <p>If you were not expecting this email, please ignore it.</p>
+        <br>
+        <p style="color: #666; font-size: 12px;">Best regards,<br>HSI Alumni Portal Team</p>
+      </div>
+    `,
+  };
+
+  await sendMail(mailOptions);
+  return true;
+};
+
 const pickEmailRecipient = (...candidates) => {
   for (const raw of candidates) {
     const value = String(raw || '').trim();
@@ -721,6 +784,7 @@ module.exports = {
   sendOTP,
   sendRejectionEmail,
   sendApprovalEmail,
+  sendAdminVerificationEmail,
   sendDataRemovalDecisionEmail,
   sendReferralInvitationEmail,
   sendJobApplicationEmail,

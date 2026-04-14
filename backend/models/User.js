@@ -101,6 +101,20 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  emailVerificationTokenHash: {
+    type: String,
+    default: null,
+    select: false,
+  },
+  emailVerificationTokenExpiresAt: {
+    type: Date,
+    default: null,
+    select: false,
+  },
+  emailVerificationSentAt: {
+    type: Date,
+    default: null,
+  },
   otp: {
     type: String,
   },
