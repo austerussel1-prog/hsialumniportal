@@ -6,6 +6,9 @@ import Sidebar from './components/Sidebar';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 const sortOptions = ['Sort By', 'Name', 'Department', 'Role'];
+const DETAIL_PREVIEW_LIMIT = 140;
+
+const isLongDetail = (value) => String(value || '').trim().length > DETAIL_PREVIEW_LIMIT;
 
 export default function DirectoryPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +36,11 @@ export default function DirectoryPage() {
       : [];
     const highlights = [user.bio, user.bio2].filter(Boolean);
     const hasDetails = highlights.length > 0 || skills.length > 0;
+    const previewHighlights = highlights.slice(0, 2);
+    const previewSkills = skills.slice(0, 3);
+    const hasOverflowDetails = highlights.length > previewHighlights.length
+      || skills.length > previewSkills.length
+      || previewHighlights.some(isLongDetail);
     const departmentLabel = user.major
       ? `${user.major} Department`
       : 'Alumni Department';
@@ -49,8 +57,11 @@ export default function DirectoryPage() {
       role: roleLabel,
       tag: user.company ? 'Onsite' : 'Remote',
       highlights,
+      previewHighlights,
       skills,
+      previewSkills,
       hasDetails,
+      hasOverflowDetails,
       avatar: (user.profileImage && !String(user.profileImage).includes('gear-icon.svg'))
         ? resolveApiAssetUrl(user.profileImage)
         : '/Logo.jpg',
@@ -243,6 +254,10 @@ export default function DirectoryPage() {
     setSortBy('Sort By');
   };
 
+  const openProfile = (profileId) => {
+    navigate(`/directory/profile/${profileId}`, { state: createProfileBackLink('/directory', 'Directory') });
+  };
+
   return (
     <motion.div
       style={{ display: 'flex', minHeight: '100vh', background: '#f3f4f6' }}
@@ -374,7 +389,7 @@ export default function DirectoryPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: isMobile ? '10px' : '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: isMobile ? '10px' : '20px', alignItems: 'stretch' }}>
           {loading && (
             <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#6b7280' }}>
               Loading directory...
@@ -401,7 +416,8 @@ export default function DirectoryPage() {
                 boxShadow: '0 6px 14px rgba(15, 23, 42, 0.06)',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '100%',
+                minHeight: isMobile ? '320px' : '388px',
+                alignSelf: 'stretch',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -434,19 +450,35 @@ export default function DirectoryPage() {
               </div>
 
               {profile.hasDetails ? (
-                <>
-                  <div style={{ marginTop: isMobile ? '8px' : '12px', display: 'grid', gap: isMobile ? '4px' : '6px', fontSize: isMobile ? '10px' : '12px', color: '#6b7280' }}>
-                    {(isMobile ? profile.highlights.slice(0, 2) : profile.highlights).map((item) => (
+                <div
+                  style={{
+                    marginTop: isMobile ? '8px' : '12px',
+                    minHeight: isMobile ? '114px' : '152px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div style={{ display: 'grid', gap: isMobile ? '4px' : '6px', fontSize: isMobile ? '10px' : '12px', color: '#6b7280' }}>
+                    {profile.previewHighlights.map((item) => (
                       <div key={item} style={{ display: 'flex', gap: '8px' }}>
                         <span style={{ color: '#e1aa18' }}>✓</span>
-                        <span>{item}</span>
+                        <span
+                          style={{
+                            display: '-webkit-box',
+                            WebkitBoxOrient: 'vertical',
+                            WebkitLineClamp: isMobile ? 2 : 3,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {item}
+                        </span>
                       </div>
                     ))}
                   </div>
 
-                  {profile.skills.length > 0 && (
+                  {profile.previewSkills.length > 0 && (
                     <div style={{ marginTop: isMobile ? '8px' : '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {(isMobile ? profile.skills.slice(0, 2) : profile.skills).map((skill) => (
+                      {profile.previewSkills.map((skill) => (
                         <span
                           key={skill}
                           style={{
@@ -463,9 +495,29 @@ export default function DirectoryPage() {
                       ))}
                     </div>
                   )}
-                </>
+
+                  {profile.hasOverflowDetails && (
+                    <button
+                      type="button"
+                      onClick={() => openProfile(profile.id)}
+                      style={{
+                        marginTop: 'auto',
+                        alignSelf: 'flex-start',
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#d97706',
+                        fontSize: isMobile ? '10px' : '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      See details...
+                    </button>
+                  )}
+                </div>
               ) : (
-                <div style={{ marginTop: isMobile ? '8px' : '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ marginTop: isMobile ? '8px' : '12px', minHeight: isMobile ? '114px' : '152px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   <div
                     style={{
                       width: '100%',
@@ -485,7 +537,7 @@ export default function DirectoryPage() {
 
               <div style={{ marginTop: 'auto', paddingTop: isMobile ? '10px' : '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <button
-                  onClick={() => navigate(`/directory/profile/${profile.id}`, { state: createProfileBackLink('/directory', 'Directory') })}
+                  onClick={() => openProfile(profile.id)}
                   style={{
                     background: '#f4b400',
                     border: 'none',
