@@ -434,9 +434,9 @@ export default function ProfilePage() {
           }),
         ]);
 
-        if (!conversationsRes.ok) return;
-
-        const conversationsBody = await conversationsRes.json().catch(() => ({}));
+        const conversationsBody = conversationsRes.ok
+          ? await conversationsRes.json().catch(() => ({}))
+          : {};
         const conversations = Array.isArray(conversationsBody?.conversations)
           ? conversationsBody.conversations
           : [];

@@ -8,6 +8,9 @@ export default function ChatPopup({ recipientId, recipientName, onClose }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth <= 900 : false
+  ));
   const chatRef = useRef(null);
   const userData = localStorage.getItem('user');
   const currentUser = userData ? JSON.parse(userData) : null;
@@ -71,6 +74,12 @@ export default function ChatPopup({ recipientId, recipientName, onClose }) {
     }
   }, [messages]);
 
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const sendMessage = async () => {
     if (!input.trim()) return;
     setSending(true);
@@ -103,10 +112,13 @@ export default function ChatPopup({ recipientId, recipientName, onClose }) {
   return (
     <div style={{
       position: 'fixed',
-      bottom: '32px',
-      right: '32px',
-      width: '420px',
-      height: '340px',
+      bottom: isMobile ? '12px' : '32px',
+      right: isMobile ? '12px' : '32px',
+      left: isMobile ? '12px' : 'auto',
+      width: isMobile ? 'auto' : '420px',
+      maxWidth: isMobile ? 'calc(100vw - 24px)' : '420px',
+      height: isMobile ? 'min(62vh, 460px)' : '340px',
+      maxHeight: isMobile ? 'calc(100vh - 24px)' : '340px',
       background: '#fff',
       borderRadius: '18px',
       boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
@@ -120,24 +132,26 @@ export default function ChatPopup({ recipientId, recipientName, onClose }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '12px 16px',
+        padding: isMobile ? '10px 12px' : '12px 16px',
         background: '#f3ede3',
         borderBottom: '1px solid #efe5d7',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
-          <ChatCircleText size={20} color="#8a5a00" />
-          {recipientName || 'Conversation'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, minWidth: 0, flex: 1 }}>
+          <ChatCircleText size={isMobile ? 18 : 20} color="#8a5a00" />
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: isMobile ? '14px' : '16px' }}>
+            {recipientName || 'Conversation'}
+          </span>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-          <X size={20} color="#8a5a00" />
+          <X size={isMobile ? 18 : 20} color="#8a5a00" />
         </button>
       </div>
       <div ref={chatRef} style={{
         flex: 1,
-        padding: '18px',
+        padding: isMobile ? '12px' : '18px',
         overflowY: 'auto',
         background: '#faf9f7',
-        minHeight: '220px',
+        minHeight: isMobile ? '180px' : '220px',
         maxHeight: '100%',
       }}>
         {loading ? (
@@ -161,10 +175,10 @@ export default function ChatPopup({ recipientId, recipientName, onClose }) {
                 background: isMine ? '#d9a520' : '#e4d6c4',
                 color: '#111827',
                 borderRadius: '12px',
-                padding: '8px 14px',
-                fontSize: '14px',
+                padding: isMobile ? '8px 12px' : '8px 14px',
+                fontSize: isMobile ? '13px' : '14px',
                 fontWeight: 500,
-                maxWidth: '70%',
+                maxWidth: isMobile ? '84%' : '70%',
                 wordBreak: 'break-word',
               }}>{msg.text}</span>
             </div>
@@ -176,9 +190,10 @@ export default function ChatPopup({ recipientId, recipientName, onClose }) {
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        padding: '12px 16px',
+        padding: isMobile ? '10px 12px' : '12px 16px',
         borderTop: '1px solid #efe5d7',
         background: '#f3ede3',
+        gap: isMobile ? '8px' : '0',
       }}>
         <input
           type="text"
@@ -191,10 +206,11 @@ export default function ChatPopup({ recipientId, recipientName, onClose }) {
             border: 'none',
             borderRadius: '8px',
             padding: '8px 12px',
-            fontSize: '14px',
+            fontSize: isMobile ? '13px' : '14px',
             outline: 'none',
             background: '#fff',
-            marginRight: '8px',
+            marginRight: isMobile ? '0' : '8px',
+            minWidth: 0,
           }}
           disabled={sending}
         />
@@ -206,8 +222,10 @@ export default function ChatPopup({ recipientId, recipientName, onClose }) {
             color: '#fff',
             border: 'none',
             borderRadius: '8px',
-            padding: '8px 16px',
+            padding: isMobile ? '8px 14px' : '8px 16px',
             fontWeight: 700,
+            fontSize: isMobile ? '13px' : '14px',
+            flexShrink: 0,
             cursor: sending || !input.trim() ? 'not-allowed' : 'pointer',
             transition: 'background 0.2s',
           }}

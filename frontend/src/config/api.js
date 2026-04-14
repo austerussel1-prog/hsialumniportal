@@ -88,6 +88,7 @@ export const apiEndpoints = {
   rejectEventRegistration: (eventId, registrationId) => `${API_URL}/api/events/${eventId}/registrations/${registrationId}/reject`,
   feedbackEvent: (id) => `${API_URL}/api/events/${id}/feedback`,
   attendees: (id) => `${API_URL}/api/events/${id}/attendees`,
+  myEventRegistrations: `${API_URL}/api/events/me/registrations`,
 
   // Achievements endpoints
   achievements: `${API_URL}/api/achievements`,
@@ -136,6 +137,9 @@ export const apiEndpoints = {
   volunteerAdminLogs: (status = 'pending') => `${API_URL}/api/mentorship/volunteer/admin/logs?status=${encodeURIComponent(status)}`,
   volunteerApproveLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/approve`,
   volunteerRejectLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/reject`,
+
+  // Notifications
+  notifications: `${API_URL}/api/notifications`,
 
   // Career jobs endpoints
   jobs: `${API_URL}/api/jobs`,
