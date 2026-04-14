@@ -800,7 +800,7 @@ function FullPostModal({ post, onClose, onHeart, onCommentSubmit, currentUserId 
                 <ReactionHeartIcon liked={liked} />
                 {post.hearts?.length > 0 && <span>{post.hearts.length}</span>}
               </button>
-              <div className="text-sm text-[#6b7280]">Comments {post.comments?.length ? `({post.comments.length})` : ''}</div>
+              <div className="text-sm text-[#6b7280]">Comments {post.comments?.length ? `(${post.comments.length})` : ''}</div>
             </div>
 
             <div className="space-y-3 max-h-64 overflow-auto mb-4">

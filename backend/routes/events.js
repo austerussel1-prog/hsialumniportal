@@ -15,6 +15,7 @@ const {
   isEventExpired,
   processExpiredEvent,
 } = require('../services/eventLifecycleService');
+const { createUserNotification } = require('../services/userNotificationService');
 
 const PORTAL_TIMEZONE_OFFSET = String(process.env.PORTAL_TIMEZONE_OFFSET || '+08:00').trim() || '+08:00';
 
@@ -74,6 +75,20 @@ const verifyAdmin = (req, res, next) => {
     return res.status(403).json({ message: 'Admins only' });
   }
   next();
+};
+
+const resolveOptionalAuthenticatedUser = async (req) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+    if (!token) return null;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('_id isDeleted').lean();
+    if (!user || user.isDeleted) return null;
+    return user;
+  } catch {
+    return null;
+  }
 };
 
 // List all events
@@ -216,7 +231,9 @@ router.post('/:id/register', async (req, res) => {
       return res.status(409).json({ message: 'You already registered for this event' });
     }
 
-    event.registrations.push({ name, email, phone, status: 'pending' });
+    const authUser = await resolveOptionalAuthenticatedUser(req);
+
+    event.registrations.push({ user: authUser?._id, name, email, phone, status: 'pending' });
     await event.save();
     res.json({ message: 'Registration submitted and pending admin approval', registrations: event.registrations });
   } catch (err) {
@@ -268,6 +285,17 @@ router.patch('/:id/registrations/:registrationId/approve', verifyUser, verifyAdm
     registration.decisionBy = req.user._id;
     await event.save();
 
+    await createUserNotification({
+      recipient: registration.user,
+      kind: 'event-registration-approved',
+      source: 'Events',
+      title: 'Event registration approved',
+      message: `Admin approved your registration for ${event.title || 'the event'}.`,
+      level: 'success',
+      actionPath: '/events',
+      metadata: { eventId: String(event._id), registrationId: String(registration._id) },
+    });
+
     return res.json({ message: 'Registration approved', registration });
   } catch (err) {
     console.error('PATCH /api/events/:id/registrations/:registrationId/approve error', err);
@@ -294,6 +322,19 @@ router.patch('/:id/registrations/:registrationId/reject', verifyUser, verifyAdmi
     registration.decisionAt = new Date();
     registration.decisionBy = req.user._id;
     await event.save();
+
+    await createUserNotification({
+      recipient: registration.user,
+      kind: 'event-registration-rejected',
+      source: 'Events',
+      title: 'Event registration rejected',
+      message: reason
+        ? `Admin rejected your registration for ${event.title || 'the event'}. Reason: ${reason}`
+        : `Admin rejected your registration for ${event.title || 'the event'}.`,
+      level: 'error',
+      actionPath: '/events',
+      metadata: { eventId: String(event._id), registrationId: String(registration._id), reason },
+    });
 
     return res.json({ message: 'Registration rejected', registration });
   } catch (err) {

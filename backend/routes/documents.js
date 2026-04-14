@@ -7,6 +7,7 @@ const DocumentRequest = require('../models/DocumentRequest');
 const User = require('../models/User');
 const { verifyToken } = require('./auth');
 const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured, isRemoteFileUrl, fetchRemoteFile } = require('../services/mediaStorage');
+const { createUserNotification } = require('../services/userNotificationService');
 
 const router = express.Router();
 
@@ -339,6 +340,17 @@ router.post('/admin/requests/:id/fulfill', verifyToken, ensureAdmin, handleSingl
       { new: true }
     ).lean();
 
+    await createUserNotification({
+      recipient: request.requester,
+      kind: 'document-request-fulfilled',
+      source: 'Documents',
+      title: 'Document request fulfilled',
+      message: `Admin fulfilled your document request for ${request.requestType || 'a document'}.`,
+      level: 'success',
+      actionPath: '/documents',
+      metadata: { requestId: String(requestId), documentId: String(doc._id) },
+    });
+
     return res.json({ message: 'Fulfilled', request: updated, document: doc });
   } catch (err) {
     console.error(err);
@@ -365,6 +377,19 @@ router.post('/admin/requests/:id/reject', verifyToken, ensureAdmin, async (req, 
       },
       { new: true }
     ).lean();
+
+    await createUserNotification({
+      recipient: request.requester,
+      kind: 'document-request-rejected',
+      source: 'Documents',
+      title: 'Document request rejected',
+      message: reason
+        ? `Admin rejected your document request for ${request.requestType || 'a document'}. Reason: ${reason}`
+        : `Admin rejected your document request for ${request.requestType || 'a document'}.`,
+      level: 'error',
+      actionPath: '/documents',
+      metadata: { requestId: String(requestId), reason },
+    });
 
     return res.json({ message: 'Rejected', request: updated });
   } catch (err) {

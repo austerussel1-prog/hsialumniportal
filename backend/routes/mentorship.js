@@ -8,6 +8,7 @@ const VolunteerParticipation = require('../models/VolunteerParticipation');
 const VolunteerLog = require('../models/VolunteerLog');
 const { verifyToken } = require('./auth');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
+const { createUserNotification } = require('../services/userNotificationService');
 
 const router = express.Router();
 
@@ -196,6 +197,18 @@ router.post('/admin/applications/:id/approve', verifyToken, ensureAdmin, async (
     profile.reviewedBy = req.adminUser._id;
     profile.reviewedAt = new Date();
     await profile.save();
+
+    await createUserNotification({
+      recipient: profile.user,
+      kind: 'mentorship-application-approved',
+      source: 'Mentorship',
+      title: 'Mentor or speaker application approved',
+      message: 'Admin approved your mentor/speaker application.',
+      level: 'success',
+      actionPath: '/mentorship',
+      metadata: { applicationId: String(profile._id) },
+    });
+
     res.json({ message: 'Approved', profile });
   } catch (err) {
     res.status(500).json({ message: 'Failed to approve application' });
@@ -210,6 +223,18 @@ router.post('/admin/applications/:id/reject', verifyToken, ensureAdmin, async (r
     profile.reviewedBy = req.adminUser._id;
     profile.reviewedAt = new Date();
     await profile.save();
+
+    await createUserNotification({
+      recipient: profile.user,
+      kind: 'mentorship-application-rejected',
+      source: 'Mentorship',
+      title: 'Mentor or speaker application rejected',
+      message: 'Admin rejected your mentor/speaker application.',
+      level: 'error',
+      actionPath: '/mentorship',
+      metadata: { applicationId: String(profile._id) },
+    });
+
     res.json({ message: 'Rejected', profile });
   } catch (err) {
     res.status(500).json({ message: 'Failed to reject application' });
@@ -441,6 +466,18 @@ router.post('/volunteer/admin/participations/:id/approve', verifyToken, ensureAd
     participation.reviewedBy = req.adminUser._id;
     participation.reviewedAt = new Date();
     await participation.save();
+
+    await createUserNotification({
+      recipient: participation.user,
+      kind: 'volunteer-application-approved',
+      source: 'Volunteer',
+      title: 'Volunteer application approved',
+      message: 'Admin approved your volunteer application.',
+      level: 'success',
+      actionPath: '/mentorship',
+      metadata: { participationId: String(participation._id) },
+    });
+
     res.json({ message: 'Approved', participation });
   } catch (err) {
     res.status(500).json({ message: 'Failed to approve participation' });
@@ -455,6 +492,18 @@ router.post('/volunteer/admin/participations/:id/reject', verifyToken, ensureAdm
     participation.reviewedBy = req.adminUser._id;
     participation.reviewedAt = new Date();
     await participation.save();
+
+    await createUserNotification({
+      recipient: participation.user,
+      kind: 'volunteer-application-rejected',
+      source: 'Volunteer',
+      title: 'Volunteer application rejected',
+      message: 'Admin rejected your volunteer application.',
+      level: 'error',
+      actionPath: '/mentorship',
+      metadata: { participationId: String(participation._id) },
+    });
+
     res.json({ message: 'Rejected', participation });
   } catch (err) {
     res.status(500).json({ message: 'Failed to reject participation' });
@@ -474,6 +523,18 @@ router.post('/volunteer/admin/participations/:id/mark-attended', verifyToken, en
     participation.reviewedBy = req.adminUser._id;
     participation.reviewedAt = new Date();
     await participation.save();
+
+    await createUserNotification({
+      recipient: participation.user,
+      kind: 'volunteer-attendance-marked',
+      source: 'Volunteer',
+      title: 'Volunteer participation updated',
+      message: 'Admin marked your volunteer participation as attended.',
+      level: 'success',
+      actionPath: '/mentorship',
+      metadata: { participationId: String(participation._id) },
+    });
+
     res.json({ message: 'Marked attended', participation });
   } catch (err) {
     res.status(500).json({ message: 'Failed to mark attended' });
@@ -573,6 +634,18 @@ router.post('/volunteer/admin/logs/:id/approve', verifyToken, ensureAdmin, async
     log.reviewedBy = req.adminUser._id;
     log.reviewedAt = new Date();
     await log.save();
+
+    await createUserNotification({
+      recipient: log.user,
+      kind: 'volunteer-log-approved',
+      source: 'Volunteer',
+      title: 'Volunteer log approved',
+      message: 'Admin approved your volunteer hours log.',
+      level: 'success',
+      actionPath: '/mentorship',
+      metadata: { logId: String(log._id) },
+    });
+
     res.json({ message: 'Approved', log });
   } catch (err) {
     res.status(500).json({ message: 'Failed to approve log' });
@@ -587,6 +660,18 @@ router.post('/volunteer/admin/logs/:id/reject', verifyToken, ensureAdmin, async 
     log.reviewedBy = req.adminUser._id;
     log.reviewedAt = new Date();
     await log.save();
+
+    await createUserNotification({
+      recipient: log.user,
+      kind: 'volunteer-log-rejected',
+      source: 'Volunteer',
+      title: 'Volunteer log rejected',
+      message: 'Admin rejected your volunteer hours log.',
+      level: 'error',
+      actionPath: '/mentorship',
+      metadata: { logId: String(log._id) },
+    });
+
     res.json({ message: 'Rejected', log });
   } catch (err) {
     res.status(500).json({ message: 'Failed to reject log' });

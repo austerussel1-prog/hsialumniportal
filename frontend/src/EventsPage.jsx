@@ -25,6 +25,7 @@ export default function EventsPage() {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmRejectRegistration, setConfirmRejectRegistration] = useState(null);
   const [activeStep, setActiveStep] = useState(1);
   const [dateFilter, setDateFilter] = useState('all'); // all | today | this_week | next_week | date
   const [selectedDate, setSelectedDate] = useState(null);
@@ -42,7 +43,7 @@ export default function EventsPage() {
   const virtualSectionRef = useRef(null);
   const feedbackSectionRef = useRef(null);
 
-  const anyModalOpen = showRegister || showEventDetails || showFeedback || showCreate || !!confirmDelete;
+  const anyModalOpen = showRegister || showEventDetails || showFeedback || showCreate || !!confirmDelete || !!confirmRejectRegistration;
 
   useEffect(() => {
     if (!anyModalOpen) return undefined;
@@ -311,9 +312,13 @@ export default function EventsPage() {
     }
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(apiEndpoints.registerEvent(selectedEvent._id), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(form),
       });
       const json = await res.json().catch(() => ({}));
@@ -393,7 +398,12 @@ export default function EventsPage() {
     }
   };
 
-  const handleRejectRegistration = async (registrationId) => {
+  const openRejectRegistrationModal = (registration) => {
+    setAdminRegRejectReason('');
+    setConfirmRejectRegistration(registration);
+  };
+
+  const handleRejectRegistration = async (registrationId, reason = '') => {
     if (!selectedEvent?._id || !registrationId) return;
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -406,11 +416,13 @@ export default function EventsPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ reason: adminRegRejectReason }),
+        body: JSON.stringify({ reason }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.message || 'Failed to reject registration');
       notify('success', 'Registration rejected.');
+      setConfirmRejectRegistration(null);
+      setAdminRegRejectReason('');
       await loadAdminRegistrations(selectedEvent._id);
     } catch (err) {
       console.error(err);
@@ -1390,16 +1402,6 @@ export default function EventsPage() {
                     </select>
                   </div>
 
-                  <div style={{ marginTop: 10 }}>
-                    <textarea
-                      value={adminRegRejectReason}
-                      onChange={(e) => setAdminRegRejectReason(e.target.value)}
-                      rows={2}
-                      placeholder="Reject reason (optional)"
-                      style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, fontSize: 12, resize: 'vertical', background: '#fff' }}
-                    />
-                  </div>
-
                   <div style={{ marginTop: 12, border: '1px solid #f1f5f9', borderRadius: 10, padding: 10, maxHeight: 280, overflowY: 'auto' }}>
                     {adminRegLoading ? (
                       <div style={{ color: '#6b7280', fontSize: 12 }}>Loading registrations...</div>
@@ -1432,7 +1434,7 @@ export default function EventsPage() {
                                 <button
                                   type="button"
                                   disabled={adminRegBusyId === String(r._id)}
-                                  onClick={() => handleRejectRegistration(r._id)}
+                                  onClick={() => openRejectRegistrationModal(r)}
                                   style={{ background: '#fff', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 8, padding: '7px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                                 >
                                   {adminRegBusyId === String(r._id) ? 'Working...' : 'Reject'}
@@ -2105,6 +2107,96 @@ export default function EventsPage() {
                     }}
                   >
                     {deletingId === confirmDelete._id ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence initial={false}>
+          {confirmRejectRegistration && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0,0,0,0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 80,
+                padding: 16,
+              }}
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget && adminRegBusyId !== String(confirmRejectRegistration?._id)) setConfirmRejectRegistration(null);
+              }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                style={{
+                  width: 'min(480px, calc(100vw - 32px))',
+                  background: '#fff',
+                  borderRadius: 16,
+                  padding: 32,
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.18)',
+                }}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Reject registration"
+                tabIndex={-1}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && adminRegBusyId !== String(confirmRejectRegistration?._id)) setConfirmRejectRegistration(null);
+                }}
+              >
+                <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 8, color: '#1f2937' }}>Reject Registration</div>
+                <div style={{ color: '#4b5563', marginBottom: 18, lineHeight: 1.45 }}>
+                  Add an optional reason for rejecting {confirmRejectRegistration?.name || 'this registration'}.
+                </div>
+
+                <textarea
+                  value={adminRegRejectReason}
+                  onChange={(e) => setAdminRegRejectReason(e.target.value)}
+                  rows={4}
+                  placeholder="Reason for rejection (optional)"
+                  style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12, fontSize: 13, resize: 'vertical', background: '#fff', marginBottom: 20 }}
+                />
+
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button
+                    className="hsi-btn hsi-btn-secondary"
+                    type="button"
+                    disabled={adminRegBusyId === String(confirmRejectRegistration._id)}
+                    onClick={() => {
+                      setConfirmRejectRegistration(null);
+                      setAdminRegRejectReason('');
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      opacity: adminRegBusyId === String(confirmRejectRegistration._id) ? 0.7 : 1,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="hsi-btn hsi-btn-danger"
+                    type="button"
+                    disabled={adminRegBusyId === String(confirmRejectRegistration._id)}
+                    onClick={() => handleRejectRegistration(confirmRejectRegistration._id, adminRegRejectReason)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      opacity: adminRegBusyId === String(confirmRejectRegistration._id) ? 0.7 : 1,
+                    }}
+                  >
+                    {adminRegBusyId === String(confirmRejectRegistration._id) ? 'Rejecting...' : 'Confirm Reject'}
                   </button>
                 </div>
               </motion.div>

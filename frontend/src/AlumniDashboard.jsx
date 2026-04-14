@@ -14,6 +14,9 @@ import {
 } from '@phosphor-icons/react';
 
 export default function AlumniDashboard() {
+  const RECENT_INBOX_LIMIT = 5;
+  const RECENT_ANNOUNCEMENTS_LIMIT = 5;
+
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -67,7 +70,9 @@ export default function AlumniDashboard() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        const convs = Array.isArray(data?.conversations) ? data.conversations.slice(0, 4) : [];
+        const convs = Array.isArray(data?.conversations)
+          ? data.conversations.slice(0, RECENT_INBOX_LIMIT)
+          : [];
         if (mounted) setConversations(convs);
       } catch (err) {
         // ignore
@@ -104,6 +109,9 @@ export default function AlumniDashboard() {
     { icon: CalendarBlank, title: 'Events', subtitle: 'Upcoming events' },
     { icon: Users, title: 'Directory', subtitle: 'Connect with alumni' },
   ];
+  const recentAnnouncements = Array.isArray(announcements)
+    ? announcements.slice(0, RECENT_ANNOUNCEMENTS_LIMIT)
+    : [];
 
   return (
     <motion.div 
@@ -234,11 +242,11 @@ export default function AlumniDashboard() {
             <div style={{background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', padding: '24px'}}>
               <h2 style={{fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '24px'}}>Recent announcements</h2>
               <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
-                {announcements.map((announcement, index) => (
+                {recentAnnouncements.map((announcement, index) => (
                   <div
                     key={index}
                     onClick={() => navigate(`/announcements?post=${announcement._id}`)}
-                    style={{paddingBottom: '16px', borderBottom: index < announcements.length - 1 ? '1px solid #e5e7eb' : 'none', cursor: 'pointer'}}
+                    style={{paddingBottom: '16px', borderBottom: index < recentAnnouncements.length - 1 ? '1px solid #e5e7eb' : 'none', cursor: 'pointer'}}
                   >
                     <h3 style={{fontWeight: '500', color: '#111827', marginBottom: '8px'}}>{announcement.title}</h3>
                     <div style={{display: 'flex', gap: '8px'}}>
