@@ -53,6 +53,19 @@ function decryptMaybe(value) {
   return decryptField(raw);
 }
 
+function sanitizeUserProfile(user) {
+  if (!user || typeof user !== 'object') return user;
+
+  return {
+    ...user,
+    name: decryptMaybe(user.name),
+    email: decryptMaybe(user.email),
+    jobTitle: decryptMaybe(user.jobTitle),
+    company: decryptMaybe(user.company),
+    profileImage: decryptMaybe(user.profileImage),
+  };
+}
+
 router.get('/_route_check', (req, res) => {
   res.json({ ok: true, router: 'mentorship' });
 });
@@ -164,7 +177,12 @@ router.get('/admin/applications', verifyToken, ensureAdmin, async (req, res) => 
       .populate('user', 'name email jobTitle company profileImage')
       .sort({ createdAt: -1 })
       .lean();
-    res.json({ applications });
+    res.json({
+      applications: applications.map((application) => ({
+        ...application,
+        user: sanitizeUserProfile(application.user),
+      })),
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch applications' });
   }
@@ -248,7 +266,13 @@ router.get('/me/sessions', verifyToken, async (req, res) => {
       .populate('mentee', 'name email jobTitle company profileImage')
       .sort({ startAt: -1 })
       .lean();
-    res.json({ sessions });
+    res.json({
+      sessions: sessions.map((session) => ({
+        ...session,
+        mentor: sanitizeUserProfile(session.mentor),
+        mentee: sanitizeUserProfile(session.mentee),
+      })),
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch sessions' });
   }
@@ -398,7 +422,12 @@ router.get('/volunteer/admin/participations', verifyToken, ensureAdmin, async (r
       .populate('user', 'name email jobTitle company profileImage')
       .sort({ createdAt: -1 })
       .lean();
-    res.json({ participations });
+    res.json({
+      participations: participations.map((participation) => ({
+        ...participation,
+        user: sanitizeUserProfile(participation.user),
+      })),
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch participations' });
   }
@@ -525,7 +554,12 @@ router.get('/volunteer/admin/logs', verifyToken, ensureAdmin, async (req, res) =
       .populate('user', 'name email jobTitle company profileImage')
       .sort({ createdAt: -1 })
       .lean();
-    res.json({ logs });
+    res.json({
+      logs: logs.map((log) => ({
+        ...log,
+        user: sanitizeUserProfile(log.user),
+      })),
+    });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch logs' });
   }

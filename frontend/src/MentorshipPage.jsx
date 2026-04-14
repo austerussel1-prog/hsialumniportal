@@ -21,7 +21,7 @@ export default function MentorshipPage() {
     if (!value) return '/Logo.jpg';
     if (String(value).includes('gear-icon.svg')) return '/Logo.jpg';
     if (typeof value === 'string' && value.startsWith('/')) {
-      return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${value}`;
+      return `${import.meta.env.VITE_API_URL}${value}`;
     }
     return value;
   };
@@ -43,7 +43,6 @@ export default function MentorshipPage() {
   });
   const [applicationStatus, setApplicationStatus] = useState(null);
   const [applicationBusy, setApplicationBusy] = useState(false);
-  const [applicationMessage, setApplicationMessage] = useState('');
 
   const [sessionDraft, setSessionDraft] = useState({
     mentorUserId: '',
@@ -55,7 +54,6 @@ export default function MentorshipPage() {
     message: '',
   });
   const [sessionBusy, setSessionBusy] = useState(false);
-  const [sessionMessage, setSessionMessage] = useState('');
   const [mySessions, setMySessions] = useState([]);
   const [sessionsBusy, setSessionsBusy] = useState(false);
 
@@ -170,8 +168,13 @@ export default function MentorshipPage() {
     }
   };
 
+  const emitToast = (type, text) => {
+    window.dispatchEvent(new CustomEvent('hsi-toast', {
+      detail: { type, text },
+    }));
+  };
+
   const openApplicationModal = () => {
-    setApplicationMessage('');
     setActiveModal({ type: 'apply' });
   };
 
@@ -197,7 +200,6 @@ export default function MentorshipPage() {
   };
 
   const openSessionsModal = async () => {
-    setSessionMessage('');
     setActiveModal({ type: 'sessions' });
     if (!token) return;
     setSessionsBusy(true);
@@ -213,7 +215,6 @@ export default function MentorshipPage() {
   };
 
   const openRequestSessionModal = (mentor) => {
-    setSessionMessage('');
     setSessionDraft({
       mentorUserId: mentor?.id || '',
       startAt: '',
@@ -228,11 +229,10 @@ export default function MentorshipPage() {
 
   const submitApplication = async () => {
     if (!token) {
-      setApplicationMessage('Please log in again.');
+      emitToast('error', 'Please log in again.');
       return;
     }
     setApplicationBusy(true);
-    setApplicationMessage('');
     try {
       const roles = [];
       if (mentorApplication.roles.mentor) roles.push('mentor');
@@ -252,13 +252,14 @@ export default function MentorshipPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setApplicationMessage(data?.message || 'Failed to submit application');
+        emitToast('error', data?.message || 'Failed to submit application');
         return;
       }
       setApplicationStatus(data?.profile?.status || 'pending');
-      setApplicationMessage('Submitted. Awaiting admin approval.');
+      closeModal();
+      emitToast('success', data?.message || 'Submitted. Awaiting admin approval.');
     } catch (err) {
-      setApplicationMessage('Failed to submit application');
+      emitToast('error', 'Failed to submit application');
     } finally {
       setApplicationBusy(false);
     }
@@ -266,19 +267,18 @@ export default function MentorshipPage() {
 
   const submitSessionRequest = async () => {
     if (!token) {
-      setSessionMessage('Please log in again.');
+      emitToast('error', 'Please log in again.');
       return;
     }
     if (!sessionDraft.mentorUserId) {
-      setSessionMessage('Please select a mentor.');
+      emitToast('error', 'Please select a mentor.');
       return;
     }
     if (!sessionDraft.startAt || !sessionDraft.endAt) {
-      setSessionMessage('Please select a start and end time.');
+      emitToast('error', 'Please select a start and end time.');
       return;
     }
     setSessionBusy(true);
-    setSessionMessage('');
     try {
       const res = await fetch(apiEndpoints.mentorshipRequestSession, {
         method: 'POST',
@@ -295,12 +295,13 @@ export default function MentorshipPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setSessionMessage(data?.message || 'Failed to request session');
+        emitToast('error', data?.message || 'Failed to request session');
         return;
       }
-      setSessionMessage('Session requested.');
+      closeModal();
+      emitToast('success', data?.message || 'Session requested');
     } catch (err) {
-      setSessionMessage('Failed to request session');
+      emitToast('error', 'Failed to request session');
     } finally {
       setSessionBusy(false);
     }
@@ -903,12 +904,10 @@ export default function MentorshipPage() {
           setApplication={setMentorApplication}
           applicationStatus={applicationStatus}
           applicationBusy={applicationBusy}
-          applicationMessage={applicationMessage}
           onSubmitApplication={submitApplication}
           sessionDraft={sessionDraft}
           setSessionDraft={setSessionDraft}
           sessionBusy={sessionBusy}
-          sessionMessage={sessionMessage}
           onSubmitSession={submitSessionRequest}
           mySessions={mySessions}
           sessionsBusy={sessionsBusy}
@@ -936,12 +935,10 @@ function MentorshipModal({
   setApplication,
   applicationStatus,
   applicationBusy,
-  applicationMessage,
   onSubmitApplication,
   sessionDraft,
   setSessionDraft,
   sessionBusy,
-  sessionMessage,
   onSubmitSession,
   mySessions,
   sessionsBusy,
@@ -1099,8 +1096,8 @@ function MentorshipModal({
               </div>
 
               <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
-                <div style={{ fontSize: isMobile ? 11 : 12, color: applicationMessage ? '#111827' : '#6b7280', fontStyle: 'italic' }}>
-                  {applicationMessage || 'Applications are reviewed by admins.'}
+                <div style={{ fontSize: isMobile ? 11 : 12, color: '#6b7280', fontStyle: 'italic' }}>
+                  Applications are reviewed by admins.
                 </div>
                 <button
                   onClick={onSubmitApplication}
@@ -1190,8 +1187,8 @@ function MentorshipModal({
               </div>
 
               <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
-                <div style={{ fontSize: isMobile ? 11 : 12, color: sessionMessage ? '#111827' : '#6b7280', fontStyle: 'italic' }}>
-                  {sessionMessage || 'Mentors can accept/decline in the scheduling panel.'}
+                <div style={{ fontSize: isMobile ? 11 : 12, color: '#6b7280', fontStyle: 'italic' }}>
+                  Mentors can accept/decline in the scheduling panel.
                 </div>
                 <button
                   onClick={onSubmitSession}
