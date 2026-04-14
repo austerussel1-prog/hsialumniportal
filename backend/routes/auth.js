@@ -337,29 +337,6 @@ router.post('/login', async (req, res) => {
     }
 
 
-    const hasPendingAdminEmailVerification =
-      user.role !== 'user'
-      && user.status === 'pending'
-      && (!user.registrationVerifiedAt || user.emailVerificationTokenHash);
-
-    if (hasPendingAdminEmailVerification) {
-      await logAuditEvent({
-        req,
-        actorId: user._id,
-        actorEmail: user.email,
-        action: 'AUTH_LOGIN',
-        entityType: 'User',
-        entityId: String(user._id),
-        status: 'failure',
-        metadata: { reason: 'admin_email_not_verified' },
-      });
-
-      return res.status(403).json({
-        message: 'Please verify your email first before logging in.',
-      });
-    }
-
-
     if (user.role === 'user') {
       if (user.status === 'rejected') {
         return res.status(403).json({ message: 'Your previous registration was declined. Please register again to retry.' });
@@ -374,10 +351,6 @@ router.post('/login', async (req, res) => {
           });
         }
       }
-    } else if (user.status !== 'approved') {
-      return res.status(403).json({
-        message: 'Your admin account is still pending activation.',
-      });
     }
 
 

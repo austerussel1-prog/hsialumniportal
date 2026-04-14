@@ -9,12 +9,6 @@ const mailFromName = String(process.env.MAIL_FROM_NAME || 'Highly Succeed Portal
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
 const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpSecure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || smtpPort === 465;
-const adminSmtpHost = String(process.env.ADMIN_SMTP_HOST || '').trim() || smtpHost;
-const adminSmtpPort = Number(process.env.ADMIN_SMTP_PORT || smtpPort);
-const adminSmtpSecure = String(process.env.ADMIN_SMTP_SECURE || '').toLowerCase() === 'true'
-  || (!String(process.env.ADMIN_SMTP_SECURE || '').trim() && adminSmtpPort === 465);
-const adminEmailUser = String(process.env.ADMIN_EMAIL_USER || process.env.EMAIL_USER || '').trim();
-const adminEmailPassword = String(process.env.ADMIN_EMAIL_PASSWORD || process.env.EMAIL_PASSWORD || '').trim();
 const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
 const resendFrom = String(process.env.RESEND_FROM || process.env.EMAIL_USER || 'onboarding@resend.dev').trim();
 const gmailOauthClientId = String(process.env.GMAIL_OAUTH_CLIENT_ID || '').trim();
@@ -55,19 +49,6 @@ const createSmtpTransport = (overrides = {}) => nodemailer.createTransport({
   ...overrides,
 });
 
-const createConfiguredSmtpTransport = (config, overrides = {}) => nodemailer.createTransport({
-  host: config.host,
-  port: config.port,
-  secure: config.secure,
-  requireTLS: typeof config.requireTLS === 'boolean' ? config.requireTLS : !config.secure,
-  ...smtpTimeouts,
-  auth: {
-    user: config.user,
-    pass: config.password,
-  },
-  ...overrides,
-});
-
 const transporter = createSmtpTransport();
 
 const assertEmailConfig = () => {
@@ -80,85 +61,11 @@ const hasUsableGmailApi = () => Boolean(
   gmailOauthClientId && gmailOauthClientSecret && gmailOauthRefreshToken && gmailSenderEmail,
 );
 const hasUsableSmtp = () => Boolean(emailUser && emailPassword);
-const hasUsableAdminSmtp = () => Boolean(adminEmailUser && adminEmailPassword);
 const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
-const isUsingResendTestSender = () => /@resend\.dev$/i.test(resendFrom);
 const activeEmailMode = hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp');
 console.log('[email] Provider mode:', activeEmailMode);
-
-const getEmailDeliveryDiagnostics = () => ({
-  activeEmailMode,
-  hasUsableResend: hasUsableResend(),
-  hasUsableGmailApi: hasUsableGmailApi(),
-  hasUsableSmtp: hasUsableSmtp(),
-  hasUsableAdminSmtp: hasUsableAdminSmtp(),
-  isUsingResendTestSender: isUsingResendTestSender(),
-  resendFrom,
-  smtpHost,
-  smtpPort,
-  adminSmtpHost,
-  adminSmtpPort,
-});
-
-const sendViaSmtpWithFallback = async (mailOptions, transportConfigs = [], smtpConfig = null) => {
-  const effectiveConfig = smtpConfig || {
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpSecure,
-    requireTLS: !smtpSecure,
-    user: emailUser,
-    password: emailPassword,
-  };
-
-  if (!effectiveConfig.user || !effectiveConfig.password) {
-    throw new Error('Server email config missing: EMAIL_USER and/or EMAIL_PASSWORD');
-  }
-
-  const candidates = [
-    ...transportConfigs,
-    {
-      host: effectiveConfig.host,
-      port: effectiveConfig.port,
-      secure: effectiveConfig.secure,
-      requireTLS: effectiveConfig.requireTLS,
-    },
-    { host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true },
-    { host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false },
-  ];
-
-  const attemptedKeys = new Set();
-  let lastError = null;
-
-  for (const candidate of candidates) {
-    const key = JSON.stringify(candidate);
-    if (attemptedKeys.has(key)) continue;
-    attemptedKeys.add(key);
-
-    try {
-      const transport = createConfiguredSmtpTransport(effectiveConfig, candidate);
-      await transport.sendMail(mailOptions);
-      return true;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  try {
-    const serviceTransport = nodemailer.createTransport({
-      service: 'gmail',
-      ...smtpTimeouts,
-      auth: { user: effectiveConfig.user, pass: effectiveConfig.password },
-    });
-    await serviceTransport.sendMail(mailOptions);
-    return true;
-  } catch (error) {
-    lastError = error;
-  }
-
-  throw new Error(`SMTP delivery failed: ${lastError?.message || 'Unknown SMTP error'}`);
-};
 
 const shouldFallbackFromResend = (error) => {
   const message = String(error?.message || '');
@@ -332,7 +239,33 @@ const sendMail = async (mailOptions) => {
     }
   }
 
-  return sendViaSmtpWithFallback(mailOptions);
+  assertEmailConfig();
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    // Gmail SMTP can be flaky on some hosts; retry with alternate Gmail configs.
+    const retries = [
+      createSmtpTransport({ host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true }),
+      createSmtpTransport({ host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false }),
+      nodemailer.createTransport({
+        service: 'gmail',
+        ...smtpTimeouts,
+        auth: { user: emailUser, pass: emailPassword },
+      }),
+    ];
+
+    for (const candidate of retries) {
+      try {
+        await candidate.sendMail(mailOptions);
+        return true;
+      } catch (_retryError) {
+        // try next transport
+      }
+    }
+
+    throw new Error(`SMTP delivery failed: ${error.message}`);
+  }
 };
 
 const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
@@ -550,81 +483,6 @@ const escapeHtml = (value) => String(value || '')
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
-
-const sendAdminVerificationEmail = async ({
-  email,
-  name,
-  role,
-  temporaryPassword,
-  verificationUrl,
-  expiresAt,
-}) => {
-  if (!hasUsableAdminSmtp()) {
-    throw new Error('Admin email config missing: ADMIN_EMAIL_USER/ADMIN_EMAIL_PASSWORD or shared SMTP credentials');
-  }
-
-  const recipient = String(email || '').trim();
-  if (!recipient) {
-    throw new Error('Recipient email is required');
-  }
-
-  const safeName = String(name || '').trim() || 'Admin User';
-  const safeRole = String(role || 'admin').trim().replace(/_/g, ' ');
-  const safeTemporaryPassword = String(temporaryPassword || '').trim();
-  const safeVerificationUrl = String(verificationUrl || '').trim();
-
-  if (!safeTemporaryPassword || !safeVerificationUrl) {
-    throw new Error('Temporary password and verification URL are required');
-  }
-
-  const expiryLabel = formatDateTime(expiresAt) || 'within 24 hours';
-  const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`;
-
-  const mailOptions = {
-    from: formatFromAddress(adminEmailUser),
-    to: recipient,
-    subject: 'HSI Alumni Portal - Verify Your Admin Account',
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 640px; margin: 0 auto;">
-        <h2 style="color: #EAB308;">HSI Alumni Portal</h2>
-        <p>Dear ${escapeHtml(safeName)},</p>
-        <p>An administrator created a new ${escapeHtml(safeRole)} account for you.</p>
-        <p>Your account will remain pending until you verify this email address.</p>
-
-        <div style="margin: 18px 0; padding: 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #ffffff;">
-          <div style="margin-bottom: 8px;"><strong>Email:</strong> ${escapeHtml(recipient)}</div>
-          <div style="margin-bottom: 8px;"><strong>Role:</strong> ${escapeHtml(safeRole)}</div>
-          <div><strong>Temporary Password:</strong> ${escapeHtml(safeTemporaryPassword)}</div>
-        </div>
-
-        <a href="${escapeHtml(safeVerificationUrl)}"
-           style="display: inline-block; background: #EAB308; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 12px 0 18px;">
-          Verify Admin Account
-        </a>
-
-        <p>This verification link expires ${escapeHtml(expiryLabel)}.</p>
-        <p>After verification, you can sign in here:</p>
-        <p><a href="${escapeHtml(loginUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(loginUrl)}</a></p>
-        <p>If you were not expecting this email, please ignore it.</p>
-        <br>
-        <p style="color: #666; font-size: 12px;">Best regards,<br>HSI Alumni Portal Team</p>
-      </div>
-    `,
-  };
-
-  await sendViaSmtpWithFallback(mailOptions, [
-    { host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true },
-    { host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false },
-  ], {
-    host: adminSmtpHost,
-    port: adminSmtpPort,
-    secure: adminSmtpSecure,
-    requireTLS: !adminSmtpSecure,
-    user: adminEmailUser,
-    password: adminEmailPassword,
-  });
-  return true;
-};
 
 const pickEmailRecipient = (...candidates) => {
   for (const raw of candidates) {
@@ -863,11 +721,9 @@ module.exports = {
   sendOTP,
   sendRejectionEmail,
   sendApprovalEmail,
-  sendAdminVerificationEmail,
   sendDataRemovalDecisionEmail,
   sendReferralInvitationEmail,
   sendJobApplicationEmail,
   sendEventFeedbackEmail,
   sendAccountFeedbackEmail,
-  getEmailDeliveryDiagnostics,
 };

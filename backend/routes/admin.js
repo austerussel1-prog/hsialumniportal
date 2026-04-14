@@ -1,151 +1,21 @@
 const express = require('express');
-const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Message = require('../models/Message');
 const Achievement = require('../models/Achievement');
 const AuditLog = require('../models/AuditLog');
-const {
-  sendApprovalEmail,
-  sendRejectionEmail,
-  sendDataRemovalDecisionEmail,
-  sendAdminVerificationEmail,
-  getEmailDeliveryDiagnostics,
-} = require('../services/emailService');
+const { sendApprovalEmail, sendRejectionEmail, sendDataRemovalDecisionEmail } = require('../services/emailService');
 const { hardDeleteUsersByIds } = require('../services/userDeletionService');
 const { verifyToken } = require('./auth');
 const { logAuditEvent } = require('../utils/auditLogger');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const router = express.Router();
-const ADMIN_CREATABLE_ROLES = new Set(['admin', 'hr', 'alumni_officer']);
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 function parsePositiveInt(value, fallback, maxValue = 3650) {
   const parsed = parseInt(String(value || ''), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return Math.min(parsed, maxValue);
-}
-
-function normalizeEmailInput(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function getAllowedAdminEmailDomains() {
-  return String(process.env.ALLOWED_ADMIN_EMAIL_DOMAINS || '')
-    .split(',')
-    .map((domain) => domain.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function getAdminEmailValidationError(email) {
-  const normalizedEmail = normalizeEmailInput(email);
-  if (!normalizedEmail) return 'Email address is required';
-  if (!EMAIL_REGEX.test(normalizedEmail)) return 'Enter a valid email address';
-
-  const allowedDomains = getAllowedAdminEmailDomains();
-  if (!allowedDomains.length) return '';
-
-  const domain = normalizedEmail.split('@')[1] || '';
-  if (allowedDomains.includes(domain)) return '';
-
-  return `Only these email domains are allowed: ${allowedDomains.join(', ')}`;
-}
-
-function getBackendBaseUrl(req) {
-  const configuredBaseUrl = String(
-    process.env.BACKEND_PUBLIC_URL || process.env.BACKEND_URL || ''
-  ).trim().replace(/\/$/, '');
-
-  if (configuredBaseUrl) {
-    return configuredBaseUrl;
-  }
-
-  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
-  const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim();
-  const protocol = forwardedProto || req.protocol || 'http';
-  const host = forwardedHost || req.get('host') || 'localhost:5000';
-
-  return `${protocol}://${host}`;
-}
-
-function getFrontendBaseUrl() {
-  return String(process.env.FRONTEND_URL || 'http://localhost:5173').trim().replace(/\/$/, '');
-}
-
-function buildAdminVerificationRedirectUrl(status) {
-  const target = new URL('/login', `${getFrontendBaseUrl()}/`);
-  target.searchParams.set('adminVerification', status);
-  return target.toString();
-}
-
-function generateTemporaryPassword(length = 12) {
-  const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const lowercase = 'abcdefghijkmnopqrstuvwxyz';
-  const digits = '23456789';
-  const symbols = '!@#$%*';
-  const allChars = `${uppercase}${lowercase}${digits}${symbols}`;
-  const passwordChars = [
-    uppercase[Math.floor(Math.random() * uppercase.length)],
-    lowercase[Math.floor(Math.random() * lowercase.length)],
-    digits[Math.floor(Math.random() * digits.length)],
-    symbols[Math.floor(Math.random() * symbols.length)],
-  ];
-
-  while (passwordChars.length < length) {
-    passwordChars.push(allChars[Math.floor(Math.random() * allChars.length)]);
-  }
-
-  for (let index = passwordChars.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [passwordChars[index], passwordChars[swapIndex]] = [passwordChars[swapIndex], passwordChars[index]];
-  }
-
-  return passwordChars.join('');
-}
-
-function createAdminVerificationToken(userId) {
-  const tokenSecret = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(tokenSecret).digest('hex');
-  const ttlHours = parsePositiveInt(process.env.ADMIN_EMAIL_VERIFICATION_HOURS, 24, 168);
-  const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
-
-  return {
-    token: `${String(userId)}.${tokenSecret}`,
-    tokenHash,
-    expiresAt,
-  };
-}
-
-function mapCreateAdminDuplicateKeyError(err) {
-  if (err?.code !== 11000) return '';
-  if (err?.keyPattern?.emailHash) return 'Email already registered';
-  if (err?.keyPattern?.employeeId) return 'Employee ID already in use';
-  return 'Duplicate record found';
-}
-
-function canReuseUserForAdminCreation(user) {
-  if (!user) return false;
-  if (user.isDeleted || user.status === 'rejected') return true;
-
-  const isPendingUnverifiedAdminInvite =
-    ADMIN_CREATABLE_ROLES.has(String(user.role || '').trim().toLowerCase())
-    && String(user.status || '').trim().toLowerCase() === 'pending'
-    && !user.registrationVerifiedAt;
-
-  return isPendingUnverifiedAdminInvite;
-}
-
-function buildExistingAccountMessage(user) {
-  if (!user) return 'Email already registered';
-
-  const details = [
-    `role: ${String(user.role || 'unknown')}`,
-    `status: ${String(user.status || 'unknown')}`,
-    `deleted: ${user.isDeleted ? 'yes' : 'no'}`,
-  ];
-
-  return `Email already registered (${details.join(', ')})`;
 }
 
 function getAccountDeletionConfig() {
@@ -307,100 +177,35 @@ router.get('/all-users', verifyAdmin, async (req, res) => {
 
 router.post('/create-admin', verifyAdmin, async (req, res) => {
   try {
-    const fullName = String(req.body?.fullName || '').trim();
-    const employeeId = String(req.body?.employeeId || '').trim();
-    const email = normalizeEmailInput(req.body?.email);
-    const contactNumber = String(req.body?.contactNumber || '').trim();
-    const address = String(req.body?.address || '').trim();
-    const role = String(req.body?.role || '').trim().toLowerCase();
+    const { fullName, employeeId, email, contactNumber, address, tempPassword } = req.body;
 
-    if (!fullName || !employeeId || !email || !contactNumber || !address || !role) {
+    if (!fullName || !employeeId || !email || !contactNumber || !address || !tempPassword) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    if (!ADMIN_CREATABLE_ROLES.has(role)) {
-      return res.status(400).json({ message: 'Select a valid admin role' });
-    }
-
-    const emailValidationError = getAdminEmailValidationError(email);
-    if (emailValidationError) {
-      return res.status(400).json({ message: emailValidationError });
-    }
-
     const existingEmail = await User.findByEmail(email);
-    const reusableExistingUser = canReuseUserForAdminCreation(existingEmail) ? existingEmail : null;
-
-    if (existingEmail && !reusableExistingUser) {
-      return res.status(409).json({ message: buildExistingAccountMessage(existingEmail) });
+    if (existingEmail) {
+      return res.status(400).json({ message: 'Email already registered' });
     }
 
     const existingEmployeeId = await User.findOne({ employeeId });
-    if (
-      existingEmployeeId
-      && (!reusableExistingUser || String(existingEmployeeId._id) !== String(reusableExistingUser._id))
-    ) {
-      return res.status(409).json({ message: 'Employee ID already in use' });
+    if (existingEmployeeId) {
+      return res.status(400).json({ message: 'Employee ID already in use' });
     }
 
-    const tempPassword = generateTemporaryPassword();
-
-    const newAdmin = reusableExistingUser || new User();
-    newAdmin.name = fullName;
-    newAdmin.employeeId = employeeId;
-    newAdmin.email = email;
-    newAdmin.contactNumber = contactNumber;
-    newAdmin.address = address;
-    newAdmin.password = tempPassword;
-    newAdmin.role = role;
-    newAdmin.status = 'pending';
-    newAdmin.provider = 'local';
-    newAdmin.googleId = null;
-    newAdmin.registrationVerifiedAt = null;
-    newAdmin.approvedAt = null;
-    newAdmin.otp = null;
-    newAdmin.otpExpiry = null;
-    newAdmin.isDeleted = false;
-    newAdmin.deletedAt = null;
-    newAdmin.deletionRequestedAt = null;
-    newAdmin.scheduledDeletionAt = null;
-    newAdmin.deletionReason = '';
-    newAdmin.dataRemovalRequestedAt = null;
-    newAdmin.dataRemovalRequestStatus = 'none';
-    newAdmin.dataRemovalRequestedFinalAction = 'delete';
-    newAdmin.dataRemovalRequestReviewedAt = null;
-    newAdmin.dataRemovalRequestReviewedBy = null;
-    newAdmin.dataRemovalRequestDecisionNote = '';
-    newAdmin.dataRemovalRequestNote = '';
-    newAdmin.clearLoginFailures();
+    const newAdmin = new User({
+      name: fullName,
+      employeeId,
+      email,
+      contactNumber,
+      address,
+      password: tempPassword,
+      role: 'admin',
+      status: 'approved',
+      provider: 'local',
+    });
 
     await newAdmin.save();
-
-    const { token, tokenHash, expiresAt } = createAdminVerificationToken(newAdmin._id);
-    newAdmin.emailVerificationTokenHash = tokenHash;
-    newAdmin.emailVerificationTokenExpiresAt = expiresAt;
-    newAdmin.emailVerificationSentAt = new Date();
-    await newAdmin.save();
-
-    const verificationUrl = `${getBackendBaseUrl(req)}/api/admin/verify-email?token=${encodeURIComponent(token)}`;
-
-    try {
-      await sendAdminVerificationEmail({
-        email: newAdmin.email,
-        name: newAdmin.name,
-        role: newAdmin.role,
-        temporaryPassword: tempPassword,
-        verificationUrl,
-        expiresAt,
-      });
-    } catch (mailErr) {
-      await User.deleteOne({ _id: newAdmin._id }).catch(() => {});
-      console.error('[admin] Failed to send admin verification email:', mailErr.message);
-      const diagnostics = getEmailDeliveryDiagnostics();
-      return res.status(502).json({
-        message: `Admin account could not be created because the verification email failed to send. ${mailErr.message}`,
-        emailDiagnostics: diagnostics,
-      });
-    }
 
     await logAuditEvent({
       req,
@@ -410,16 +215,11 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
       entityType: 'User',
       entityId: String(newAdmin._id),
       status: 'success',
-      metadata: {
-        createdRole: newAdmin.role,
-        createdEmail: newAdmin.email,
-        verificationSent: true,
-        reusedExistingUser: Boolean(reusableExistingUser),
-      },
+      metadata: { createdRole: newAdmin.role, createdEmail: newAdmin.email },
     });
 
     res.status(201).json({
-      message: 'Admin user created. A verification email with a temporary password has been sent.',
+      message: 'Admin user created successfully',
       user: {
         id: newAdmin._id,
         name: newAdmin.name,
@@ -433,7 +233,6 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    const duplicateMessage = mapCreateAdminDuplicateKeyError(err);
     await logAuditEvent({
       req,
       actorId: req.user?._id,
@@ -444,87 +243,7 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
       status: 'failure',
       metadata: { error: err.message },
     });
-    if (duplicateMessage) {
-      return res.status(409).json({ message: duplicateMessage });
-    }
     res.status(500).json({ message: 'Error creating admin user' });
-  }
-});
-
-router.get('/verify-email', async (req, res) => {
-  const token = String(req.query?.token || '').trim();
-
-  if (!token) {
-    return res.redirect(buildAdminVerificationRedirectUrl('invalid'));
-  }
-
-  const separatorIndex = token.indexOf('.');
-  const userId = separatorIndex > 0 ? token.slice(0, separatorIndex) : '';
-  const tokenSecret = separatorIndex > 0 ? token.slice(separatorIndex + 1) : '';
-
-  if (!userId || !tokenSecret) {
-    return res.redirect(buildAdminVerificationRedirectUrl('invalid'));
-  }
-
-  try {
-    const user = await User.findById(userId)
-      .select('+emailVerificationTokenHash +emailVerificationTokenExpiresAt');
-
-    if (!user || user.isDeleted) {
-      return res.redirect(buildAdminVerificationRedirectUrl('invalid'));
-    }
-
-    if (user.registrationVerifiedAt && user.status === 'approved') {
-      return res.redirect(buildAdminVerificationRedirectUrl('already-verified'));
-    }
-
-    if (!user.emailVerificationTokenHash || !user.emailVerificationTokenExpiresAt) {
-      return res.redirect(buildAdminVerificationRedirectUrl('invalid'));
-    }
-
-    if (new Date(user.emailVerificationTokenExpiresAt).getTime() < Date.now()) {
-      user.emailVerificationTokenHash = null;
-      user.emailVerificationTokenExpiresAt = null;
-      await user.save();
-      return res.redirect(buildAdminVerificationRedirectUrl('expired'));
-    }
-
-    const incomingHash = crypto.createHash('sha256').update(tokenSecret).digest('hex');
-    if (incomingHash !== user.emailVerificationTokenHash) {
-      return res.redirect(buildAdminVerificationRedirectUrl('invalid'));
-    }
-
-    user.registrationVerifiedAt = new Date();
-    user.status = 'approved';
-    user.approvedAt = new Date();
-    user.emailVerificationTokenHash = null;
-    user.emailVerificationTokenExpiresAt = null;
-    await user.save();
-
-    await logAuditEvent({
-      req,
-      actorId: user._id,
-      actorEmail: user.email,
-      action: 'ADMIN_VERIFY_EMAIL',
-      entityType: 'User',
-      entityId: String(user._id),
-      status: 'success',
-      metadata: { verifiedRole: user.role },
-    });
-
-    return res.redirect(buildAdminVerificationRedirectUrl('success'));
-  } catch (err) {
-    console.error('[admin] Error verifying admin email:', err);
-    await logAuditEvent({
-      req,
-      actorEmail: '',
-      action: 'ADMIN_VERIFY_EMAIL',
-      entityType: 'User',
-      entityId: userId || '',
-      status: 'failure',
-      metadata: { error: err.message },
-    });
-    return res.redirect(buildAdminVerificationRedirectUrl('error'));
   }
 });
 

@@ -16,28 +16,6 @@ import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
 const ALUMNI_PAGE_SIZE = 10;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
-const ALLOWED_ADMIN_EMAIL_DOMAINS = String(import.meta.env.VITE_ADMIN_ALLOWED_EMAIL_DOMAINS || '')
-  .split(',')
-  .map((domain) => domain.trim().toLowerCase())
-  .filter(Boolean);
-
-function normalizeEmailInput(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function getAdminEmailValidationError(email) {
-  const normalizedEmail = normalizeEmailInput(email);
-  if (!normalizedEmail) return 'Email address is required.';
-  if (!EMAIL_REGEX.test(normalizedEmail)) return 'Enter a valid email address.';
-
-  if (!ALLOWED_ADMIN_EMAIL_DOMAINS.length) return '';
-
-  const domain = normalizedEmail.split('@')[1] || '';
-  if (ALLOWED_ADMIN_EMAIL_DOMAINS.includes(domain)) return '';
-
-  return `Only these email domains are allowed: ${ALLOWED_ADMIN_EMAIL_DOMAINS.join(', ')}`;
-}
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -72,8 +50,10 @@ export default function AdminDashboard() {
     contactNumber: '',
     address: '',
     role: '',
+    tempPassword: '',
   });
   const [addUserLoading, setAddUserLoading] = useState(false);
+  const [addUserError, setAddUserError] = useState('');
   
  
   const [alumni, setAlumni] = useState([]);
@@ -682,21 +662,14 @@ export default function AdminDashboard() {
     const { name, value } = e.target;
     setAddUserForm((prev) => ({
       ...prev,
-      [name]: name === 'email' ? normalizeEmailInput(value) : value,
+      [name]: value,
     }));
   };
 
   const handleCreateAdminUser = async (e) => {
     e.preventDefault();
     setAddUserLoading(true);
-
-    const normalizedEmail = normalizeEmailInput(addUserForm.email);
-    const emailValidationError = getAdminEmailValidationError(normalizedEmail);
-    if (emailValidationError) {
-      notify('error', emailValidationError);
-      setAddUserLoading(false);
-      return;
-    }
+    setAddUserError('');
 
     try {
       const token = localStorage.getItem('token');
@@ -707,17 +680,17 @@ export default function AdminDashboard() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          fullName: addUserForm.fullName.trim(),
-          employeeId: addUserForm.employeeId.trim(),
-          email: normalizedEmail,
-          contactNumber: addUserForm.contactNumber.trim(),
-          address: addUserForm.address.trim(),
+          fullName: addUserForm.fullName,
+          employeeId: addUserForm.employeeId,
+          email: addUserForm.email,
+          contactNumber: addUserForm.contactNumber,
+          address: addUserForm.address,
           role: addUserForm.role,
+          tempPassword: addUserForm.tempPassword,
         }),
       });
 
       if (response.ok) {
-        const data = await response.json().catch(() => ({}));
         await fetchAllUsers();
         await fetchStats();
         setShowAddUserModal(false);
@@ -728,8 +701,8 @@ export default function AdminDashboard() {
           contactNumber: '',
           address: '',
           role: '',
+          tempPassword: '',
         });
-        notify('success', data?.message || 'Admin account created and verification email sent.');
       } else {
         const text = await response.text().catch(() => '');
         let message = 'Failed to create admin user';
@@ -739,11 +712,11 @@ export default function AdminDashboard() {
         } catch (err) {
           if (text) message = text;
         }
-        notify('error', message);
+        setAddUserError(message);
       }
     } catch (err) {
       console.error('Error creating admin user:', err);
-      notify('error', err?.message || 'Failed to create admin user');
+      setAddUserError(err?.message || 'Failed to create admin user');
     } finally {
       setAddUserLoading(false);
     }
@@ -1331,6 +1304,7 @@ export default function AdminDashboard() {
                       {canAddAdminUser ? (
                         <button
                           onClick={() => {
+                            setAddUserError('');
                             setShowAddUserModal(true);
                           }}
                           className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-semibold rounded-md transition whitespace-nowrap"
@@ -1780,6 +1754,7 @@ export default function AdminDashboard() {
                     {user?.role === 'super_admin' && (
                       <button
                         onClick={() => {
+                          setAddUserError('');
                           setShowAddUserModal(true);
                         }}
                         className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-md transition"
@@ -2200,7 +2175,13 @@ export default function AdminDashboard() {
             className="bg-white rounded-xl md:rounded-2xl shadow-xl w-full max-w-[90vw] md:max-w-md p-3 md:p-8 relative max-h-[92vh] overflow-y-auto scrollbar-hide"
           >
             <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Add Admin User</h3>
-            <p className="text-gray-600 mb-3 md:mb-4 text-sm md:text-base">Fill in the details to create an admin account. A temporary password and verification link will be emailed automatically.</p>
+            <p className="text-gray-600 mb-3 md:mb-4 text-sm md:text-base">Fill in the details to create an admin account.</p>
+
+            {addUserError && (
+              <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
+                {addUserError}
+              </p>
+            )}
 
             <form onSubmit={handleCreateAdminUser} className="space-y-3 md:space-y-4">
               <div>
@@ -2235,11 +2216,6 @@ export default function AdminDashboard() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
                   required
                 />
-                {ALLOWED_ADMIN_EMAIL_DOMAINS.length > 0 && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Allowed domains: {ALLOWED_ADMIN_EMAIL_DOMAINS.join(', ')}
-                  </p>
-                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
@@ -2278,8 +2254,16 @@ export default function AdminDashboard() {
                   <option value="alumni_officer">Alumni Officer</option>
                 </select>
               </div>
-              <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
-                A secure temporary password will be generated automatically and included in the verification email.
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
+                <input
+                  name="tempPassword"
+                  value={addUserForm.tempPassword}
+                  onChange={handleAddUserChange}
+                  type="password"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  required
+                />
               </div>
 
               <div className="flex gap-3 pt-2">

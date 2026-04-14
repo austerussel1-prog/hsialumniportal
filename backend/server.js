@@ -20,7 +20,6 @@ const mentorshipRoutes = require('./routes/mentorship');
 const jobApplicationRoutes = require('./routes/jobApplications');
 const jobRoutes = require('./routes/jobs');
 const notificationsRoutes = require('./routes/notifications');
-const { getEmailDeliveryDiagnostics } = require('./services/emailService');
 const { scheduleDataRetentionJob } = require('./services/privacyRetentionService');
 const { scheduleEventLifecycleJob } = require('./services/eventLifecycleService');
 const { hasEncryptionKey, getEncryptionKeyFingerprint } = require('./utils/fieldEncryption');
@@ -100,7 +99,6 @@ app.get('/api/health', (req, res) => {
       || process.env.RENDER_GIT_BRANCH
       || process.env.VERCEL_GIT_COMMIT_SHA
       || null,
-    email: getEmailDeliveryDiagnostics(),
   });
 });
 
