@@ -74,7 +74,6 @@ export default function AdminDashboard() {
     role: '',
   });
   const [addUserLoading, setAddUserLoading] = useState(false);
-  const [addUserError, setAddUserError] = useState('');
   
  
   const [alumni, setAlumni] = useState([]);
@@ -690,12 +689,11 @@ export default function AdminDashboard() {
   const handleCreateAdminUser = async (e) => {
     e.preventDefault();
     setAddUserLoading(true);
-    setAddUserError('');
 
     const normalizedEmail = normalizeEmailInput(addUserForm.email);
     const emailValidationError = getAdminEmailValidationError(normalizedEmail);
     if (emailValidationError) {
-      setAddUserError(emailValidationError);
+      notify('error', emailValidationError);
       setAddUserLoading(false);
       return;
     }
@@ -741,11 +739,11 @@ export default function AdminDashboard() {
         } catch (err) {
           if (text) message = text;
         }
-        setAddUserError(message);
+        notify('error', message);
       }
     } catch (err) {
       console.error('Error creating admin user:', err);
-      setAddUserError(err?.message || 'Failed to create admin user');
+      notify('error', err?.message || 'Failed to create admin user');
     } finally {
       setAddUserLoading(false);
     }
@@ -1333,7 +1331,6 @@ export default function AdminDashboard() {
                       {canAddAdminUser ? (
                         <button
                           onClick={() => {
-                            setAddUserError('');
                             setShowAddUserModal(true);
                           }}
                           className="px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-semibold rounded-md transition whitespace-nowrap"
@@ -1783,7 +1780,6 @@ export default function AdminDashboard() {
                     {user?.role === 'super_admin' && (
                       <button
                         onClick={() => {
-                          setAddUserError('');
                           setShowAddUserModal(true);
                         }}
                         className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-md transition"
@@ -2205,12 +2201,6 @@ export default function AdminDashboard() {
           >
             <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Add Admin User</h3>
             <p className="text-gray-600 mb-3 md:mb-4 text-sm md:text-base">Fill in the details to create an admin account. A temporary password and verification link will be emailed automatically.</p>
-
-            {addUserError && (
-              <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
-                {addUserError}
-              </p>
-            )}
 
             <form onSubmit={handleCreateAdminUser} className="space-y-3 md:space-y-4">
               <div>
