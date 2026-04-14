@@ -128,6 +128,18 @@ function canReuseUserForAdminCreation(user) {
   return user.isDeleted || user.status === 'rejected';
 }
 
+function buildExistingAccountMessage(user) {
+  if (!user) return 'Email already registered';
+
+  const details = [
+    `role: ${String(user.role || 'unknown')}`,
+    `status: ${String(user.status || 'unknown')}`,
+    `deleted: ${user.isDeleted ? 'yes' : 'no'}`,
+  ];
+
+  return `Email already registered (${details.join(', ')})`;
+}
+
 function getAccountDeletionConfig() {
   const graceDays = parsePositiveInt(process.env.ACCOUNT_SOFT_DELETE_GRACE_DAYS, 30, 365);
   const finalActionRaw = String(process.env.ACCOUNT_SOFT_DELETE_FINAL_ACTION || 'delete').trim().toLowerCase();
@@ -311,7 +323,7 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
     const reusableExistingUser = canReuseUserForAdminCreation(existingEmail) ? existingEmail : null;
 
     if (existingEmail && !reusableExistingUser) {
-      return res.status(409).json({ message: 'Email already registered' });
+      return res.status(409).json({ message: buildExistingAccountMessage(existingEmail) });
     }
 
     const existingEmployeeId = await User.findOne({ employeeId });
