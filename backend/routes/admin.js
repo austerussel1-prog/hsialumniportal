@@ -10,6 +10,7 @@ const {
   sendRejectionEmail,
   sendDataRemovalDecisionEmail,
   sendAdminVerificationEmail,
+  getEmailDeliveryDiagnostics,
 } = require('../services/emailService');
 const { hardDeleteUsersByIds } = require('../services/userDeletionService');
 const { verifyToken } = require('./auth');
@@ -387,8 +388,10 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
     } catch (mailErr) {
       await User.deleteOne({ _id: newAdmin._id }).catch(() => {});
       console.error('[admin] Failed to send admin verification email:', mailErr.message);
+      const diagnostics = getEmailDeliveryDiagnostics();
       return res.status(502).json({
-        message: 'Admin account could not be created because the verification email failed to send.',
+        message: `Admin account could not be created because the verification email failed to send. ${mailErr.message}`,
+        emailDiagnostics: diagnostics,
       });
     }
 

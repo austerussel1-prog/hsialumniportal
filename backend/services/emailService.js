@@ -67,6 +67,16 @@ const hasUsableResend = () => Boolean(
 const activeEmailMode = hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp');
 console.log('[email] Provider mode:', activeEmailMode);
 
+const getEmailDeliveryDiagnostics = () => ({
+  activeEmailMode,
+  hasUsableResend: hasUsableResend(),
+  hasUsableGmailApi: hasUsableGmailApi(),
+  hasUsableSmtp: hasUsableSmtp(),
+  resendFrom,
+  smtpHost,
+  smtpPort,
+});
+
 const shouldFallbackFromResend = (error) => {
   const message = String(error?.message || '');
   return /resend api error \(4\d{2}\)|validation_error|verify a domain|testing emails|change the "from" address/i.test(message);
@@ -790,4 +800,5 @@ module.exports = {
   sendJobApplicationEmail,
   sendEventFeedbackEmail,
   sendAccountFeedbackEmail,
+  getEmailDeliveryDiagnostics,
 };
