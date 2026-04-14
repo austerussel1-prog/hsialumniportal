@@ -123,6 +123,11 @@ function mapCreateAdminDuplicateKeyError(err) {
   return 'Duplicate record found';
 }
 
+function canReuseUserForAdminCreation(user) {
+  if (!user) return false;
+  return user.isDeleted || user.status === 'rejected';
+}
+
 function getAccountDeletionConfig() {
   const graceDays = parsePositiveInt(process.env.ACCOUNT_SOFT_DELETE_GRACE_DAYS, 30, 365);
   const finalActionRaw = String(process.env.ACCOUNT_SOFT_DELETE_FINAL_ACTION || 'delete').trim().toLowerCase();
@@ -303,29 +308,50 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
     }
 
     const existingEmail = await User.findByEmail(email);
-    if (existingEmail) {
+    const reusableExistingUser = canReuseUserForAdminCreation(existingEmail) ? existingEmail : null;
+
+    if (existingEmail && !reusableExistingUser) {
       return res.status(409).json({ message: 'Email already registered' });
     }
 
     const existingEmployeeId = await User.findOne({ employeeId });
-    if (existingEmployeeId) {
+    if (
+      existingEmployeeId
+      && (!reusableExistingUser || String(existingEmployeeId._id) !== String(reusableExistingUser._id))
+    ) {
       return res.status(409).json({ message: 'Employee ID already in use' });
     }
 
     const tempPassword = generateTemporaryPassword();
 
-    const newAdmin = new User({
-      name: fullName,
-      employeeId,
-      email,
-      contactNumber,
-      address,
-      password: tempPassword,
-      role,
-      status: 'pending',
-      registrationVerifiedAt: null,
-      provider: 'local',
-    });
+    const newAdmin = reusableExistingUser || new User();
+    newAdmin.name = fullName;
+    newAdmin.employeeId = employeeId;
+    newAdmin.email = email;
+    newAdmin.contactNumber = contactNumber;
+    newAdmin.address = address;
+    newAdmin.password = tempPassword;
+    newAdmin.role = role;
+    newAdmin.status = 'pending';
+    newAdmin.provider = 'local';
+    newAdmin.googleId = null;
+    newAdmin.registrationVerifiedAt = null;
+    newAdmin.approvedAt = null;
+    newAdmin.otp = null;
+    newAdmin.otpExpiry = null;
+    newAdmin.isDeleted = false;
+    newAdmin.deletedAt = null;
+    newAdmin.deletionRequestedAt = null;
+    newAdmin.scheduledDeletionAt = null;
+    newAdmin.deletionReason = '';
+    newAdmin.dataRemovalRequestedAt = null;
+    newAdmin.dataRemovalRequestStatus = 'none';
+    newAdmin.dataRemovalRequestedFinalAction = 'delete';
+    newAdmin.dataRemovalRequestReviewedAt = null;
+    newAdmin.dataRemovalRequestReviewedBy = null;
+    newAdmin.dataRemovalRequestDecisionNote = '';
+    newAdmin.dataRemovalRequestNote = '';
+    newAdmin.clearLoginFailures();
 
     await newAdmin.save();
 
@@ -362,7 +388,12 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
       entityType: 'User',
       entityId: String(newAdmin._id),
       status: 'success',
-      metadata: { createdRole: newAdmin.role, createdEmail: newAdmin.email, verificationSent: true },
+      metadata: {
+        createdRole: newAdmin.role,
+        createdEmail: newAdmin.email,
+        verificationSent: true,
+        reusedExistingUser: Boolean(reusableExistingUser),
+      },
     });
 
     res.status(201).json({
