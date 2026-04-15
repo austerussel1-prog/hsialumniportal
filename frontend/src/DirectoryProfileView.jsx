@@ -105,6 +105,29 @@ export default function DirectoryProfileView() {
     careerDocuments: Array.isArray(profile.careerDocuments) ? profile.careerDocuments : [],
   } : null;
 
+  const resolveCareerDocumentName = (file) => {
+    if (!file) return 'Document';
+    if (typeof file === 'string') return file;
+    return file.name || file.filename || file.originalName || 'Document';
+  };
+
+  const resolveCareerDocumentUrl = (file) => {
+    if (!file) return '';
+    if (typeof file === 'string') {
+      return resolveApiAssetUrl(file);
+    }
+
+    const rawUrl = file.url
+      || file.link
+      || file.fileUrl
+      || file.path
+      || file.downloadUrl
+      || file.secure_url
+      || '';
+
+    return resolveApiAssetUrl(rawUrl);
+  };
+
   return (
     <motion.div
       style={{ display: 'flex', minHeight: '100vh', background: '#f6f2ea', overflowX: 'hidden' }}
@@ -666,13 +689,15 @@ export default function DirectoryProfileView() {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {profileData.careerDocuments.map((file) => {
-                        const name = typeof file === 'string'
-                          ? file
-                          : (file.name || file.filename || file.originalName || 'Document');
-                        const url = typeof file === 'object' ? resolveApiAssetUrl(file.url || file.link || '') : null;
+                        const name = resolveCareerDocumentName(file);
+                        const url = resolveCareerDocumentUrl(file);
+                        const key = file?.id || file?._id || `${name}-${url || 'no-url'}`;
                         return (
-                          <div
-                            key={file.id || file._id || name}
+                          <a
+                            key={key}
+                            href={url || undefined}
+                            target={url ? '_blank' : undefined}
+                            rel={url ? 'noopener noreferrer' : undefined}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -681,6 +706,11 @@ export default function DirectoryProfileView() {
                               background: '#f9fafb',
                               borderRadius: '12px',
                               border: '1px solid #e5e7eb',
+                              textDecoration: 'none',
+                              cursor: url ? 'pointer' : 'default',
+                            }}
+                            onClick={(event) => {
+                              if (!url) event.preventDefault();
                             }}
                           >
                             <div style={{
@@ -699,40 +729,19 @@ export default function DirectoryProfileView() {
                               {name.charAt(0).toUpperCase()}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              {url ? (
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    margin: 0,
-                                    fontSize: '14px',
-                                    fontWeight: '600',
-                                    color: '#2563eb',
-                                    textDecoration: 'none',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    display: 'block',
-                                  }}
-                                >
-                                  {name}
-                                </a>
-                              ) : (
-                                <p style={{
-                                  margin: 0,
-                                  fontSize: '14px',
-                                  fontWeight: '600',
-                                  color: '#111827',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}>
-                                  {name}
-                                </p>
-                              )}
+                              <p style={{
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                color: url ? '#2563eb' : '#111827',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {name}
+                              </p>
                             </div>
-                          </div>
+                          </a>
                         );
                       })}
                     </div>

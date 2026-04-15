@@ -97,6 +97,10 @@ export default function AccountSettings() {
     }));
   };
 
+  const isTransientFetchFailure = (error) => (
+    error instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(String(error?.message || ''))
+  );
+
   const resetMessages = () => {
     // Toast handles transient feedback globally.
   };
@@ -330,7 +334,11 @@ export default function AccountSettings() {
       localStorage.setItem('user', JSON.stringify(updatedUser));
       emitToast('success', body?.message || 'Privacy settings saved successfully.');
     } catch (err) {
-      emitToast('error', err?.message || 'Failed to save privacy settings.');
+      if (isTransientFetchFailure(err)) {
+        emitToast('warning', 'Connection issue. Please try again in a moment.');
+      } else {
+        emitToast('error', err?.message || 'Failed to save privacy settings.');
+      }
     } finally {
       setLoading(false);
     }
