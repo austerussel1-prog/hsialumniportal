@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LinkedinLogo, TwitterLogo, InstagramLogo, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, BookOpen, Briefcase, DownloadSimple } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints } from './config/api';
+import { API_URL, apiEndpoints } from './config/api';
 
 const normalizeCareerDocument = (file, index = 0) => {
   if (!file) return null;
@@ -41,6 +41,14 @@ const parseFilenameFromContentDisposition = (contentDisposition, fallbackName = 
 
   const basicMatch = /filename="([^"]+)"/i.exec(contentDisposition || '');
   return basicMatch?.[1] || fallbackName;
+};
+
+const getCareerDocumentDownloadEndpoint = (ownerId, documentId) => {
+  if (typeof apiEndpoints.downloadCareerDocument === 'function') {
+    return apiEndpoints.downloadCareerDocument(ownerId, documentId);
+  }
+
+  return `${API_URL}/api/auth/users/${encodeURIComponent(ownerId)}/career-documents/${encodeURIComponent(documentId)}/download`;
 };
 
 export default function DirectoryProfileView() {
@@ -149,7 +157,7 @@ export default function DirectoryProfileView() {
       throw new Error('You must be signed in to access this document.');
     }
 
-    const response = await fetch(apiEndpoints.downloadCareerDocument(ownerId, file.id), {
+    const response = await fetch(getCareerDocumentDownloadEndpoint(ownerId, file.id), {
       headers: { Authorization: `Bearer ${token}` },
     });
 

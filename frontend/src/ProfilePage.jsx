@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, LinkedinLogo, TwitterLogo, InstagramLogo, PencilSimple, UploadSimple, DownloadSimple, X, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, Plus, Gear, SignOut, User, BookOpen, Briefcase, Bell } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints, resolveApiAssetUrl } from './config/api';
+import { API_URL, apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 const formatRelativeNotificationTime = (iso) => {
   if (!iso) return 'Now';
@@ -66,6 +66,16 @@ const parseFilenameFromContentDisposition = (contentDisposition, fallbackName = 
   const basicMatch = /filename="([^"]+)"/i.exec(contentDisposition || '');
   return basicMatch?.[1] || fallbackName;
 };
+
+const getCareerDocumentDownloadEndpoint = (ownerId, documentId) => {
+  if (typeof apiEndpoints.downloadCareerDocument === 'function') {
+    return apiEndpoints.downloadCareerDocument(ownerId, documentId);
+  }
+
+  return `${API_URL}/api/auth/users/${encodeURIComponent(ownerId)}/career-documents/${encodeURIComponent(documentId)}/download`;
+};
+
+const getCareerDocumentUploadEndpoint = () => apiEndpoints.uploadCareerDocument || `${API_URL}/api/auth/me/career-document`;
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -911,7 +921,7 @@ export default function ProfilePage() {
       throw new Error('You must be signed in to access this document.');
     }
 
-    const response = await fetch(apiEndpoints.downloadCareerDocument(ownerId, file.id), {
+    const response = await fetch(getCareerDocumentDownloadEndpoint(ownerId, file.id), {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -978,7 +988,7 @@ export default function ProfilePage() {
     setIsUploadingCareerDocument(true);
 
     try {
-      const response = await fetch(apiEndpoints.uploadCareerDocument, {
+      const response = await fetch(getCareerDocumentUploadEndpoint(), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: payload,
