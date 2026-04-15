@@ -267,8 +267,6 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
       twoFactorEnabled: true,
     });
 
-    await newAdmin.save();
-
     try {
       await sendAdminInviteEmail({
         email: normalizedEmail,
@@ -278,11 +276,12 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
       });
     } catch (mailErr) {
       console.error('[admin] Failed to send admin invite email:', mailErr.message);
-      await User.deleteOne({ _id: newAdmin._id });
       return res.status(500).json({
         message: 'Admin account was not created because the confirmation email could not be sent',
       });
     }
+
+    await newAdmin.save();
 
     await logAuditEvent({
       req,
