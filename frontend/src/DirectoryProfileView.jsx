@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LinkedinLogo, TwitterLogo, InstagramLogo, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, BookOpen, Briefcase } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints } from './config/api';
+import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 export default function DirectoryProfileView() {
   const navigate = useNavigate();
@@ -669,7 +669,7 @@ export default function DirectoryProfileView() {
                         const name = typeof file === 'string'
                           ? file
                           : (file.name || file.filename || file.originalName || 'Document');
-                        const url = typeof file === 'object' ? file.url || file.link : null;
+                        const url = typeof file === 'object' ? resolveApiAssetUrl(file.url || file.link || '') : null;
                         return (
                           <div
                             key={file.id || file._id || name}

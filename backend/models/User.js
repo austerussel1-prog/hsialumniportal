@@ -217,6 +217,8 @@ const userSchema = new mongoose.Schema({
       {
         id: { type: Number },
         name: { type: String },
+        url: { type: String },
+        contentType: { type: String },
       },
     ],
     default: [],

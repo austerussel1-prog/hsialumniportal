@@ -22,6 +22,20 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const fallbackProfileImage = '/Logo.jpg';
   const notificationAvatarCacheRef = useRef({});
+  const normalizeCareerDocument = (file, fallbackId = Date.now()) => {
+    if (!file) return null;
+    if (typeof file === 'string') {
+      return { id: fallbackId, name: file, url: '', contentType: '' };
+    }
+
+    return {
+      ...file,
+      id: file.id || fallbackId,
+      name: file.name || file.filename || file.originalName || 'Document',
+      url: file.url || file.link || '',
+      contentType: file.contentType || file.type || '',
+    };
+  };
   const resolveProfileImage = (value) => {
     if (!value) return fallbackProfileImage;
     if (String(value).includes('gear-icon.svg')) return fallbackProfileImage;
@@ -38,7 +52,7 @@ export default function ProfilePage() {
     const userData = localStorage.getItem('user');
     const user = userData ? JSON.parse(userData) : null;
     const saved = localStorage.getItem(`careerDocuments_${user?.email}`);
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved).map((file, index) => normalizeCareerDocument(file, Date.now() + index)).filter(Boolean) : [];
   });
   const [isDragging, setIsDragging] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -755,7 +769,7 @@ export default function ProfilePage() {
           setProjects(data.user.projects);
         }
         if (Array.isArray(data.user.careerDocuments)) {
-          setUploadedFiles(data.user.careerDocuments);
+          setUploadedFiles(data.user.careerDocuments.map((file, index) => normalizeCareerDocument(file, Date.now() + index)).filter(Boolean));
         }
 
         localStorage.setItem('user', JSON.stringify(data.user));
@@ -782,7 +796,7 @@ export default function ProfilePage() {
             localStorage.setItem(`projects_${data.user.email}`, JSON.stringify(data.user.projects));
           }
           if (Array.isArray(data.user.careerDocuments)) {
-            localStorage.setItem(`careerDocuments_${data.user.email}`, JSON.stringify(data.user.careerDocuments));
+            localStorage.setItem(`careerDocuments_${data.user.email}`, JSON.stringify(data.user.careerDocuments.map((file, index) => normalizeCareerDocument(file, Date.now() + index)).filter(Boolean)));
           }
         }
       } catch (err) {
@@ -1031,13 +1045,48 @@ export default function ProfilePage() {
     }
   };
 
-  const handleFileUpload = (event) => {
+  const uploadCareerDocumentFile = async (file) => {
+    if (!file) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const fd = new FormData();
+    fd.append('document', file);
+
+    try {
+      const response = await fetch(apiEndpoints.uploadCareerDocument, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.message || 'Career document upload failed');
+      }
+
+      const nextDocuments = Array.isArray(data?.user?.careerDocuments)
+        ? data.user.careerDocuments.map((item, index) => normalizeCareerDocument(item, Date.now() + index)).filter(Boolean)
+        : [...uploadedFiles, normalizeCareerDocument(data?.document, Date.now())].filter(Boolean);
+
+      setUploadedFiles(nextDocuments);
+      if (user?.email) {
+        localStorage.setItem(`careerDocuments_${user.email}`, JSON.stringify(nextDocuments));
+      }
+      showSuccessToast('Career document uploaded successfully.');
+    } catch (err) {
+      console.error('Error uploading career document', err);
+      window.dispatchEvent(new CustomEvent('hsi-toast', {
+        detail: { type: 'error', text: err?.message || 'Failed to upload career document.' },
+      }));
+    }
+  };
+
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (file) {
-      const newFiles = [...uploadedFiles, { name: file.name, id: Date.now() }];
-      setUploadedFiles(newFiles);
-      localStorage.setItem(`careerDocuments_${user?.email}`, JSON.stringify(newFiles));
-      updateProfileExtras(projects, newFiles);
+      await uploadCareerDocumentFile(file);
     }
     event.target.value = '';
   };
@@ -1051,15 +1100,12 @@ export default function ProfilePage() {
     setIsDragging(false);
   };
 
-  const handleDrop = (event) => {
+  const handleDrop = async (event) => {
     event.preventDefault();
     setIsDragging(false);
     const file = event.dataTransfer.files[0];
     if (file) {
-      const newFiles = [...uploadedFiles, { name: file.name, id: Date.now() }];
-      setUploadedFiles(newFiles);
-      localStorage.setItem(`careerDocuments_${user?.email}`, JSON.stringify(newFiles));
-      updateProfileExtras(projects, newFiles);
+      await uploadCareerDocumentFile(file);
     }
   };
 
@@ -2351,17 +2397,38 @@ export default function ProfilePage() {
                       {file.name.charAt(0).toUpperCase()}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ 
-                        margin: 0, 
-                        fontSize: '14px', 
-                        fontWeight: '600', 
-                        color: '#111827',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {file.name}
-                      </p>
+                      {file.url ? (
+                        <a
+                          href={resolveApiAssetUrl(file.url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            margin: 0,
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#2563eb',
+                            textDecoration: 'none',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            display: 'block',
+                          }}
+                        >
+                          {file.name}
+                        </a>
+                      ) : (
+                        <p style={{ 
+                          margin: 0, 
+                          fontSize: '14px', 
+                          fontWeight: '600', 
+                          color: '#111827',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {file.name}
+                        </p>
+                      )}
                     </div>
                     <button
                       onClick={(e) => {
