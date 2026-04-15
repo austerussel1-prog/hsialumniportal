@@ -60,7 +60,6 @@ export default function MentorshipPage() {
   const [opportunities, setOpportunities] = useState([]);
   const [volunteerSummary, setVolunteerSummary] = useState(null);
   const [volunteerBusy, setVolunteerBusy] = useState(false);
-  const [volunteerMessage, setVolunteerMessage] = useState('');
   const [volunteerLog, setVolunteerLog] = useState({ title: '', category: '', date: '', hours: '', notes: '' });
   const sectionBase = {
     height: 'auto',
@@ -168,6 +167,10 @@ export default function MentorshipPage() {
     }
   };
 
+  const mentorCardWidth = isMobile ? 190 : 280;
+  const mentorCardHeight = isMobile ? 310 : 392;
+  const mentorCardImageHeight = isMobile ? 168 : 240;
+
   const emitToast = (type, text) => {
     window.dispatchEvent(new CustomEvent('hsi-toast', {
       detail: { type, text },
@@ -179,7 +182,6 @@ export default function MentorshipPage() {
   };
 
   const openVolunteerModal = async () => {
-    setVolunteerMessage('');
     setActiveModal({ type: 'volunteer' });
     if (!token) return;
     setVolunteerBusy(true);
@@ -324,8 +326,10 @@ export default function MentorshipPage() {
   };
 
   const applyToOpportunity = async (id, role) => {
-    if (!token) return;
-    setVolunteerMessage('');
+    if (!token) {
+      emitToast('error', 'Please log in again.');
+      return;
+    }
     try {
       const res = await fetch(apiEndpoints.volunteerApply(id), {
         method: 'POST',
@@ -334,33 +338,68 @@ export default function MentorshipPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setVolunteerMessage(data?.message || 'Failed to apply');
+        emitToast('error', data?.message || 'Failed to apply');
         return;
       }
-      setVolunteerMessage('Applied. Awaiting admin approval.');
+      emitToast('success', data?.message || 'Applied. Awaiting admin approval.');
     } catch (err) {
-      setVolunteerMessage('Failed to apply');
+      emitToast('error', 'Failed to apply');
     }
   };
 
   const submitVolunteerLog = async () => {
-    if (!token) return;
-    setVolunteerMessage('');
+    if (!token) {
+      emitToast('error', 'Please log in again.');
+      return;
+    }
+
+    const normalizedTitle = String(volunteerLog.title || '').trim();
+    const normalizedCategory = String(volunteerLog.category || '').trim();
+    const normalizedDate = String(volunteerLog.date || '').trim();
+    const parsedHours = Number(volunteerLog.hours);
+
+    if (!normalizedTitle) {
+      emitToast('error', 'Activity title is required.');
+      return;
+    }
+
+    if (!normalizedCategory) {
+      emitToast('error', 'Category is required.');
+      return;
+    }
+
+    if (!normalizedDate) {
+      emitToast('error', 'Date is required.');
+      return;
+    }
+
+    if (!Number.isFinite(parsedHours) || parsedHours <= 0) {
+      emitToast('error', 'Hours must be greater than 0.');
+      return;
+    }
+
     try {
       const res = await fetch(apiEndpoints.volunteerCreateLog, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify(volunteerLog),
+        body: JSON.stringify({
+          ...volunteerLog,
+          title: normalizedTitle,
+          category: normalizedCategory,
+          date: normalizedDate,
+          hours: parsedHours,
+          notes: String(volunteerLog.notes || '').trim(),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setVolunteerMessage(data?.message || 'Failed to log hours');
+        emitToast('error', data?.message || 'Failed to log hours');
         return;
       }
-      setVolunteerMessage('Logged. Awaiting admin approval.');
+      emitToast('success', data?.message || 'Logged. Awaiting admin approval.');
       setVolunteerLog({ title: '', category: '', date: '', hours: '', notes: '' });
     } catch (err) {
-      setVolunteerMessage('Failed to log hours');
+      emitToast('error', 'Failed to log hours');
     }
   };
 
@@ -736,14 +775,19 @@ export default function MentorshipPage() {
                     overflowX: 'auto',
                     paddingBottom: '8px',
                     scrollSnapType: 'x mandatory',
+                    alignItems: 'stretch',
                   }}
                 >
                   {mentors.map((mentor) => (
                     <div
                       key={mentor.name}
                       style={{
-                        minWidth: isMobile ? '190px' : '250px',
-                        minHeight: isMobile ? '310px' : '380px',
+                        width: `${mentorCardWidth}px`,
+                        minWidth: `${mentorCardWidth}px`,
+                        maxWidth: `${mentorCardWidth}px`,
+                        height: `${mentorCardHeight}px`,
+                        minHeight: `${mentorCardHeight}px`,
+                        maxHeight: `${mentorCardHeight}px`,
                         background: '#ffffff',
                         borderRadius: '16px',
                         boxShadow: '0 8px 20px rgba(0, 0, 0, 0.08)',
@@ -751,13 +795,14 @@ export default function MentorshipPage() {
                         scrollSnapAlign: 'start',
                         display: 'flex',
                         flexDirection: 'column',
+                        flex: '0 0 auto',
                       }}
                       onClick={() => openRequestSessionModal(mentor)}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => { if (e.key === 'Enter') openRequestSessionModal(mentor); }}
                     >
-                      <div style={{ height: isMobile ? '168px' : '240px', background: '#e5e7eb', position: 'relative' }}>
+                      <div style={{ height: `${mentorCardImageHeight}px`, background: '#e5e7eb', position: 'relative', flexShrink: 0 }}>
                         <img
                           src={mentor.image}
                           alt={mentor.name}
@@ -782,16 +827,26 @@ export default function MentorshipPage() {
                           </span>
                         ) : null}
                       </div>
-                      <div style={{ padding: isMobile ? '10px 12px 12px' : '14px 16px 16px' }}>
-                        <h3 style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: '700', color: '#111827', marginBottom: '6px' }}>
-                          {mentor.name}
-                        </h3>
-                        <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#6b7280', marginBottom: '10px' }}>
-                          {mentor.title}
-                        </p>
-                        <div style={{ fontSize: isMobile ? '11px' : '12px', color: '#4b5563', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '1px solid #9ca3af' }} />
-                          <span>{mentor.sessions}</span>
+                      <div
+                        style={{
+                          padding: isMobile ? '10px 12px 12px' : '14px 16px 16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          flex: 1,
+                        }}
+                      >
+                        <div>
+                          <h3 style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: '700', color: '#111827', marginBottom: '6px' }}>
+                            {mentor.name}
+                          </h3>
+                          <p style={{ fontSize: isMobile ? '11px' : '12px', color: '#6b7280', marginBottom: '10px' }}>
+                            {mentor.title}
+                          </p>
+                          <div style={{ fontSize: isMobile ? '11px' : '12px', color: '#4b5563', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <span style={{ width: '16px', height: '16px', borderRadius: '50%', border: '1px solid #9ca3af' }} />
+                            <span>{mentor.sessions}</span>
+                          </div>
                         </div>
                         <div style={{ marginTop: '10px', borderTop: '1px solid #e5e7eb', paddingTop: '10px' }}>
                           <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '4px' }}>Experience</div>
@@ -914,7 +969,6 @@ export default function MentorshipPage() {
           onRespondSession={respondToSession}
           opportunities={opportunities}
           volunteerBusy={volunteerBusy}
-          volunteerMessage={volunteerMessage}
           onApplyOpportunity={applyToOpportunity}
           volunteerSummary={volunteerSummary}
           volunteerLog={volunteerLog}
@@ -945,7 +999,6 @@ function MentorshipModal({
   onRespondSession,
   opportunities,
   volunteerBusy,
-  volunteerMessage,
   onApplyOpportunity,
   volunteerSummary,
   volunteerLog,
@@ -1311,8 +1364,8 @@ function MentorshipModal({
                   <textarea value={volunteerLog.notes} onChange={(e) => setVolunteerLog((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes (optional)" style={{ ...inputStyle, gridColumn: '1 / -1', minHeight: 90, resize: 'vertical' }} />
                 </div>
                 <div style={{ marginTop: 12, display: 'flex', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 0 }}>
-                  <div style={{ fontSize: isMobile ? 11 : 12, color: volunteerMessage ? '#111827' : '#6b7280', fontStyle: 'italic' }}>
-                    {volunteerMessage || 'Logs are reviewed by admins.'}
+                  <div style={{ fontSize: isMobile ? 11 : 12, color: '#6b7280', fontStyle: 'italic' }}>
+                    Logs are reviewed by admins.
                   </div>
                   <button onClick={onSubmitVolunteerLog} style={{ ...smallAction('#e1b11c', '#111827'), width: isMobile ? '100%' : 'auto' }}>Submit log</button>
                 </div>

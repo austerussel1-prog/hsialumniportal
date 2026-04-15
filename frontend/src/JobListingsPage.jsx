@@ -28,6 +28,13 @@ function resolveSortTimestamp(job) {
   return 0;
 }
 
+function toLineList(value) {
+  return String(value || '')
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 const categoryMeta = {
   all: {
     title: 'Career & Job Opportunities',
@@ -82,6 +89,16 @@ export default function JobListingsPage() {
     position: '',
     location: '',
     type: 'Project-based',
+    department: 'General',
+    workMode: '',
+    experience: '',
+    vacancies: '',
+    salary: '',
+    description: '',
+    aboutCompany: '',
+    jobDescription: '',
+    requirementsText: '',
+    responsibilitiesText: '',
   });
 
   const category = useMemo(() => {
@@ -126,6 +143,19 @@ export default function JobListingsPage() {
       ...prev,
       category: params.get('category') || 'exclusive',
       type: prev.type || 'Project-based',
+      company: '',
+      position: '',
+      location: '',
+      department: 'General',
+      workMode: '',
+      experience: '',
+      vacancies: '',
+      salary: '',
+      description: '',
+      aboutCompany: '',
+      jobDescription: '',
+      requirementsText: '',
+      responsibilitiesText: '',
     }));
 
     params.delete('post');
@@ -199,6 +229,14 @@ export default function JobListingsPage() {
                   department: item?.department || 'General',
                   role: item?.role || 'Staff',
                   tag: item?.tag || 'Standard',
+                  workMode: item?.workMode || '',
+                  experience: item?.experience || '',
+                  vacancies: item?.vacancies || '',
+                  salary: item?.salary || '',
+                  aboutCompany: item?.aboutCompany || '',
+                  jobDescription: item?.jobDescription || '',
+                  requirements: item?.requirements || [],
+                  responsibilities: item?.responsibilities || [],
                 }),
               });
               const postData = await postRes.json().catch(() => ({}));
@@ -241,6 +279,16 @@ export default function JobListingsPage() {
       position: '',
       location: '',
       type: 'Project-based',
+      department: 'General',
+      workMode: '',
+      experience: '',
+      vacancies: '',
+      salary: '',
+      description: '',
+      aboutCompany: '',
+      jobDescription: '',
+      requirementsText: '',
+      responsibilitiesText: '',
     }));
   };
 
@@ -255,8 +303,21 @@ export default function JobListingsPage() {
     const company = postForm.company.trim();
     const position = postForm.position.trim();
     const jobLocation = postForm.location.trim();
+    const department = postForm.department.trim() || 'General';
+    const workMode = postForm.workMode.trim();
+    const experience = postForm.experience.trim();
+    const vacancies = postForm.vacancies.trim();
+    const salary = postForm.salary.trim();
+    const description = postForm.description.trim();
+    const aboutCompany = postForm.aboutCompany.trim();
+    const jobDescription = postForm.jobDescription.trim();
+    const requirements = toLineList(postForm.requirementsText);
+    const responsibilities = toLineList(postForm.responsibilitiesText);
 
-    if (!company || !position || !jobLocation) return;
+    if (!company || !position || !jobLocation) {
+      showToast('error', 'Company, position, and location are required.');
+      return;
+    }
 
     const resolvedType = nextCategory === 'freelance'
       ? (postForm.type || 'Project-based')
@@ -271,6 +332,16 @@ export default function JobListingsPage() {
       type: resolvedType,
       status: 'Open',
       applyLink: `mailto:hr@hsi.com?subject=Application%20-%20${encodeURIComponent(position)}`,
+      description,
+      department,
+      workMode,
+      experience,
+      vacancies,
+      salary,
+      aboutCompany,
+      jobDescription,
+      requirements,
+      responsibilities,
     };
 
     const token = localStorage.getItem('token');
@@ -302,6 +373,16 @@ export default function JobListingsPage() {
         type: resolvedType,
         status: 'Open',
         applyLink: `mailto:hr@hsi.com?subject=Application%20-%20${encodeURIComponent(position)}`,
+        description,
+        department,
+        workMode,
+        experience,
+        vacancies,
+        salary,
+        aboutCompany,
+        jobDescription,
+        requirements,
+        responsibilities,
       }),
     })
       .then(async (response) => {
@@ -1003,13 +1084,15 @@ export default function JobListingsPage() {
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: isMobile ? '94vw' : '620px',
+                maxWidth: isMobile ? '94vw' : '920px',
+                maxHeight: isMobile ? '90vh' : '88vh',
                 background: '#fff',
                 borderRadius: isMobile ? '12px' : '16px',
                 border: '1px solid #efe4d3',
                 boxShadow: '0 18px 40px rgba(17, 24, 39, 0.18)',
                 padding: isMobile ? '12px' : '18px',
                 overflowX: 'hidden',
+                overflowY: 'auto',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
@@ -1164,6 +1247,183 @@ export default function JobListingsPage() {
                           padding: '0 12px',
                           fontSize: '12px',
                           outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Department</div>
+                      <input
+                        value={postForm.department}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, department: e.target.value }))}
+                        placeholder="Department"
+                        style={{
+                          height: '40px',
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '0 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Work Mode</div>
+                      <input
+                        value={postForm.workMode}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, workMode: e.target.value }))}
+                        placeholder="Onsite / Hybrid / Remote"
+                        style={{
+                          height: '40px',
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '0 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Experience</div>
+                      <input
+                        value={postForm.experience}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, experience: e.target.value }))}
+                        placeholder="2+ years"
+                        style={{
+                          height: '40px',
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '0 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>No. of Vacancy</div>
+                      <input
+                        value={postForm.vacancies}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, vacancies: e.target.value }))}
+                        placeholder="6"
+                        style={{
+                          height: '40px',
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '0 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Offered Salary</div>
+                      <input
+                        value={postForm.salary}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, salary: e.target.value }))}
+                        placeholder="PHP 50,000/month"
+                        style={{
+                          height: '40px',
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '0 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Short Description</div>
+                    <textarea
+                      value={postForm.description}
+                      onChange={(e) => setPostForm((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="Short summary shown on the job card"
+                      rows={3}
+                      style={{
+                        borderRadius: '10px',
+                        border: '1px solid #d9dde5',
+                        padding: '10px 12px',
+                        fontSize: '12px',
+                        outline: 'none',
+                        resize: 'vertical',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Job Description</div>
+                    <textarea
+                      value={postForm.jobDescription}
+                      onChange={(e) => setPostForm((prev) => ({ ...prev, jobDescription: e.target.value }))}
+                      placeholder="Full job description"
+                      rows={5}
+                      style={{
+                        borderRadius: '10px',
+                        border: '1px solid #d9dde5',
+                        padding: '10px 12px',
+                        fontSize: '12px',
+                        outline: 'none',
+                        resize: 'vertical',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>About Company</div>
+                    <textarea
+                      value={postForm.aboutCompany}
+                      onChange={(e) => setPostForm((prev) => ({ ...prev, aboutCompany: e.target.value }))}
+                      placeholder="Optional company background shown in job details"
+                      rows={4}
+                      style={{
+                        borderRadius: '10px',
+                        border: '1px solid #d9dde5',
+                        padding: '10px 12px',
+                        fontSize: '12px',
+                        outline: 'none',
+                        resize: 'vertical',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Requirements (1 per line)</div>
+                      <textarea
+                        value={postForm.requirementsText}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, requirementsText: e.target.value }))}
+                        placeholder="List each requirement on a new line"
+                        rows={6}
+                        style={{
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '10px 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '800', color: '#374151' }}>Responsibilities (1 per line)</div>
+                      <textarea
+                        value={postForm.responsibilitiesText}
+                        onChange={(e) => setPostForm((prev) => ({ ...prev, responsibilitiesText: e.target.value }))}
+                        placeholder="List each responsibility on a new line"
+                        rows={6}
+                        style={{
+                          borderRadius: '10px',
+                          border: '1px solid #d9dde5',
+                          padding: '10px 12px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          resize: 'vertical',
                         }}
                       />
                     </div>
