@@ -632,11 +632,11 @@ export default function ProfilePage() {
   const updateProfileExtras = async (nextProjects, nextDocuments) => {
     const token = localStorage.getItem('token');
     if (!token) {
-      return;
+      return null;
     }
 
     try {
-      await fetch(apiEndpoints.updateProfile, {
+      const response = await fetch(apiEndpoints.updateProfile, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -647,8 +647,14 @@ export default function ProfilePage() {
           careerDocuments: nextDocuments,
         }),
       });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.message || 'Failed to save profile extras');
+      }
+      return body;
     } catch (err) {
       console.error('Error saving profile extras', err);
+      return null;
     }
   };
 
@@ -1051,6 +1057,31 @@ export default function ProfilePage() {
     window.open(resolveApiAssetUrl(nextUrl), '_blank', 'noopener,noreferrer');
   };
 
+  const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+
+  const persistCareerDocuments = async (nextDocuments) => {
+    const saved = await updateProfileExtras(projects, nextDocuments);
+    const normalizedDocuments = Array.isArray(saved?.user?.careerDocuments)
+      ? saved.user.careerDocuments.map((item, index) => normalizeCareerDocument(item, Date.now() + index)).filter(Boolean)
+      : nextDocuments;
+
+    setUploadedFiles(normalizedDocuments);
+    const nextEmail = String(saved?.user?.email || user?.email || '').trim();
+    if (nextEmail) {
+      localStorage.setItem(`careerDocuments_${nextEmail}`, JSON.stringify(normalizedDocuments));
+    }
+    if (saved?.user) {
+      localStorage.setItem('user', JSON.stringify(saved.user));
+    }
+
+    return normalizedDocuments;
+  };
+
   const uploadCareerDocumentFile = async (file) => {
     if (!file) return;
 
@@ -1076,16 +1107,29 @@ export default function ProfilePage() {
         ? data.user.careerDocuments.map((item, index) => normalizeCareerDocument(item, Date.now() + index)).filter(Boolean)
         : [...uploadedFiles, normalizeCareerDocument(data?.document, Date.now())].filter(Boolean);
 
-      setUploadedFiles(nextDocuments);
-      if (user?.email) {
-        localStorage.setItem(`careerDocuments_${user.email}`, JSON.stringify(nextDocuments));
-      }
+      await persistCareerDocuments(nextDocuments);
       showSuccessToast('Career document uploaded successfully.');
     } catch (err) {
       console.error('Error uploading career document', err);
-      window.dispatchEvent(new CustomEvent('hsi-toast', {
-        detail: { type: 'error', text: err?.message || 'Failed to upload career document.' },
-      }));
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        const fallbackDocument = normalizeCareerDocument({
+          id: Date.now(),
+          name: file.name,
+          url: dataUrl,
+          contentType: file.type || '',
+        }, Date.now());
+        const nextDocuments = [...uploadedFiles, fallbackDocument].filter(Boolean);
+        await persistCareerDocuments(nextDocuments);
+        window.dispatchEvent(new CustomEvent('hsi-toast', {
+          detail: { type: 'warning', text: 'Career document uploaded using fallback storage.' },
+        }));
+      } catch (fallbackErr) {
+        console.error('Career document fallback persistence failed', fallbackErr);
+        window.dispatchEvent(new CustomEvent('hsi-toast', {
+          detail: { type: 'error', text: err?.message || fallbackErr?.message || 'Failed to upload career document.' },
+        }));
+      }
     }
   };
 
