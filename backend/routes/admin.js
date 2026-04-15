@@ -277,7 +277,7 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
     } catch (mailErr) {
       console.error('[admin] Failed to send admin invite email:', mailErr.message);
       return res.status(500).json({
-        message: 'Admin account was not created because the confirmation email could not be sent',
+        message: `Admin account was not created because the confirmation email could not be sent (${mailErr.message})`,
       });
     }
 
