@@ -23,6 +23,31 @@ const formatFromAddress = (rawEmail) => {
   return `${mailFromName} <${safeEmail}>`;
 };
 
+const normalizeRecipientList = (rawTo) => String(rawTo || '')
+  .split(',')
+  .map((item) => item.trim().toLowerCase())
+  .filter(Boolean);
+
+const assertSmtpAcceptedRecipients = (info, mailOptions) => {
+  const recipients = normalizeRecipientList(mailOptions?.to);
+  if (!recipients.length) return;
+
+  const accepted = Array.isArray(info?.accepted)
+    ? info.accepted.map((item) => String(item || '').trim().toLowerCase())
+    : [];
+  const rejected = Array.isArray(info?.rejected)
+    ? info.rejected.map((item) => String(item || '').trim().toLowerCase())
+    : [];
+  const notAccepted = recipients.filter((email) => !accepted.includes(email));
+
+  if (rejected.length || notAccepted.length) {
+    const response = String(info?.response || '').trim();
+    throw new Error(
+      `SMTP recipient rejection detected. rejected=${rejected.join(',') || 'none'} notAccepted=${notAccepted.join(',') || 'none'}${response ? ` response=${response}` : ''}`,
+    );
+  }
+};
+
 if (!emailUser || !emailPassword) {
   console.warn('[email] Missing SMTP credentials at startup', {
     hasEmailUser: Boolean(emailUser),
@@ -241,7 +266,8 @@ const sendMail = async (mailOptions) => {
 
   assertEmailConfig();
   try {
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
+    assertSmtpAcceptedRecipients(info, mailOptions);
     return true;
   } catch (error) {
     // Gmail SMTP can be flaky on some hosts; retry with alternate Gmail configs.
@@ -257,7 +283,8 @@ const sendMail = async (mailOptions) => {
 
     for (const candidate of retries) {
       try {
-        await candidate.sendMail(mailOptions);
+        const info = await candidate.sendMail(mailOptions);
+        assertSmtpAcceptedRecipients(info, mailOptions);
         return true;
       } catch (_retryError) {
         // try next transport
