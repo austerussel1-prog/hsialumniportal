@@ -1413,9 +1413,29 @@ const careerDocumentUpload = multer({
 const handleSingleCareerDocumentUpload = (req, res, next) => {
   careerDocumentUpload.single('file')(req, res, (err) => {
     if (!err) {
+      if (req.file) {
+        console.log('[career-document] multer received file', {
+          userId: String(req.user?.id || ''),
+          originalName: req.file.originalname,
+          storedName: req.file.filename,
+          sizeBytes: req.file.size || 0,
+          mimeType: req.file.mimetype || '',
+        });
+      } else {
+        console.log('[career-document] multer completed without file', {
+          userId: String(req.user?.id || ''),
+        });
+      }
       next();
       return;
     }
+
+    console.error('[career-document] multer upload failed', {
+      userId: String(req.user?.id || ''),
+      code: err?.code || '',
+      message: err?.message || 'Unknown upload error',
+      isMulterError: err instanceof multer.MulterError,
+    });
 
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ message: `File must be ${MAX_CAREER_DOCUMENT_FILE_SIZE_LABEL} or smaller.` });
@@ -1503,12 +1523,23 @@ router.post('/me/avatar', verifyToken, upload.single('avatar'), async (req, res)
 
 router.post('/me/career-document', verifyToken, handleSingleCareerDocumentUpload, async (req, res) => {
   try {
+    console.log('[career-document] upload request started', {
+      userId: String(req.user?.id || ''),
+      hasFile: Boolean(req.file),
+    });
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const storedFile = await storeUploadedCareerDocumentFile(req.file);
+    console.log('[career-document] stored file resolved', {
+      userId: String(req.user?.id || ''),
+      originalName: req.file.originalname,
+      storedName: storedFile?.storedName || '',
+      url: storedFile?.url || '',
+    });
+
     const documentEntry = normalizeCareerDocumentEntry({
       id: Date.now(),
       name: req.file.originalname,
@@ -1526,13 +1557,24 @@ router.post('/me/career-document', verifyToken, handleSingleCareerDocumentUpload
     ];
     await user.save();
 
+    console.log('[career-document] upload request completed', {
+      userId: String(req.user?.id || ''),
+      documentId: String(documentEntry?.id || ''),
+      careerDocumentCount: Array.isArray(user.careerDocuments) ? user.careerDocuments.length : 0,
+    });
+
     return res.status(201).json({
       message: 'Career document uploaded',
       document: documentEntry,
       user: buildUserPayload(user),
     });
   } catch (err) {
-    console.error('Error uploading career document', err);
+    console.error('[career-document] upload request failed', {
+      userId: String(req.user?.id || ''),
+      message: err?.message || 'Unknown upload failure',
+      statusCode: err?.statusCode || 500,
+      stack: err?.stack || '',
+    });
     return res.status(err.statusCode || 500).json({ message: err.message || 'Error uploading career document' });
   }
 });
@@ -1540,6 +1582,11 @@ router.post('/me/career-document', verifyToken, handleSingleCareerDocumentUpload
 router.get('/users/:userId/career-documents/:documentId/download', verifyToken, async (req, res) => {
   try {
     const { userId, documentId } = req.params;
+    console.log('[career-document] download request started', {
+      requesterId: String(req.user?.id || ''),
+      ownerId: String(userId || ''),
+      documentId: String(documentId || ''),
+    });
     const targetUser = await User.findById(userId)
       .select('role status profileVisibility isDeleted isAnonymized careerDocuments')
       .lean();
@@ -1567,12 +1614,25 @@ router.get('/users/:userId/career-documents/:documentId/download', verifyToken, 
     const numericDocumentId = Number(documentId);
     const doc = normalizedDocuments.find((item) => String(item.id) === String(documentId) || (Number.isFinite(numericDocumentId) && Number(item.id) === numericDocumentId));
     if (!doc) {
+      console.warn('[career-document] download document missing from profile', {
+        requesterId: String(req.user?.id || ''),
+        ownerId: String(userId || ''),
+        documentId: String(documentId || ''),
+        availableDocumentIds: normalizedDocuments.map((item) => String(item?.id || '')).filter(Boolean),
+      });
       return res.status(404).json({ message: 'Document not found' });
     }
 
     if (isRemoteFileUrl(doc.url)) {
       const remoteResponse = await fetchRemoteFile(doc.url);
       if (!remoteResponse?.ok) {
+        console.warn('[career-document] remote download unavailable', {
+          requesterId: String(req.user?.id || ''),
+          ownerId: String(userId || ''),
+          documentId: String(documentId || ''),
+          url: String(doc.url || ''),
+          remoteStatus: remoteResponse?.status || 0,
+        });
         return res.status(502).json({ message: 'Career document is unavailable right now' });
       }
 
@@ -1585,17 +1645,37 @@ router.get('/users/:userId/career-documents/:documentId/download', verifyToken, 
 
     const storedName = getCareerDocumentStoredName(doc);
     if (!storedName) {
+      console.warn('[career-document] local download missing stored name', {
+        requesterId: String(req.user?.id || ''),
+        ownerId: String(userId || ''),
+        documentId: String(documentId || ''),
+        originalName: String(doc.originalName || doc.name || ''),
+        url: String(doc.url || ''),
+      });
       return res.status(404).json({ message: 'This document needs to be uploaded again.' });
     }
 
     const filePath = path.join(careerDocumentUploadsDir, storedName);
     if (!fs.existsSync(filePath)) {
+      console.warn('[career-document] local file missing on server', {
+        requesterId: String(req.user?.id || ''),
+        ownerId: String(userId || ''),
+        documentId: String(documentId || ''),
+        storedName,
+        filePath,
+      });
       return res.status(404).json({ message: 'File missing on server' });
     }
 
     return res.download(filePath, doc.originalName || doc.name || 'document');
   } catch (err) {
-    console.error('Error downloading career document', err);
+    console.error('[career-document] download request failed', {
+      requesterId: String(req.user?.id || ''),
+      ownerId: String(req.params?.userId || ''),
+      documentId: String(req.params?.documentId || ''),
+      message: err?.message || 'Unknown download failure',
+      stack: err?.stack || '',
+    });
     return res.status(500).json({ message: 'Failed to download career document' });
   }
 });
