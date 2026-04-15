@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import LoginPage from './LoginPage.jsx';
 import RegisterPage from './RegisterPage.jsx';
 import AdminDashboard from './AdminDashboard.jsx';
@@ -108,9 +108,13 @@ function EventReminderDetailsModal({ event, onClose }) {
   if (!event) return null;
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22, ease: 'easeOut' }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -125,7 +129,12 @@ function EventReminderDetailsModal({ event, onClose }) {
         if (modalEvent.target === modalEvent.currentTarget) onClose();
       }}
     >
-      <div
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 14, scale: 0.985 }}
+        transition={{ duration: 0.24, ease: 'easeOut' }}
+        className="hsi-reminder-scroll"
         style={{
           width: 'min(900px, calc(100vw - 32px))',
           maxHeight: '90vh',
@@ -133,6 +142,8 @@ function EventReminderDetailsModal({ event, onClose }) {
           background: '#ffffff',
           borderRadius: 18,
           boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}
       >
         <div style={{ position: 'relative', height: 260, background: 'linear-gradient(135deg,#065f46,#1f2937)' }}>
@@ -240,8 +251,8 @@ function EventReminderDetailsModal({ event, onClose }) {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -266,9 +277,13 @@ function ReminderModal({ reminders, onClose, onOpenPrimary, onViewEventDetails }
   const modalBadgeText = hasSameDayReminder && hasDayBeforeReminder ? 'Upcoming reminders' : hasDayBeforeReminder ? '1-day-before Reminder' : 'Same-day Reminder';
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22, ease: 'easeOut' }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -283,7 +298,12 @@ function ReminderModal({ reminders, onClose, onOpenPrimary, onViewEventDetails }
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 14, scale: 0.985 }}
+        transition={{ duration: 0.24, ease: 'easeOut' }}
+        className="hsi-reminder-scroll"
         style={{
           width: '100%',
           maxWidth: isMobile ? '96vw' : '860px',
@@ -293,6 +313,8 @@ function ReminderModal({ reminders, onClose, onOpenPrimary, onViewEventDetails }
           borderRadius: isMobile ? '18px' : '22px',
           boxShadow: '0 24px 64px rgba(0, 0, 0, 0.28)',
           overflowX: 'hidden',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}
       >
         <div
@@ -483,8 +505,8 @@ function ReminderModal({ reminders, onClose, onOpenPrimary, onViewEventDetails }
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -817,21 +839,34 @@ function AppShell() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
+      <style>{`
+        .hsi-reminder-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .hsi-reminder-scroll::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <Toast toast={toast} centerOffsetPx={toastCenterOffsetPx} />
-      {showScheduleReminder && scheduleReminders.length > 0 ? (
-        <ReminderModal
-          reminders={scheduleReminders}
-          onClose={dismissScheduleReminder}
-          onOpenPrimary={openPrimaryFromReminder}
-          onViewEventDetails={openEventDetailsFromReminder}
-        />
-      ) : null}
-      {selectedReminderEvent ? (
-        <EventReminderDetailsModal
-          event={selectedReminderEvent}
-          onClose={() => setSelectedReminderEvent(null)}
-        />
-      ) : null}
+      <AnimatePresence>
+        {showScheduleReminder && scheduleReminders.length > 0 ? (
+          <ReminderModal
+            reminders={scheduleReminders}
+            onClose={dismissScheduleReminder}
+            onOpenPrimary={openPrimaryFromReminder}
+            onViewEventDetails={openEventDetailsFromReminder}
+          />
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selectedReminderEvent ? (
+          <EventReminderDetailsModal
+            event={selectedReminderEvent}
+            onClose={() => setSelectedReminderEvent(null)}
+          />
+        ) : null}
+      </AnimatePresence>
       <div className="pt-16 md:pt-0" style={{ flex: 1 }}>
         <AnimatedRoutes />
       </div>
