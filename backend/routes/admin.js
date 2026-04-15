@@ -1,16 +1,61 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const dns = require('dns').promises;
 const User = require('../models/User');
 const Message = require('../models/Message');
 const Achievement = require('../models/Achievement');
 const AuditLog = require('../models/AuditLog');
-const { sendApprovalEmail, sendRejectionEmail, sendDataRemovalDecisionEmail } = require('../services/emailService');
+const { sendApprovalEmail, sendRejectionEmail, sendDataRemovalDecisionEmail, sendAdminInviteEmail } = require('../services/emailService');
 const { hardDeleteUsersByIds } = require('../services/userDeletionService');
 const { verifyToken } = require('./auth');
 const { logAuditEvent } = require('../utils/auditLogger');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const router = express.Router();
+const EMAIL_BASIC_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeEmailInput(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function hasValidEmailFormat(email) {
+  return EMAIL_BASIC_REGEX.test(email);
+}
+
+async function resolveWithTimeout(task, timeoutMs = 3000) {
+  return Promise.race([
+    task,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
+}
+
+async function hasDeliverableEmailDomain(email) {
+  const [, domainRaw = ''] = String(email || '').split('@');
+  const domain = domainRaw.trim().toLowerCase();
+  if (!domain) return false;
+
+  try {
+    const mxRecords = await resolveWithTimeout(dns.resolveMx(domain));
+    if (Array.isArray(mxRecords) && mxRecords.length > 0) return true;
+  } catch (_) {
+    // Fallback to A/AAAA lookup for domains that receive mail without MX.
+  }
+
+  try {
+    const [aRecords, aaaaRecords] = await Promise.allSettled([
+      resolveWithTimeout(dns.resolve4(domain)),
+      resolveWithTimeout(dns.resolve6(domain)),
+    ]);
+
+    const hasA = aRecords.status === 'fulfilled' && Array.isArray(aRecords.value) && aRecords.value.length > 0;
+    const hasAAAA = aaaaRecords.status === 'fulfilled' && Array.isArray(aaaaRecords.value) && aaaaRecords.value.length > 0;
+    return hasA || hasAAAA;
+  } catch (_) {
+    return false;
+  }
+}
 
 function parsePositiveInt(value, fallback, maxValue = 3650) {
   const parsed = parseInt(String(value || ''), 10);
@@ -177,13 +222,29 @@ router.get('/all-users', verifyAdmin, async (req, res) => {
 
 router.post('/create-admin', verifyAdmin, async (req, res) => {
   try {
-    const { fullName, employeeId, email, contactNumber, address, tempPassword } = req.body;
+    const { fullName, employeeId, email, contactNumber, address, role, tempPassword } = req.body;
+    const normalizedEmail = normalizeEmailInput(email);
+    const normalizedRole = String(role || 'admin').trim().toLowerCase();
+    const allowedAdminRoles = new Set(['admin', 'hr', 'alumni_officer']);
 
-    if (!fullName || !employeeId || !email || !contactNumber || !address || !tempPassword) {
+    if (!fullName || !employeeId || !normalizedEmail || !contactNumber || !address || !tempPassword) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    const existingEmail = await User.findByEmail(email);
+    if (!allowedAdminRoles.has(normalizedRole)) {
+      return res.status(400).json({ message: 'Invalid admin role selected' });
+    }
+
+    if (!hasValidEmailFormat(normalizedEmail)) {
+      return res.status(400).json({ message: 'Please enter a valid email address' });
+    }
+
+    const isDeliverableDomain = await hasDeliverableEmailDomain(normalizedEmail);
+    if (!isDeliverableDomain) {
+      return res.status(400).json({ message: 'Email domain is invalid or cannot receive email' });
+    }
+
+    const existingEmail = await User.findByEmail(normalizedEmail);
     if (existingEmail) {
       return res.status(400).json({ message: 'Email already registered' });
     }
@@ -196,16 +257,32 @@ router.post('/create-admin', verifyAdmin, async (req, res) => {
     const newAdmin = new User({
       name: fullName,
       employeeId,
-      email,
+      email: normalizedEmail,
       contactNumber,
       address,
       password: tempPassword,
-      role: 'admin',
+      role: normalizedRole,
       status: 'approved',
       provider: 'local',
+      twoFactorEnabled: true,
     });
 
     await newAdmin.save();
+
+    try {
+      await sendAdminInviteEmail({
+        email: normalizedEmail,
+        name: fullName,
+        role: normalizedRole,
+        tempPassword,
+      });
+    } catch (mailErr) {
+      console.error('[admin] Failed to send admin invite email:', mailErr.message);
+      await User.deleteOne({ _id: newAdmin._id });
+      return res.status(500).json({
+        message: 'Admin account was not created because the confirmation email could not be sent',
+      });
+    }
 
     await logAuditEvent({
       req,

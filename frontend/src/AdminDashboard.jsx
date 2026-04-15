@@ -16,6 +16,7 @@ import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
 const ALUMNI_PAGE_SIZE = 10;
+const EMAIL_BASIC_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -670,6 +671,13 @@ export default function AdminDashboard() {
     e.preventDefault();
     setAddUserLoading(true);
     setAddUserError('');
+    const normalizedEmail = String(addUserForm.email || '').trim().toLowerCase();
+
+    if (!EMAIL_BASIC_REGEX.test(normalizedEmail)) {
+      setAddUserError('Please enter a valid email address');
+      setAddUserLoading(false);
+      return;
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -682,7 +690,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           fullName: addUserForm.fullName,
           employeeId: addUserForm.employeeId,
-          email: addUserForm.email,
+          email: normalizedEmail,
           contactNumber: addUserForm.contactNumber,
           address: addUserForm.address,
           role: addUserForm.role,

@@ -442,6 +442,50 @@ const sendApprovalEmail = async (email, name) => {
   }
 };
 
+const sendAdminInviteEmail = async ({
+  email,
+  name,
+  role = 'admin',
+  tempPassword,
+}) => {
+  assertEmailConfig();
+  const safeEmail = String(email || '').trim();
+  const safeName = String(name || '').trim() || 'Admin User';
+  const safeRole = String(role || 'admin').trim().toLowerCase();
+  const safeTempPassword = String(tempPassword || '').trim();
+  const frontEndUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  const mailOptions = {
+    from: formatFromAddress(process.env.EMAIL_USER),
+    to: safeEmail,
+    subject: 'HSI Alumni Portal - Admin Account Confirmation',
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 640px; margin: 0 auto;">
+        <h2 style="color: #EAB308;">HSI Alumni Portal</h2>
+        <p>Dear ${escapeHtml(safeName)},</p>
+        <p>Your ${escapeHtml(safeRole.replace('_', ' '))} account has been created for the HSI Alumni Portal.</p>
+        <p style="margin: 14px 0 8px;"><strong>Temporary Password:</strong></p>
+        <div style="font-size: 20px; letter-spacing: 1px; text-align: center; background: #f5f5f5; padding: 16px; border-radius: 8px; font-weight: 700;">
+          ${escapeHtml(safeTempPassword)}
+        </div>
+        <p style="margin-top: 14px;">
+          For verification, a one-time code will be sent to this email when you log in.
+        </p>
+        <a href="${frontEndUrl}/login"
+           style="display: inline-block; background: #EAB308; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
+          Login to Your Account
+        </a>
+        <p>Please change your password after your first successful login.</p>
+        <br>
+        <p style="color: #666; font-size: 12px;">Best regards,<br>HSI Alumni Portal Team</p>
+      </div>
+    `,
+  };
+
+  await sendMail(mailOptions);
+  return true;
+};
+
 // Send referral invitation
 const sendReferralInvitationEmail = async (toEmail, jobLink, customMessage = '') => {
   assertEmailConfig();
@@ -721,6 +765,7 @@ module.exports = {
   sendOTP,
   sendRejectionEmail,
   sendApprovalEmail,
+  sendAdminInviteEmail,
   sendDataRemovalDecisionEmail,
   sendReferralInvitationEmail,
   sendJobApplicationEmail,
