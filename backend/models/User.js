@@ -217,6 +217,12 @@ const userSchema = new mongoose.Schema({
       {
         id: { type: Number },
         name: { type: String },
+        originalName: { type: String },
+        storedName: { type: String },
+        url: { type: String },
+        mimeType: { type: String },
+        sizeBytes: { type: Number },
+        uploadedAt: { type: Date },
       },
     ],
     default: [],

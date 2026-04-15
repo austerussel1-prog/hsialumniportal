@@ -2,9 +2,46 @@ import React, { useEffect, useState } from 'react';
 import ChatPopup from './components/ChatPopup';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LinkedinLogo, TwitterLogo, InstagramLogo, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, BookOpen, Briefcase } from '@phosphor-icons/react';
+import { LinkedinLogo, TwitterLogo, InstagramLogo, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, BookOpen, Briefcase, DownloadSimple } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
+
+const normalizeCareerDocument = (file, index = 0) => {
+  if (!file) return null;
+  if (typeof file === 'string') {
+    const name = String(file).trim();
+    if (!name) return null;
+    return { id: Date.now() + index, name, originalName: name };
+  }
+
+  const name = String(file.name || file.originalName || file.filename || 'Document').trim() || 'Document';
+  return {
+    ...file,
+    id: file.id || file._id || `${name}-${index}`,
+    name,
+    originalName: String(file.originalName || name).trim() || name,
+  };
+};
+
+const normalizeCareerDocuments = (files) => Array.isArray(files)
+  ? files.map((file, index) => normalizeCareerDocument(file, index)).filter(Boolean)
+  : [];
+
+const getCareerDocumentName = (file) => String(file?.originalName || file?.name || 'Document').trim() || 'Document';
+
+const parseFilenameFromContentDisposition = (contentDisposition, fallbackName = 'document') => {
+  const encodedMatch = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition || '');
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1]);
+    } catch {
+      return encodedMatch[1];
+    }
+  }
+
+  const basicMatch = /filename="([^"]+)"/i.exec(contentDisposition || '');
+  return basicMatch?.[1] || fallbackName;
+};
 
 export default function DirectoryProfileView() {
   const navigate = useNavigate();
@@ -102,8 +139,69 @@ export default function DirectoryProfileView() {
     twitterUrl: profile.twitterUrl || '',
     instagramUrl: profile.instagramUrl || '',
     projects: Array.isArray(profile.projects) ? profile.projects : [],
-    careerDocuments: Array.isArray(profile.careerDocuments) ? profile.careerDocuments : [],
+    careerDocuments: normalizeCareerDocuments(profile.careerDocuments),
   } : null;
+
+  const fetchCareerDocument = async (file) => {
+    const token = localStorage.getItem('token');
+    const ownerId = profile?.id || profile?._id || userId;
+    if (!token || !ownerId || !file?.id) {
+      throw new Error('You must be signed in to access this document.');
+    }
+
+    const response = await fetch(apiEndpoints.downloadCareerDocument(ownerId, file.id), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      const body = contentType.includes('application/json') ? await response.json() : { message: await response.text() };
+      throw new Error(body?.message || `Download failed (${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const filename = parseFilenameFromContentDisposition(
+      response.headers.get('content-disposition') || '',
+      getCareerDocumentName(file),
+    );
+    return { blob, filename };
+  };
+
+  const handleOpenCareerDocument = async (file) => {
+    try {
+      const { blob } = await fetchCareerDocument(file);
+      const objectUrl = URL.createObjectURL(blob);
+      const openedWindow = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      if (!openedWindow) {
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('hsi-toast', { detail: { type: 'error', text: err?.message || 'Failed to open document.' } }));
+    }
+  };
+
+  const handleDownloadCareerDocument = async (file) => {
+    try {
+      const { blob, filename } = await fetchCareerDocument(file);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      window.dispatchEvent(new CustomEvent('hsi-toast', { detail: { type: 'error', text: err?.message || 'Failed to download document.' } }));
+    }
+  };
 
   return (
     <motion.div
@@ -666,10 +764,7 @@ export default function DirectoryProfileView() {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {profileData.careerDocuments.map((file) => {
-                        const name = typeof file === 'string'
-                          ? file
-                          : (file.name || file.filename || file.originalName || 'Document');
-                        const url = typeof file === 'object' ? file.url || file.link : null;
+                        const name = getCareerDocumentName(file);
                         return (
                           <div
                             key={file.id || file._id || name}
@@ -699,39 +794,47 @@ export default function DirectoryProfileView() {
                               {name.charAt(0).toUpperCase()}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              {url ? (
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    margin: 0,
-                                    fontSize: '14px',
-                                    fontWeight: '600',
-                                    color: '#2563eb',
-                                    textDecoration: 'none',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    display: 'block',
-                                  }}
-                                >
-                                  {name}
-                                </a>
-                              ) : (
-                                <p style={{
+                              <button
+                                onClick={() => handleOpenCareerDocument(file)}
+                                style={{
                                   margin: 0,
+                                  padding: 0,
                                   fontSize: '14px',
                                   fontWeight: '600',
-                                  color: '#111827',
+                                  color: '#2563eb',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
-                                }}>
-                                  {name}
-                                </p>
-                              )}
+                                  display: 'block',
+                                  width: '100%',
+                                  textAlign: 'left',
+                                }}
+                                title={`Open ${name}`}
+                              >
+                                {name}
+                              </button>
                             </div>
+                            <button
+                              onClick={() => handleDownloadCareerDocument(file)}
+                              style={{
+                                background: '#eef2ff',
+                                border: '1px solid #c7d2fe',
+                                color: '#3730a3',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                padding: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                              title={`Download ${name}`}
+                            >
+                              <DownloadSimple size={18} />
+                            </button>
                           </div>
                         );
                       })}

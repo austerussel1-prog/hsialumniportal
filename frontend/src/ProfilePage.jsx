@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, LinkedinLogo, TwitterLogo, InstagramLogo, PencilSimple, UploadSimple, X, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, Plus, Gear, SignOut, User, BookOpen, Briefcase, Bell } from '@phosphor-icons/react';
+import { ArrowLeft, LinkedinLogo, TwitterLogo, InstagramLogo, PencilSimple, UploadSimple, DownloadSimple, X, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, Plus, Gear, SignOut, User, BookOpen, Briefcase, Bell } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
@@ -16,6 +16,55 @@ const formatRelativeNotificationTime = (iso) => {
   if (hrs < 24) return `${hrs}h`;
   const days = Math.floor(hrs / 24);
   return `${days}d`;
+};
+
+const normalizeCareerDocument = (file, index = 0) => {
+  if (!file) return null;
+
+  if (typeof file === 'string') {
+    const name = String(file).trim();
+    if (!name) return null;
+    return {
+      id: Date.now() + index,
+      name,
+      originalName: name,
+      url: '',
+      sizeBytes: 0,
+      mimeType: '',
+    };
+  }
+
+  const name = String(file.name || file.originalName || file.filename || 'Document').trim() || 'Document';
+  return {
+    ...file,
+    id: file.id || file._id || `${name}-${index}`,
+    name,
+    originalName: String(file.originalName || name).trim() || name,
+    url: String(file.url || file.link || '').trim(),
+    sizeBytes: Number(file.sizeBytes) || 0,
+    mimeType: String(file.mimeType || '').trim(),
+  };
+};
+
+const normalizeCareerDocuments = (files) => {
+  if (!Array.isArray(files)) return [];
+  return files.map((file, index) => normalizeCareerDocument(file, index)).filter(Boolean);
+};
+
+const getCareerDocumentName = (file) => String(file?.originalName || file?.name || 'Document').trim() || 'Document';
+
+const parseFilenameFromContentDisposition = (contentDisposition, fallbackName = 'document') => {
+  const encodedMatch = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition || '');
+  if (encodedMatch?.[1]) {
+    try {
+      return decodeURIComponent(encodedMatch[1]);
+    } catch {
+      return encodedMatch[1];
+    }
+  }
+
+  const basicMatch = /filename="([^"]+)"/i.exec(contentDisposition || '');
+  return basicMatch?.[1] || fallbackName;
 };
 
 export default function ProfilePage() {
@@ -38,9 +87,10 @@ export default function ProfilePage() {
     const userData = localStorage.getItem('user');
     const user = userData ? JSON.parse(userData) : null;
     const saved = localStorage.getItem(`careerDocuments_${user?.email}`);
-    return saved ? JSON.parse(saved) : [];
+    return saved ? normalizeCareerDocuments(JSON.parse(saved)) : [];
   });
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingCareerDocument, setIsUploadingCareerDocument] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showMoreDetailsModal, setShowMoreDetailsModal] = useState(false);
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
@@ -755,7 +805,7 @@ export default function ProfilePage() {
           setProjects(data.user.projects);
         }
         if (Array.isArray(data.user.careerDocuments)) {
-          setUploadedFiles(data.user.careerDocuments);
+          setUploadedFiles(normalizeCareerDocuments(data.user.careerDocuments));
         }
 
         localStorage.setItem('user', JSON.stringify(data.user));
@@ -782,7 +832,7 @@ export default function ProfilePage() {
             localStorage.setItem(`projects_${data.user.email}`, JSON.stringify(data.user.projects));
           }
           if (Array.isArray(data.user.careerDocuments)) {
-            localStorage.setItem(`careerDocuments_${data.user.email}`, JSON.stringify(data.user.careerDocuments));
+            localStorage.setItem(`careerDocuments_${data.user.email}`, JSON.stringify(normalizeCareerDocuments(data.user.careerDocuments)));
           }
         }
       } catch (err) {
@@ -822,6 +872,131 @@ export default function ProfilePage() {
         detail: { type: 'success', text },
       }),
     );
+  };
+
+  const showErrorToast = (text) => {
+    window.dispatchEvent(
+      new CustomEvent('hsi-toast', {
+        detail: { type: 'error', text },
+      }),
+    );
+  };
+
+  const persistCareerDocuments = (nextDocuments, nextUser = null) => {
+    const normalizedDocuments = normalizeCareerDocuments(nextDocuments);
+    const activeUser = nextUser || (() => {
+      const rawUser = localStorage.getItem('user');
+      return rawUser ? JSON.parse(rawUser) : null;
+    })();
+
+    if (activeUser) {
+      localStorage.setItem('user', JSON.stringify({ ...activeUser, careerDocuments: normalizedDocuments }));
+    }
+
+    if (activeUser?.email) {
+      localStorage.setItem(`careerDocuments_${activeUser.email}`, JSON.stringify(normalizedDocuments));
+    }
+
+    setUploadedFiles(normalizedDocuments);
+    return normalizedDocuments;
+  };
+
+  const fetchCareerDocument = async (file) => {
+    const token = localStorage.getItem('token');
+    const rawUser = localStorage.getItem('user');
+    const activeUser = rawUser ? JSON.parse(rawUser) : null;
+    const ownerId = activeUser?.id || activeUser?._id;
+
+    if (!token || !ownerId || !file?.id) {
+      throw new Error('You must be signed in to access this document.');
+    }
+
+    const response = await fetch(apiEndpoints.downloadCareerDocument(ownerId, file.id), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type') || '';
+      const body = contentType.includes('application/json') ? await response.json() : { message: await response.text() };
+      throw new Error(body?.message || `Download failed (${response.status})`);
+    }
+
+    const blob = await response.blob();
+    const filename = parseFilenameFromContentDisposition(
+      response.headers.get('content-disposition') || '',
+      getCareerDocumentName(file),
+    );
+
+    return { blob, filename };
+  };
+
+  const handleOpenCareerDocument = async (file) => {
+    try {
+      const { blob } = await fetchCareerDocument(file);
+      const objectUrl = URL.createObjectURL(blob);
+      const openedWindow = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      if (!openedWindow) {
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+    } catch (err) {
+      showErrorToast(err?.message || 'Failed to open document.');
+    }
+  };
+
+  const handleDownloadCareerDocument = async (file) => {
+    try {
+      const { blob, filename } = await fetchCareerDocument(file);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      showErrorToast(err?.message || 'Failed to download document.');
+    }
+  };
+
+  const uploadCareerDocument = async (file) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      showErrorToast('You must be signed in to upload a document.');
+      return;
+    }
+
+    const payload = new FormData();
+    payload.append('file', file);
+    setIsUploadingCareerDocument(true);
+
+    try {
+      const response = await fetch(apiEndpoints.uploadCareerDocument, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: payload,
+      });
+      const contentType = response.headers.get('content-type') || '';
+      const body = contentType.includes('application/json') ? await response.json() : { message: await response.text() };
+      if (!response.ok) {
+        throw new Error(body?.message || `Upload failed (${response.status})`);
+      }
+
+      const nextDocuments = persistCareerDocuments(body?.user?.careerDocuments || [...uploadedFiles, body?.document], body?.user || null);
+      updateProfileExtras(projects, nextDocuments);
+      showSuccessToast('Career document uploaded successfully.');
+    } catch (err) {
+      showErrorToast(err?.message || 'Failed to upload career document.');
+    } finally {
+      setIsUploadingCareerDocument(false);
+    }
   };
 
   const handleSave = async () => {
@@ -1034,10 +1209,7 @@ export default function ProfilePage() {
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
-      const newFiles = [...uploadedFiles, { name: file.name, id: Date.now() }];
-      setUploadedFiles(newFiles);
-      localStorage.setItem(`careerDocuments_${user?.email}`, JSON.stringify(newFiles));
-      updateProfileExtras(projects, newFiles);
+      uploadCareerDocument(file);
     }
     event.target.value = '';
   };
@@ -1056,17 +1228,13 @@ export default function ProfilePage() {
     setIsDragging(false);
     const file = event.dataTransfer.files[0];
     if (file) {
-      const newFiles = [...uploadedFiles, { name: file.name, id: Date.now() }];
-      setUploadedFiles(newFiles);
-      localStorage.setItem(`careerDocuments_${user?.email}`, JSON.stringify(newFiles));
-      updateProfileExtras(projects, newFiles);
+      uploadCareerDocument(file);
     }
   };
 
   const handleRemoveFile = (fileId) => {
-    const newFiles = uploadedFiles.filter(f => f.id !== fileId);
-    setUploadedFiles(newFiles);
-    localStorage.setItem(`careerDocuments_${user?.email}`, JSON.stringify(newFiles));
+    const newFiles = uploadedFiles.filter((file) => String(file.id) !== String(fileId));
+    persistCareerDocuments(newFiles);
     updateProfileExtras(projects, newFiles);
   };
 
@@ -2302,7 +2470,11 @@ export default function ProfilePage() {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => document.getElementById('fileInput').click()}
+              onClick={() => {
+                if (!isUploadingCareerDocument) {
+                  document.getElementById('fileInput').click();
+                }
+              }}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -2312,14 +2484,15 @@ export default function ProfilePage() {
                 border: isDragging ? '2px dashed #3b82f6' : '2px dashed #d1d5db',
                 borderRadius: '12px',
                 background: isDragging ? '#eff6ff' : '#f9fafb',
-                cursor: 'pointer',
+                cursor: isUploadingCareerDocument ? 'not-allowed' : 'pointer',
+                opacity: isUploadingCareerDocument ? 0.7 : 1,
                 transition: 'all 0.2s ease',
                 marginBottom: uploadedFiles.length > 0 ? '16px' : '0',
               }}
             >
               <UploadSimple size={48} color={isDragging ? '#3b82f6' : '#9ca3af'} style={{ marginBottom: '12px' }} />
               <p style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
-                <span style={{ color: '#3b82f6' }}>Click to upload</span> or drag and drop
+                <span style={{ color: '#3b82f6' }}>{isUploadingCareerDocument ? 'Uploading...' : 'Click to upload'}</span>{!isUploadingCareerDocument ? ' or drag and drop' : ''}
               </p>
             </div>
             
@@ -2348,21 +2521,55 @@ export default function ProfilePage() {
                       fontWeight: '700',
                       flexShrink: 0,
                     }}>
-                      {file.name.charAt(0).toUpperCase()}
+                      {getCareerDocumentName(file).charAt(0).toUpperCase()}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ 
-                        margin: 0, 
-                        fontSize: '14px', 
-                        fontWeight: '600', 
-                        color: '#111827',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {file.name}
-                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenCareerDocument(file);
+                        }}
+                        style={{
+                          margin: 0,
+                          padding: 0,
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#2563eb',
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          textAlign: 'left',
+                          width: '100%',
+                        }}
+                        title={`Open ${getCareerDocumentName(file)}`}
+                      >
+                        {getCareerDocumentName(file)}
+                      </button>
                     </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadCareerDocument(file);
+                      }}
+                      style={{
+                        background: '#eef2ff',
+                        border: '1px solid #c7d2fe',
+                        color: '#3730a3',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        padding: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                      title={`Download ${getCareerDocumentName(file)}`}
+                    >
+                      <DownloadSimple size={18} />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -2389,6 +2596,7 @@ export default function ProfilePage() {
               id="fileInput"
               type="file"
               onChange={handleFileUpload}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.png,.jpg,.jpeg"
               style={{ display: 'none' }}
             />
           </div>

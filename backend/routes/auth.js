@@ -10,7 +10,7 @@ const FeedbackReview = require('../models/FeedbackReview');
 const { sendAccountFeedbackEmail, sendOTP } = require('../services/emailService');
 const { logAuditEvent, getClientIp } = require('../utils/auditLogger');
 const { touchUserActivity } = require('../utils/userActivity');
-const { uploadLocalFile, cleanupLocalFile } = require('../services/mediaStorage');
+const { uploadLocalFile, cleanupLocalFile, isRemoteFileUrl, fetchRemoteFile, isCloudinaryConfigured } = require('../services/mediaStorage');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const router = express.Router();
@@ -22,6 +22,9 @@ const googleClient = GOOGLE_CLIENT_ID
   : null;
 const LOGIN_MAX_ATTEMPTS = Math.max(1, parseInt(process.env.LOGIN_MAX_ATTEMPTS || '5', 10) || 5);
 const LOGIN_LOCK_MINUTES = Math.max(1, parseInt(process.env.LOGIN_LOCK_MINUTES || '15', 10) || 15);
+const DIRECTORY_VIEWER_ROLES = ['super_admin', 'admin', 'hr', 'alumni_officer'];
+const MAX_CAREER_DOCUMENT_FILE_SIZE_BYTES = 15 * 1024 * 1024;
+const MAX_CAREER_DOCUMENT_FILE_SIZE_LABEL = '15MB';
 
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -111,6 +114,49 @@ function revealEncrypted(value) {
   return decryptField(raw);
 }
 
+function normalizeCareerDocumentEntry(entry, index = 0) {
+  if (!entry) return null;
+
+  if (typeof entry === 'string') {
+    const name = String(entry).trim();
+    if (!name) return null;
+    return {
+      id: Date.now() + index,
+      name,
+      originalName: name,
+      storedName: '',
+      url: '',
+      mimeType: '',
+      sizeBytes: 0,
+      uploadedAt: null,
+    };
+  }
+
+  const name = String(entry.name || entry.originalName || entry.filename || 'Document').trim() || 'Document';
+  const numericId = Number(entry.id);
+  return {
+    id: Number.isFinite(numericId) ? numericId : Date.now() + index,
+    name,
+    originalName: String(entry.originalName || name).trim() || name,
+    storedName: String(entry.storedName || entry.filename || '').trim(),
+    url: String(entry.url || entry.link || '').trim(),
+    mimeType: String(entry.mimeType || '').trim(),
+    sizeBytes: Number(entry.sizeBytes) || 0,
+    uploadedAt: entry.uploadedAt || null,
+  };
+}
+
+function normalizeCareerDocuments(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry, index) => normalizeCareerDocumentEntry(entry, index))
+    .filter(Boolean);
+}
+
+function toDownloadName(value) {
+  return String(value || 'document').replace(/[\r\n"]/g, '_').trim() || 'document';
+}
+
 function buildUserPayload(user) {
   const visibility = String(user.profileVisibility || '').trim().toLowerCase();
   const normalizedVisibility = visibility === 'private' ? 'private' : 'public';
@@ -137,7 +183,7 @@ function buildUserPayload(user) {
     twitterUrl: user.twitterUrl,
     instagramUrl: user.instagramUrl,
     projects: user.projects || [],
-    careerDocuments: user.careerDocuments || [],
+    careerDocuments: normalizeCareerDocuments(user.careerDocuments),
     twoFactorEnabled: Boolean(user.twoFactorEnabled),
     loginAlerts: typeof user.loginAlerts === 'boolean' ? user.loginAlerts : true,
     profileVisibility: normalizedVisibility,
@@ -775,7 +821,7 @@ router.get('/directory/:userId', verifyToken, async (req, res) => {
     }
 
     const isSelf = String(user._id) === String(req.user.id);
-    const isAdminViewer = ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(String(req.user?.role || ''));
+    const isAdminViewer = DIRECTORY_VIEWER_ROLES.includes(String(req.user?.role || ''));
     if (!isSelf && !isAdminViewer && String(user.profileVisibility || '').trim().toLowerCase() === 'private') {
       return res.status(403).json({ message: 'This profile is private' });
     }
@@ -855,7 +901,7 @@ router.put('/me', verifyToken, async (req, res) => {
     if (typeof twitterUrl === 'string') user.twitterUrl = twitterUrl;
     if (typeof instagramUrl === 'string') user.instagramUrl = instagramUrl;
     if (Array.isArray(projects)) user.projects = projects;
-    if (Array.isArray(careerDocuments)) user.careerDocuments = careerDocuments;
+    if (Array.isArray(careerDocuments)) user.careerDocuments = normalizeCareerDocuments(careerDocuments);
 
     await user.save();
 
@@ -1314,6 +1360,11 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+const careerDocumentUploadsDir = path.join(uploadsDir, 'career-documents');
+if (!fs.existsSync(careerDocumentUploadsDir)) {
+  fs.mkdirSync(careerDocumentUploadsDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir);
@@ -1326,6 +1377,84 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
+
+const careerDocumentStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, careerDocumentUploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, '_');
+    cb(null, `${unique}-${safeName}`);
+  },
+});
+
+const careerDocumentUpload = multer({
+  storage: careerDocumentStorage,
+  limits: { fileSize: MAX_CAREER_DOCUMENT_FILE_SIZE_BYTES },
+});
+
+const handleSingleCareerDocumentUpload = (req, res, next) => {
+  careerDocumentUpload.single('file')(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: `File must be ${MAX_CAREER_DOCUMENT_FILE_SIZE_LABEL} or smaller.` });
+    }
+
+    return res.status(400).json({ message: err.message || 'File upload failed.' });
+  });
+};
+
+const storeUploadedCareerDocumentFile = async (file) => {
+  if (!file?.filename) {
+    const error = new Error('No file uploaded');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const fallbackUrl = `/uploads/career-documents/${file.filename}`;
+  const cloudConfigured = isCloudinaryConfigured();
+  const cloudRequired = process.env.NODE_ENV === 'production';
+
+  if (cloudConfigured && file.path) {
+    try {
+      const uploadedUrl = await uploadLocalFile(file.path, {
+        folder: 'career-documents',
+        resourceType: 'raw',
+      });
+
+      if (uploadedUrl) {
+        cleanupLocalFile(file.path);
+        return {
+          storedName: file.filename,
+          url: uploadedUrl,
+        };
+      }
+    } catch (err) {
+      console.error('Career document cloud upload failed:', err.message);
+      cleanupLocalFile(file.path);
+      const error = new Error('Cloud document upload failed. Please try again.');
+      error.statusCode = 503;
+      throw error;
+    }
+  }
+
+  if (cloudRequired) {
+    cleanupLocalFile(file.path);
+    const error = new Error('Cloudinary storage is not configured on the server.');
+    error.statusCode = 503;
+    throw error;
+  }
+
+  return {
+    storedName: file.filename,
+    url: fallbackUrl,
+  };
+};
 
 router.post('/me/avatar', verifyToken, upload.single('avatar'), async (req, res) => {
   try {
@@ -1353,6 +1482,104 @@ router.post('/me/avatar', verifyToken, upload.single('avatar'), async (req, res)
   } catch (err) {
     console.error('Error uploading avatar', err);
     res.status(500).json({ message: 'Error uploading avatar' });
+  }
+});
+
+router.post('/me/career-document', verifyToken, handleSingleCareerDocumentUpload, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const storedFile = await storeUploadedCareerDocumentFile(req.file);
+    const documentEntry = normalizeCareerDocumentEntry({
+      id: Date.now(),
+      name: req.file.originalname,
+      originalName: req.file.originalname,
+      storedName: storedFile.storedName,
+      url: storedFile.url,
+      mimeType: req.file.mimetype || '',
+      sizeBytes: req.file.size || 0,
+      uploadedAt: new Date(),
+    });
+
+    user.careerDocuments = [
+      ...normalizeCareerDocuments(user.careerDocuments),
+      documentEntry,
+    ];
+    await user.save();
+
+    return res.status(201).json({
+      message: 'Career document uploaded',
+      document: documentEntry,
+      user: buildUserPayload(user),
+    });
+  } catch (err) {
+    console.error('Error uploading career document', err);
+    return res.status(err.statusCode || 500).json({ message: err.message || 'Error uploading career document' });
+  }
+});
+
+router.get('/users/:userId/career-documents/:documentId/download', verifyToken, async (req, res) => {
+  try {
+    const { userId, documentId } = req.params;
+    const targetUser = await User.findById(userId)
+      .select('role status profileVisibility isDeleted isAnonymized careerDocuments')
+      .lean();
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (targetUser.isDeleted || targetUser.isAnonymized) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isSelf = String(userId) === String(req.user.id);
+    const isAdminViewer = DIRECTORY_VIEWER_ROLES.includes(String(req.user?.role || ''));
+
+    if (!isSelf && !isAdminViewer && String(targetUser.status || '').trim().toLowerCase() !== 'approved') {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (!isSelf && !isAdminViewer && String(targetUser.profileVisibility || '').trim().toLowerCase() === 'private') {
+      return res.status(403).json({ message: 'This profile is private' });
+    }
+
+    const normalizedDocuments = normalizeCareerDocuments(targetUser.careerDocuments);
+    const numericDocumentId = Number(documentId);
+    const doc = normalizedDocuments.find((item) => String(item.id) === String(documentId) || (Number.isFinite(numericDocumentId) && Number(item.id) === numericDocumentId));
+    if (!doc) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    if (isRemoteFileUrl(doc.url)) {
+      const remoteResponse = await fetchRemoteFile(doc.url);
+      if (!remoteResponse?.ok) {
+        return res.status(502).json({ message: 'Career document is unavailable right now' });
+      }
+
+      const fileBuffer = Buffer.from(await remoteResponse.arrayBuffer());
+      res.setHeader('Content-Type', remoteResponse.headers.get('content-type') || doc.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Length', String(fileBuffer.length));
+      res.setHeader('Content-Disposition', `attachment; filename="${toDownloadName(doc.originalName || doc.name)}"`);
+      return res.send(fileBuffer);
+    }
+
+    if (!doc.storedName) {
+      return res.status(404).json({ message: 'This document needs to be uploaded again.' });
+    }
+
+    const filePath = path.join(careerDocumentUploadsDir, doc.storedName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File missing on server' });
+    }
+
+    return res.download(filePath, doc.originalName || doc.name || 'document');
+  } catch (err) {
+    console.error('Error downloading career document', err);
+    return res.status(500).json({ message: 'Failed to download career document' });
   }
 });
 
