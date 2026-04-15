@@ -22,20 +22,6 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const fallbackProfileImage = '/Logo.jpg';
   const notificationAvatarCacheRef = useRef({});
-  const normalizeCareerDocument = (file, fallbackId = Date.now()) => {
-    if (!file) return null;
-    if (typeof file === 'string') {
-      return { id: fallbackId, name: file, url: '', contentType: '' };
-    }
-
-    return {
-      ...file,
-      id: file.id || fallbackId,
-      name: file.name || file.filename || file.originalName || 'Document',
-      url: file.url || file.link || '',
-      contentType: file.contentType || file.type || '',
-    };
-  };
   const resolveProfileImage = (value) => {
     if (!value) return fallbackProfileImage;
     if (String(value).includes('gear-icon.svg')) return fallbackProfileImage;
@@ -52,7 +38,7 @@ export default function ProfilePage() {
     const userData = localStorage.getItem('user');
     const user = userData ? JSON.parse(userData) : null;
     const saved = localStorage.getItem(`careerDocuments_${user?.email}`);
-    return saved ? JSON.parse(saved).map((file, index) => normalizeCareerDocument(file, Date.now() + index)).filter(Boolean) : [];
+    return saved ? JSON.parse(saved) : [];
   });
   const [isDragging, setIsDragging] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -632,11 +618,11 @@ export default function ProfilePage() {
   const updateProfileExtras = async (nextProjects, nextDocuments) => {
     const token = localStorage.getItem('token');
     if (!token) {
-      return null;
+      return;
     }
 
     try {
-      const response = await fetch(apiEndpoints.updateProfile, {
+      await fetch(apiEndpoints.updateProfile, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -647,14 +633,8 @@ export default function ProfilePage() {
           careerDocuments: nextDocuments,
         }),
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(body?.message || 'Failed to save profile extras');
-      }
-      return body;
     } catch (err) {
       console.error('Error saving profile extras', err);
-      return null;
     }
   };
 
@@ -775,7 +755,7 @@ export default function ProfilePage() {
           setProjects(data.user.projects);
         }
         if (Array.isArray(data.user.careerDocuments)) {
-          setUploadedFiles(data.user.careerDocuments.map((file, index) => normalizeCareerDocument(file, Date.now() + index)).filter(Boolean));
+          setUploadedFiles(data.user.careerDocuments);
         }
 
         localStorage.setItem('user', JSON.stringify(data.user));
@@ -802,7 +782,7 @@ export default function ProfilePage() {
             localStorage.setItem(`projects_${data.user.email}`, JSON.stringify(data.user.projects));
           }
           if (Array.isArray(data.user.careerDocuments)) {
-            localStorage.setItem(`careerDocuments_${data.user.email}`, JSON.stringify(data.user.careerDocuments.map((file, index) => normalizeCareerDocument(file, Date.now() + index)).filter(Boolean)));
+            localStorage.setItem(`careerDocuments_${data.user.email}`, JSON.stringify(data.user.careerDocuments));
           }
         }
       } catch (err) {
@@ -1051,92 +1031,13 @@ export default function ProfilePage() {
     }
   };
 
-  const openCareerDocument = (url) => {
-    const nextUrl = String(url || '').trim();
-    if (!nextUrl || typeof window === 'undefined') return;
-    window.open(resolveApiAssetUrl(nextUrl), '_blank', 'noopener,noreferrer');
-  };
-
-  const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
-
-  const persistCareerDocuments = async (nextDocuments) => {
-    const saved = await updateProfileExtras(projects, nextDocuments);
-    const normalizedDocuments = Array.isArray(saved?.user?.careerDocuments)
-      ? saved.user.careerDocuments.map((item, index) => normalizeCareerDocument(item, Date.now() + index)).filter(Boolean)
-      : nextDocuments;
-
-    setUploadedFiles(normalizedDocuments);
-    const nextEmail = String(saved?.user?.email || user?.email || '').trim();
-    if (nextEmail) {
-      localStorage.setItem(`careerDocuments_${nextEmail}`, JSON.stringify(normalizedDocuments));
-    }
-    if (saved?.user) {
-      localStorage.setItem('user', JSON.stringify(saved.user));
-    }
-
-    return normalizedDocuments;
-  };
-
-  const uploadCareerDocumentFile = async (file) => {
-    if (!file) return;
-
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const fd = new FormData();
-    fd.append('document', file);
-
-    try {
-      const response = await fetch(apiEndpoints.uploadCareerDocument, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data?.message || 'Career document upload failed');
-      }
-
-      const nextDocuments = Array.isArray(data?.user?.careerDocuments)
-        ? data.user.careerDocuments.map((item, index) => normalizeCareerDocument(item, Date.now() + index)).filter(Boolean)
-        : [...uploadedFiles, normalizeCareerDocument(data?.document, Date.now())].filter(Boolean);
-
-      await persistCareerDocuments(nextDocuments);
-      showSuccessToast('Career document uploaded successfully.');
-    } catch (err) {
-      console.error('Error uploading career document', err);
-      try {
-        const dataUrl = await readFileAsDataUrl(file);
-        const fallbackDocument = normalizeCareerDocument({
-          id: Date.now(),
-          name: file.name,
-          url: dataUrl,
-          contentType: file.type || '',
-        }, Date.now());
-        const nextDocuments = [...uploadedFiles, fallbackDocument].filter(Boolean);
-        await persistCareerDocuments(nextDocuments);
-        window.dispatchEvent(new CustomEvent('hsi-toast', {
-          detail: { type: 'warning', text: 'Career document uploaded using fallback storage.' },
-        }));
-      } catch (fallbackErr) {
-        console.error('Career document fallback persistence failed', fallbackErr);
-        window.dispatchEvent(new CustomEvent('hsi-toast', {
-          detail: { type: 'error', text: err?.message || fallbackErr?.message || 'Failed to upload career document.' },
-        }));
-      }
-    }
-  };
-
-  const handleFileUpload = async (event) => {
+  const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
-      await uploadCareerDocumentFile(file);
+      const newFiles = [...uploadedFiles, { name: file.name, id: Date.now() }];
+      setUploadedFiles(newFiles);
+      localStorage.setItem(`careerDocuments_${user?.email}`, JSON.stringify(newFiles));
+      updateProfileExtras(projects, newFiles);
     }
     event.target.value = '';
   };
@@ -1150,12 +1051,15 @@ export default function ProfilePage() {
     setIsDragging(false);
   };
 
-  const handleDrop = async (event) => {
+  const handleDrop = (event) => {
     event.preventDefault();
     setIsDragging(false);
     const file = event.dataTransfer.files[0];
     if (file) {
-      await uploadCareerDocumentFile(file);
+      const newFiles = [...uploadedFiles, { name: file.name, id: Date.now() }];
+      setUploadedFiles(newFiles);
+      localStorage.setItem(`careerDocuments_${user?.email}`, JSON.stringify(newFiles));
+      updateProfileExtras(projects, newFiles);
     }
   };
 
@@ -2422,42 +2326,15 @@ export default function ProfilePage() {
             {uploadedFiles.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {uploadedFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    role={file.url ? 'button' : undefined}
-                    tabIndex={file.url ? 0 : -1}
-                    onClick={() => {
-                      if (!file.url) return;
-                      openCareerDocument(file.url);
-                    }}
-                    onKeyDown={(event) => {
-                      if (!file.url) return;
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        openCareerDocument(file.url);
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px',
-                      padding: '16px',
-                      background: '#f9fafb',
-                      borderRadius: '12px',
-                      border: '1px solid #e5e7eb',
-                      cursor: file.url ? 'pointer' : 'default',
-                      transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                    }}
-                    onMouseEnter={(event) => {
-                      if (!file.url) return;
-                      event.currentTarget.style.borderColor = '#93c5fd';
-                      event.currentTarget.style.boxShadow = '0 8px 18px rgba(37, 99, 235, 0.08)';
-                    }}
-                    onMouseLeave={(event) => {
-                      event.currentTarget.style.borderColor = '#e5e7eb';
-                      event.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
+                  <div key={file.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    padding: '16px',
+                    background: '#f9fafb',
+                    borderRadius: '12px',
+                    border: '1px solid #e5e7eb',
+                  }}>
                     <div style={{
                       width: '48px',
                       height: '48px',
@@ -2478,7 +2355,7 @@ export default function ProfilePage() {
                         margin: 0, 
                         fontSize: '14px', 
                         fontWeight: '600', 
-                        color: file.url ? '#2563eb' : '#111827',
+                        color: '#111827',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -2486,28 +2363,6 @@ export default function ProfilePage() {
                         {file.name}
                       </p>
                     </div>
-                    {file.url ? (
-                      <a
-                        href={resolveApiAssetUrl(file.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                        onClick={(event) => event.stopPropagation()}
-                        style={{
-                          color: '#184d91',
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          textDecoration: 'none',
-                          padding: '8px 10px',
-                          borderRadius: '10px',
-                          border: '1px solid #bfdbfe',
-                          background: '#eff6ff',
-                          flexShrink: 0,
-                        }}
-                      >
-                        Download
-                      </a>
-                    ) : null}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

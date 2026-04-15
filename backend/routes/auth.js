@@ -1308,17 +1308,13 @@ router.post('/feedback', verifyToken, async (req, res) => {
   }
 });
 
+// Avatar upload - saves file under /uploads and updates user's profileImage
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const careerDocumentsDir = path.join(uploadsDir, 'career-documents');
-if (!fs.existsSync(careerDocumentsDir)) {
-  fs.mkdirSync(careerDocumentsDir, { recursive: true });
-}
-
-const avatarStorage = multer.diskStorage({
+const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir);
   },
@@ -1329,19 +1325,7 @@ const avatarStorage = multer.diskStorage({
   }
 });
 
-const careerDocumentStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, careerDocumentsDir);
-  },
-  filename: function (req, file, cb) {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, '_');
-    cb(null, `${unique}-${safeName}`);
-  }
-});
-
-const upload = multer({ storage: avatarStorage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
-const uploadCareerDocument = multer({ storage: careerDocumentStorage, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
 
 router.post('/me/avatar', verifyToken, upload.single('avatar'), async (req, res) => {
   try {
@@ -1369,47 +1353,6 @@ router.post('/me/avatar', verifyToken, upload.single('avatar'), async (req, res)
   } catch (err) {
     console.error('Error uploading avatar', err);
     res.status(500).json({ message: 'Error uploading avatar' });
-  }
-});
-
-router.post('/me/career-document', verifyToken, uploadCareerDocument.single('document'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    let documentUrl = `/uploads/career-documents/${req.file.filename}`;
-    try {
-      const uploadedUrl = await uploadLocalFile(req.file.path, { folder: 'career-documents', resourceType: 'raw' });
-      if (uploadedUrl) {
-        documentUrl = uploadedUrl;
-        cleanupLocalFile(req.file.path);
-      }
-    } catch (uploadErr) {
-      console.error('Career document cloud upload failed:', uploadErr.message);
-    }
-
-    const nextDocument = {
-      id: Date.now(),
-      name: req.file.originalname,
-      url: documentUrl,
-      contentType: req.file.mimetype || '',
-    };
-
-    user.careerDocuments = Array.isArray(user.careerDocuments)
-      ? [...user.careerDocuments, nextDocument]
-      : [nextDocument];
-    await user.save();
-
-    return res.json({
-      message: 'Career document uploaded',
-      document: nextDocument,
-      user: buildUserPayload(user),
-    });
-  } catch (err) {
-    console.error('Error uploading career document', err);
-    return res.status(500).json({ message: 'Error uploading career document' });
   }
 });
 

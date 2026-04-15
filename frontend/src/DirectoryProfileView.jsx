@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LinkedinLogo, TwitterLogo, InstagramLogo, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, BookOpen, Briefcase } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints, resolveApiAssetUrl } from './config/api';
+import { apiEndpoints } from './config/api';
 
 export default function DirectoryProfileView() {
   const navigate = useNavigate();
@@ -104,35 +104,6 @@ export default function DirectoryProfileView() {
     projects: Array.isArray(profile.projects) ? profile.projects : [],
     careerDocuments: Array.isArray(profile.careerDocuments) ? profile.careerDocuments : [],
   } : null;
-
-  const resolveCareerDocumentName = (file) => {
-    if (!file) return 'Document';
-    if (typeof file === 'string') return file;
-    return file.name || file.filename || file.originalName || 'Document';
-  };
-
-  const resolveCareerDocumentUrl = (file) => {
-    if (!file) return '';
-    if (typeof file === 'string') {
-      return resolveApiAssetUrl(file);
-    }
-
-    const rawUrl = file.url
-      || file.link
-      || file.fileUrl
-      || file.path
-      || file.downloadUrl
-      || file.secure_url
-      || '';
-
-    return resolveApiAssetUrl(rawUrl);
-  };
-
-  const openCareerDocument = (url) => {
-    const nextUrl = String(url || '').trim();
-    if (!nextUrl || typeof window === 'undefined') return;
-    window.open(nextUrl, '_blank', 'noopener,noreferrer');
-  };
 
   return (
     <motion.div
@@ -695,14 +666,13 @@ export default function DirectoryProfileView() {
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {profileData.careerDocuments.map((file) => {
-                        const name = resolveCareerDocumentName(file);
-                        const url = resolveCareerDocumentUrl(file);
-                        const key = file?.id || file?._id || `${name}-${url || 'no-url'}`;
+                        const name = typeof file === 'string'
+                          ? file
+                          : (file.name || file.filename || file.originalName || 'Document');
+                        const url = typeof file === 'object' ? file.url || file.link : null;
                         return (
                           <div
-                            key={key}
-                            role={url ? 'button' : undefined}
-                            tabIndex={url ? 0 : -1}
+                            key={file.id || file._id || name}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -711,28 +681,6 @@ export default function DirectoryProfileView() {
                               background: '#f9fafb',
                               borderRadius: '12px',
                               border: '1px solid #e5e7eb',
-                              cursor: url ? 'pointer' : 'default',
-                              transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                            }}
-                            onClick={() => {
-                              if (!url) return;
-                              openCareerDocument(url);
-                            }}
-                            onKeyDown={(event) => {
-                              if (!url) return;
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                openCareerDocument(url);
-                              }
-                            }}
-                            onMouseEnter={(event) => {
-                              if (!url) return;
-                              event.currentTarget.style.borderColor = '#93c5fd';
-                              event.currentTarget.style.boxShadow = '0 8px 18px rgba(37, 99, 235, 0.08)';
-                            }}
-                            onMouseLeave={(event) => {
-                              event.currentTarget.style.borderColor = '#e5e7eb';
-                              event.currentTarget.style.boxShadow = 'none';
                             }}
                           >
                             <div style={{
@@ -751,40 +699,39 @@ export default function DirectoryProfileView() {
                               {name.charAt(0).toUpperCase()}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{
-                                margin: 0,
-                                fontSize: '14px',
-                                fontWeight: '600',
-                                color: url ? '#2563eb' : '#111827',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}>
-                                {name}
-                              </p>
+                              {url ? (
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    margin: 0,
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    color: '#2563eb',
+                                    textDecoration: 'none',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    display: 'block',
+                                  }}
+                                >
+                                  {name}
+                                </a>
+                              ) : (
+                                <p style={{
+                                  margin: 0,
+                                  fontSize: '14px',
+                                  fontWeight: '600',
+                                  color: '#111827',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}>
+                                  {name}
+                                </p>
+                              )}
                             </div>
-                            {url ? (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download
-                                onClick={(event) => event.stopPropagation()}
-                                style={{
-                                  color: '#184d91',
-                                  fontSize: '13px',
-                                  fontWeight: 700,
-                                  textDecoration: 'none',
-                                  padding: '8px 10px',
-                                  borderRadius: '10px',
-                                  border: '1px solid #bfdbfe',
-                                  background: '#eff6ff',
-                                  flexShrink: 0,
-                                }}
-                              >
-                                Download
-                              </a>
-                            ) : null}
                           </div>
                         );
                       })}
