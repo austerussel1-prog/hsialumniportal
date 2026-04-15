@@ -674,7 +674,9 @@ export default function AdminDashboard() {
     const normalizedEmail = String(addUserForm.email || '').trim().toLowerCase();
 
     if (!EMAIL_BASIC_REGEX.test(normalizedEmail)) {
-      setAddUserError('Please enter a valid email address');
+      const message = 'Please enter a valid email address';
+      setAddUserError(message);
+      notify('error', message);
       setAddUserLoading(false);
       return;
     }
@@ -701,6 +703,7 @@ export default function AdminDashboard() {
       if (response.ok) {
         await fetchAllUsers();
         await fetchStats();
+        notify('success', 'Admin user created successfully. Confirmation email sent.');
         setShowAddUserModal(false);
         setAddUserForm({
           fullName: '',
@@ -721,10 +724,13 @@ export default function AdminDashboard() {
           if (text) message = text;
         }
         setAddUserError(message);
+        notify('error', message);
       }
     } catch (err) {
       console.error('Error creating admin user:', err);
-      setAddUserError(err?.message || 'Failed to create admin user');
+      const message = err?.message || 'Failed to create admin user';
+      setAddUserError(message);
+      notify('error', message);
     } finally {
       setAddUserLoading(false);
     }
