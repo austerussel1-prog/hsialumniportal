@@ -128,6 +128,12 @@ export default function DirectoryProfileView() {
     return resolveApiAssetUrl(rawUrl);
   };
 
+  const openCareerDocument = (url) => {
+    const nextUrl = String(url || '').trim();
+    if (!nextUrl || typeof window === 'undefined') return;
+    window.open(nextUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <motion.div
       style={{ display: 'flex', minHeight: '100vh', background: '#f6f2ea', overflowX: 'hidden' }}
@@ -693,11 +699,10 @@ export default function DirectoryProfileView() {
                         const url = resolveCareerDocumentUrl(file);
                         const key = file?.id || file?._id || `${name}-${url || 'no-url'}`;
                         return (
-                          <a
+                          <div
                             key={key}
-                            href={url || undefined}
-                            target={url ? '_blank' : undefined}
-                            rel={url ? 'noopener noreferrer' : undefined}
+                            role={url ? 'button' : undefined}
+                            tabIndex={url ? 0 : -1}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -706,12 +711,19 @@ export default function DirectoryProfileView() {
                               background: '#f9fafb',
                               borderRadius: '12px',
                               border: '1px solid #e5e7eb',
-                              textDecoration: 'none',
                               cursor: url ? 'pointer' : 'default',
                               transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
                             }}
-                            onClick={(event) => {
-                              if (!url) event.preventDefault();
+                            onClick={() => {
+                              if (!url) return;
+                              openCareerDocument(url);
+                            }}
+                            onKeyDown={(event) => {
+                              if (!url) return;
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                openCareerDocument(url);
+                              }
                             }}
                             onMouseEnter={(event) => {
                               if (!url) return;
@@ -751,7 +763,29 @@ export default function DirectoryProfileView() {
                                 {name}
                               </p>
                             </div>
-                          </a>
+                            {url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                onClick={(event) => event.stopPropagation()}
+                                style={{
+                                  color: '#184d91',
+                                  fontSize: '13px',
+                                  fontWeight: 700,
+                                  textDecoration: 'none',
+                                  padding: '8px 10px',
+                                  borderRadius: '10px',
+                                  border: '1px solid #bfdbfe',
+                                  background: '#eff6ff',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                Download
+                              </a>
+                            ) : null}
+                          </div>
                         );
                       })}
                     </div>

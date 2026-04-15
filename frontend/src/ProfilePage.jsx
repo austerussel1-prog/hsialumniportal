@@ -1045,6 +1045,12 @@ export default function ProfilePage() {
     }
   };
 
+  const openCareerDocument = (url) => {
+    const nextUrl = String(url || '').trim();
+    if (!nextUrl || typeof window === 'undefined') return;
+    window.open(resolveApiAssetUrl(nextUrl), '_blank', 'noopener,noreferrer');
+  };
+
   const uploadCareerDocumentFile = async (file) => {
     if (!file) return;
 
@@ -2372,14 +2378,19 @@ export default function ProfilePage() {
             {uploadedFiles.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {uploadedFiles.map((file) => (
-                  <a
+                  <div
                     key={file.id}
-                    href={file.url ? resolveApiAssetUrl(file.url) : undefined}
-                    target={file.url ? '_blank' : undefined}
-                    rel={file.url ? 'noopener noreferrer' : undefined}
-                    onClick={(event) => {
-                      if (!file.url) {
+                    role={file.url ? 'button' : undefined}
+                    tabIndex={file.url ? 0 : -1}
+                    onClick={() => {
+                      if (!file.url) return;
+                      openCareerDocument(file.url);
+                    }}
+                    onKeyDown={(event) => {
+                      if (!file.url) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
+                        openCareerDocument(file.url);
                       }
                     }}
                     style={{
@@ -2390,7 +2401,6 @@ export default function ProfilePage() {
                       background: '#f9fafb',
                       borderRadius: '12px',
                       border: '1px solid #e5e7eb',
-                      textDecoration: 'none',
                       cursor: file.url ? 'pointer' : 'default',
                       transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
                     }}
@@ -2432,10 +2442,31 @@ export default function ProfilePage() {
                         {file.name}
                       </p>
                     </div>
+                    {file.url ? (
+                      <a
+                        href={resolveApiAssetUrl(file.url)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                        onClick={(event) => event.stopPropagation()}
+                        style={{
+                          color: '#184d91',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                          padding: '8px 10px',
+                          borderRadius: '10px',
+                          border: '1px solid #bfdbfe',
+                          background: '#eff6ff',
+                          flexShrink: 0,
+                        }}
+                      >
+                        Download
+                      </a>
+                    ) : null}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        e.preventDefault();
                         handleRemoveFile(file.id);
                       }}
                       style={{
@@ -2450,7 +2481,7 @@ export default function ProfilePage() {
                     >
                       <X size={20} />
                     </button>
-                  </a>
+                  </div>
                 ))}
               </div>
             )}
