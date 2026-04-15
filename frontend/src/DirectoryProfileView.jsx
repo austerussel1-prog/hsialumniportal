@@ -708,9 +708,19 @@ export default function DirectoryProfileView() {
                               border: '1px solid #e5e7eb',
                               textDecoration: 'none',
                               cursor: url ? 'pointer' : 'default',
+                              transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
                             }}
                             onClick={(event) => {
                               if (!url) event.preventDefault();
+                            }}
+                            onMouseEnter={(event) => {
+                              if (!url) return;
+                              event.currentTarget.style.borderColor = '#93c5fd';
+                              event.currentTarget.style.boxShadow = '0 8px 18px rgba(37, 99, 235, 0.08)';
+                            }}
+                            onMouseLeave={(event) => {
+                              event.currentTarget.style.borderColor = '#e5e7eb';
+                              event.currentTarget.style.boxShadow = 'none';
                             }}
                           >
                             <div style={{

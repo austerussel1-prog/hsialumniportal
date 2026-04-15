@@ -2372,15 +2372,38 @@ export default function ProfilePage() {
             {uploadedFiles.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {uploadedFiles.map((file) => (
-                  <div key={file.id} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '16px',
-                    padding: '16px',
-                    background: '#f9fafb',
-                    borderRadius: '12px',
-                    border: '1px solid #e5e7eb',
-                  }}>
+                  <a
+                    key={file.id}
+                    href={file.url ? resolveApiAssetUrl(file.url) : undefined}
+                    target={file.url ? '_blank' : undefined}
+                    rel={file.url ? 'noopener noreferrer' : undefined}
+                    onClick={(event) => {
+                      if (!file.url) {
+                        event.preventDefault();
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      padding: '16px',
+                      background: '#f9fafb',
+                      borderRadius: '12px',
+                      border: '1px solid #e5e7eb',
+                      textDecoration: 'none',
+                      cursor: file.url ? 'pointer' : 'default',
+                      transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                    }}
+                    onMouseEnter={(event) => {
+                      if (!file.url) return;
+                      event.currentTarget.style.borderColor = '#93c5fd';
+                      event.currentTarget.style.boxShadow = '0 8px 18px rgba(37, 99, 235, 0.08)';
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.borderColor = '#e5e7eb';
+                      event.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
                     <div style={{
                       width: '48px',
                       height: '48px',
@@ -2397,42 +2420,22 @@ export default function ProfilePage() {
                       {file.name.charAt(0).toUpperCase()}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      {file.url ? (
-                        <a
-                          href={resolveApiAssetUrl(file.url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            margin: 0,
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            color: '#2563eb',
-                            textDecoration: 'none',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            display: 'block',
-                          }}
-                        >
-                          {file.name}
-                        </a>
-                      ) : (
-                        <p style={{ 
-                          margin: 0, 
-                          fontSize: '14px', 
-                          fontWeight: '600', 
-                          color: '#111827',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {file.name}
-                        </p>
-                      )}
+                      <p style={{ 
+                        margin: 0, 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        color: file.url ? '#2563eb' : '#111827',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {file.name}
+                      </p>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        e.preventDefault();
                         handleRemoveFile(file.id);
                       }}
                       style={{
@@ -2447,7 +2450,7 @@ export default function ProfilePage() {
                     >
                       <X size={20} />
                     </button>
-                  </div>
+                  </a>
                 ))}
               </div>
             )}
