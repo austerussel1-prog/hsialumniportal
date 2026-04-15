@@ -157,6 +157,22 @@ function toDownloadName(value) {
   return String(value || 'document').replace(/[\r\n"]/g, '_').trim() || 'document';
 }
 
+function getCareerDocumentStoredName(doc) {
+  const directStoredName = String(doc?.storedName || '').trim();
+  if (directStoredName) return directStoredName;
+
+  const rawUrl = String(doc?.url || '').trim();
+  if (!rawUrl || /^https?:\/\//i.test(rawUrl)) return '';
+
+  const normalizedPath = rawUrl.split('?')[0].replace(/\\/g, '/');
+  const marker = '/uploads/career-documents/';
+  const markerIndex = normalizedPath.toLowerCase().indexOf(marker);
+  if (markerIndex < 0) return '';
+
+  const derivedName = normalizedPath.slice(markerIndex + marker.length).trim();
+  return derivedName ? path.basename(derivedName) : '';
+}
+
 function buildUserPayload(user) {
   const visibility = String(user.profileVisibility || '').trim().toLowerCase();
   const normalizedVisibility = visibility === 'private' ? 'private' : 'public';
@@ -1567,11 +1583,12 @@ router.get('/users/:userId/career-documents/:documentId/download', verifyToken, 
       return res.send(fileBuffer);
     }
 
-    if (!doc.storedName) {
+    const storedName = getCareerDocumentStoredName(doc);
+    if (!storedName) {
       return res.status(404).json({ message: 'This document needs to be uploaded again.' });
     }
 
-    const filePath = path.join(careerDocumentUploadsDir, doc.storedName);
+    const filePath = path.join(careerDocumentUploadsDir, storedName);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ message: 'File missing on server' });
     }
