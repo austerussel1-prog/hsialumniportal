@@ -2191,12 +2191,6 @@ export default function AdminDashboard() {
             <h3 className="text-xl md:text-2xl font-bold mb-3 md:mb-4">Add Admin User</h3>
             <p className="text-gray-600 mb-3 md:mb-4 text-sm md:text-base">Fill in the details to create an admin account.</p>
 
-            {addUserError && (
-              <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
-                {addUserError}
-              </p>
-            )}
-
             <form onSubmit={handleCreateAdminUser} className="space-y-3 md:space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
