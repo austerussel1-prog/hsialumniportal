@@ -79,7 +79,7 @@ export default function AdminDashboard() {
   const fetchAllUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/admin/all-users', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/all-users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -97,7 +97,7 @@ export default function AdminDashboard() {
   const fetchPendingUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/admin/pending-users', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/pending-users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
         const data = await response.json();
         setPendingUsers(data.users);
       } else {
-        const fallback = await fetch('http://localhost:5000/api/admin/all-users', {
+        const fallback = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/all-users`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/admin/stats', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -146,7 +146,7 @@ export default function AdminDashboard() {
     setActionLoading(userId);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/admin/approve/${userId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/approve/${userId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -194,7 +194,7 @@ export default function AdminDashboard() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/admin/create-admin', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/create-admin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -263,7 +263,7 @@ export default function AdminDashboard() {
     setActionLoading(selectedUserId);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/admin/reject/${selectedUserId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/reject/${selectedUserId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

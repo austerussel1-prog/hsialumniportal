@@ -1,20 +1,19 @@
 // API configuration
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+export const API_URL = String(import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
 
-export function resolveApiAssetUrl(value) {
+export const resolveApiAssetUrl = (value) => {
   if (!value) return '';
+
   const raw = String(value).trim();
   if (!raw) return '';
-  if (/^(https?:)?\/\//i.test(raw) || raw.startsWith('data:') || raw.startsWith('blob:')) {
-    return raw;
-  }
+  if (/^(data:|blob:)/i.test(raw)) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('//')) return `https:${raw}`;
+  if (!API_URL) return raw;
 
-  // Upload assets are served by the backend service, not by the Vercel frontend domain.
-  if (raw.startsWith('/uploads/')) return `${API_URL}${raw}`;
-  if (raw.startsWith('uploads/')) return `${API_URL}/${raw}`;
-
-  return raw;
-}
+  const normalizedPath = raw.startsWith('/') ? raw : `/${raw}`;
+  return `${API_URL}${normalizedPath}`;
+};
 
 export const apiEndpoints = {
   // Auth endpoints
@@ -34,6 +33,8 @@ export const apiEndpoints = {
   accountFeedbackAlumniUsers: `${API_URL}/api/auth/feedback/alumni-users`,
   accountFeedbackReviews: `${API_URL}/api/auth/feedback/reviews`,
   uploadAvatar: `${API_URL}/api/auth/me/avatar`,
+  uploadCareerDocument: `${API_URL}/api/auth/me/career-document`,
+  downloadCareerDocument: (userId, documentId) => `${API_URL}/api/auth/users/${encodeURIComponent(userId)}/career-documents/${encodeURIComponent(documentId)}/download`,
   directoryUsers: `${API_URL}/api/auth/directory`,
   directoryUser: (userId) => `${API_URL}/api/auth/directory/${userId}`,
 
@@ -56,6 +57,9 @@ export const apiEndpoints = {
   approveDataRemovalRequest: (userId) => `${API_URL}/api/admin/data-removal-requests/${userId}/approve`,
   rejectDataRemovalRequest: (userId) => `${API_URL}/api/admin/data-removal-requests/${userId}/reject`,
 
+  // Job application endpoints
+  submitJobApplication: `${API_URL}/api/job-applications`,
+
   // Alumni endpoints
   allAlumni: `${API_URL}/api/admin/all-alumni`,
   createAlumni: `${API_URL}/api/admin/create-alumni`,
@@ -67,7 +71,9 @@ export const apiEndpoints = {
   getMessages: `${API_URL}/api/messages`,
   searchGifs: `${API_URL}/api/messages/search-gifs`,
   sendMessage: `${API_URL}/api/messages`,
+  messageAttachment: (messageId, download = false) => `${API_URL}/api/messages/attachments/${messageId}${download ? '?download=1' : ''}`,
   sendReferralInvitation: `${API_URL}/api/referrals/send`,
+  notifications: `${API_URL}/api/notifications`,
 
   // User management endpoints
   deleteUser: (userId) => `${API_URL}/api/admin/delete-user/${userId}`,
@@ -81,6 +87,7 @@ export const apiEndpoints = {
 
   // Events endpoints
   events: `${API_URL}/api/events`,
+  myEventRegistrations: `${API_URL}/api/events/me/registrations`,
   event: (id) => `${API_URL}/api/events/${id}`,
   registerEvent: (id) => `${API_URL}/api/events/${id}/register`,
   eventRegistrations: (id, status = '') => `${API_URL}/api/events/${id}/registrations${status ? `?status=${encodeURIComponent(status)}` : ''}`,
@@ -88,7 +95,6 @@ export const apiEndpoints = {
   rejectEventRegistration: (eventId, registrationId) => `${API_URL}/api/events/${eventId}/registrations/${registrationId}/reject`,
   feedbackEvent: (id) => `${API_URL}/api/events/${id}/feedback`,
   attendees: (id) => `${API_URL}/api/events/${id}/attendees`,
-  myEventRegistrations: `${API_URL}/api/events/me/registrations`,
 
   // Achievements endpoints
   achievements: `${API_URL}/api/achievements`,
@@ -137,11 +143,4 @@ export const apiEndpoints = {
   volunteerAdminLogs: (status = 'pending') => `${API_URL}/api/mentorship/volunteer/admin/logs?status=${encodeURIComponent(status)}`,
   volunteerApproveLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/approve`,
   volunteerRejectLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/reject`,
-
-  // Notifications
-  notifications: `${API_URL}/api/notifications`,
-
-  // Career jobs endpoints
-  jobs: `${API_URL}/api/jobs`,
-  jobById: (id) => `${API_URL}/api/jobs/${id}`,
 };

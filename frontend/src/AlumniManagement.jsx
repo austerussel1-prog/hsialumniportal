@@ -17,20 +17,16 @@ import {
 } from '@phosphor-icons/react';
 
 export default function AlumniManagement() {
-  const RECENT_INBOX_LIMIT = 5;
-  const RECENT_ANNOUNCEMENTS_LIMIT = 5;
-
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
-  const [mentorshipProfile, setMentorshipProfile] = useState(null);
-  const [mentorshipSessions, setMentorshipSessions] = useState([]);
+  const [userNotifications, setUserNotifications] = useState([]);
 
   const resolveProfileImage = (value) => {
     if (!value) return '/Logo.jpg';
     if (String(value).includes('gear-icon.svg')) return '/Logo.jpg';
     if (typeof value === 'string' && value.startsWith('/')) {
-      return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${value}`;
+      return `${import.meta.env.VITE_API_URL}${value}`;
     }
     return value;
   };
@@ -95,9 +91,7 @@ export default function AlumniManagement() {
         const res = await fetch(apiEndpoints.getConversations, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return;
         const data = await res.json();
-        const convs = Array.isArray(data?.conversations)
-          ? data.conversations.slice(0, RECENT_INBOX_LIMIT)
-          : [];
+        const convs = Array.isArray(data?.conversations) ? data.conversations.slice(0, 4) : [];
         if (mounted) setConversations(convs);
       } catch (err) {
         // ignore
@@ -109,33 +103,28 @@ export default function AlumniManagement() {
 
   useEffect(() => {
     let mounted = true;
-    async function loadMentorshipNotifications() {
+
+    async function loadUserNotifications() {
       try {
         const token = localStorage.getItem('token');
         if (!token) return;
-
-        const [profileRes, sessionsRes] = await Promise.all([
-          fetch(apiEndpoints.mentorshipProfile, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(apiEndpoints.mentorshipSessions, { headers: { Authorization: `Bearer ${token}` } }),
-        ]);
-
-        const profileData = await profileRes.json().catch(() => ({}));
-        const sessionsData = await sessionsRes.json().catch(() => ({}));
-
-        if (!mounted) return;
-        if (profileRes.ok) {
-          setMentorshipProfile(profileData?.profile || null);
-        }
-        if (sessionsRes.ok) {
-          setMentorshipSessions(Array.isArray(sessionsData?.sessions) ? sessionsData.sessions : []);
-        }
-      } catch (err) {
+        const res = await fetch(apiEndpoints.notifications, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!mounted || !res.ok) return;
+        setUserNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
+      } catch {
         // ignore
       }
     }
 
-    loadMentorshipNotifications();
-    return () => { mounted = false; };
+    loadUserNotifications();
+    const intervalId = setInterval(loadUserNotifications, 15000);
+    return () => {
+      mounted = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {
@@ -159,53 +148,25 @@ export default function AlumniManagement() {
   const dashboardNotifications = useMemo(() => {
     const items = [];
 
-    if (mentorshipProfile?.status === 'approved') {
-      items.push({
-        id: `mentor-application-approved-${mentorshipProfile.reviewedAt || mentorshipProfile.updatedAt || 'latest'}`,
-        text: 'Admin approved your mentor application.',
-        source: 'Mentorship',
-        onClick: () => navigate('/mentorship'),
-      });
-    }
+    if (Array.isArray(userNotifications)) {
+      userNotifications.forEach((notification) => {
+        const id = String(notification?._id || notification?.id || '').trim();
+        const actionPath = String(notification?.actionPath || '').trim();
+        if (!id) return;
 
-    if (mentorshipProfile?.status === 'rejected') {
-      items.push({
-        id: `mentor-application-rejected-${mentorshipProfile.reviewedAt || mentorshipProfile.updatedAt || 'latest'}`,
-        text: 'Admin rejected your mentor application.',
-        source: 'Mentorship',
-        onClick: () => navigate('/mentorship'),
-      });
-    }
-
-    if (Array.isArray(mentorshipSessions)) {
-      mentorshipSessions
-        .filter((session) => ['accepted', 'declined'].includes(String(session?.status || '').toLowerCase()))
-        .forEach((session) => {
-          const mentorName = session?.mentor?.name || 'your mentor';
-          const normalizedStatus = String(session?.status || '').toLowerCase();
-          const decisionLabel = normalizedStatus === 'accepted' ? 'approved' : 'rejected';
-          items.push({
-            id: `session-${session._id || session.id}-${normalizedStatus}`,
-            text: `${mentorName} ${decisionLabel} your session scheduling request.`,
-            source: 'Mentorship',
-            onClick: () => navigate('/mentorship'),
-          });
-        });
-    }
-
-    if (Array.isArray(announcements)) {
-      announcements.slice(0, 6).forEach((announcement, idx) => {
         items.push({
-          id: `announcement-${announcement._id || idx}`,
-          text: `New announcement: ${announcement.title}`,
-          source: 'Announcements',
-          onClick: () => navigate(`/announcements?post=${announcement._id}`),
+          id,
+          text: notification?.message || notification?.title || 'New notification',
+          source: notification?.source || 'System',
+          onClick: () => {
+            if (actionPath) navigate(actionPath);
+          },
         });
       });
     }
 
     return items.filter((item) => !dismissedNotificationIds.includes(item.id));
-  }, [announcements, mentorshipProfile, mentorshipSessions, dismissedNotificationIds, navigate]);
+  }, [dismissedNotificationIds, navigate, userNotifications]);
 
   useEffect(() => {
     setActiveNotificationIndex(0);
@@ -236,18 +197,6 @@ export default function AlumniManagement() {
     });
   };
 
-  useEffect(() => {
-    const id = String(activeDashboardNotification?.id || '').trim();
-    if (!id) return undefined;
-    if (dismissedNotificationIds.includes(id)) return undefined;
-
-    const timeoutId = setTimeout(() => {
-      dismissDashboardNotification(id);
-    }, 1800);
-
-    return () => clearTimeout(timeoutId);
-  }, [activeDashboardNotification, dismissedNotificationIds, notificationStorageKey]);
-
   const handleDashboardNotificationClick = (notification) => {
     if (!notification) return;
     dismissDashboardNotification(notification.id);
@@ -263,9 +212,6 @@ export default function AlumniManagement() {
     { icon: CalendarBlank, title: 'Events', subtitle: 'Upcoming events', onClick: () => navigate('/events') },
     { icon: Users, title: 'Directory', subtitle: 'Connect with alumni', onClick: () => navigate('/directory') },
   ];
-  const recentAnnouncements = Array.isArray(announcements)
-    ? announcements.slice(0, RECENT_ANNOUNCEMENTS_LIMIT)
-    : [];
 
   const jumpTo = [
     { icon: User, label: 'Profile', onClick: () => navigate('/profile') },
@@ -553,12 +499,12 @@ export default function AlumniManagement() {
                   <span style={{fontSize: '10px', color: '#b07a15', fontWeight: '700', letterSpacing: '0.08em'}}>LATEST</span>
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column', gap: '14px'}}>
-                  {recentAnnouncements.map((announcement, index) => (
+                  {announcements.map((announcement, index) => (
                     <div
                       className="am-clickable"
                       key={index}
                       onClick={() => navigate(`/announcements?post=${announcement._id}`)}
-                      style={{paddingBottom: '12px', borderBottom: index < recentAnnouncements.length - 1 ? '1px solid #f0e7db' : 'none', cursor: 'pointer'}}
+                      style={{paddingBottom: '12px', borderBottom: index < announcements.length - 1 ? '1px solid #f0e7db' : 'none', cursor: 'pointer'}}
                     >
                       <div style={{fontWeight: '600', color: '#111827', marginBottom: '6px', fontSize: '13px'}}>{announcement.title}</div>
                       <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
