@@ -17,6 +17,8 @@ import {
 } from '@phosphor-icons/react';
 
 export default function AlumniManagement() {
+  const RECENT_ITEMS_LIMIT = 3;
+
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
@@ -91,7 +93,7 @@ export default function AlumniManagement() {
         const res = await fetch(apiEndpoints.getConversations, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) return;
         const data = await res.json();
-        const convs = Array.isArray(data?.conversations) ? data.conversations.slice(0, 4) : [];
+        const convs = Array.isArray(data?.conversations) ? data.conversations.slice(0, RECENT_ITEMS_LIMIT) : [];
         if (mounted) setConversations(convs);
       } catch (err) {
         // ignore
@@ -212,6 +214,9 @@ export default function AlumniManagement() {
     { icon: CalendarBlank, title: 'Events', subtitle: 'Upcoming events', onClick: () => navigate('/events') },
     { icon: Users, title: 'Directory', subtitle: 'Connect with alumni', onClick: () => navigate('/directory') },
   ];
+  const recentAnnouncements = Array.isArray(announcements)
+    ? announcements.slice(0, RECENT_ITEMS_LIMIT)
+    : [];
 
   const jumpTo = [
     { icon: User, label: 'Profile', onClick: () => navigate('/profile') },
@@ -499,12 +504,12 @@ export default function AlumniManagement() {
                   <span style={{fontSize: '10px', color: '#b07a15', fontWeight: '700', letterSpacing: '0.08em'}}>LATEST</span>
                 </div>
                 <div style={{display: 'flex', flexDirection: 'column', gap: '14px'}}>
-                  {announcements.map((announcement, index) => (
+                  {recentAnnouncements.map((announcement, index) => (
                     <div
                       className="am-clickable"
                       key={index}
                       onClick={() => navigate(`/announcements?post=${announcement._id}`)}
-                      style={{paddingBottom: '12px', borderBottom: index < announcements.length - 1 ? '1px solid #f0e7db' : 'none', cursor: 'pointer'}}
+                      style={{paddingBottom: '12px', borderBottom: index < recentAnnouncements.length - 1 ? '1px solid #f0e7db' : 'none', cursor: 'pointer'}}
                     >
                       <div style={{fontWeight: '600', color: '#111827', marginBottom: '6px', fontSize: '13px'}}>{announcement.title}</div>
                       <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
