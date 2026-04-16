@@ -254,11 +254,11 @@ export default function RegisterPage() {
     >
       <div className="order-1 w-full min-h-[100dvh] md:min-h-0 md:w-1/2 flex flex-col justify-center items-center bg-white px-8 pb-8 pt-16 sm:px-6 sm:pb-8 sm:pt-28 md:order-1 md:p-8 lg:p-10">
         <div className="w-full max-w-[22rem] md:max-w-lg">
-          <div className="absolute left-1/2 top-12 flex -translate-x-1/2 items-center z-50 md:fixed md:left-0 md:top-0 md:m-4 md:translate-x-0">
-            <img src="/Logo.jpg" alt="HSI Logo" className="h-16 sm:h-16 md:h-24 md:mr-3" />
+          <div className="mb-6 flex justify-center md:mb-8 md:justify-start">
+            <img src="/Logo.jpg" alt="HSI Logo" className="h-16 sm:h-16 md:h-20" />
           </div>
 
-          <h2 className="mt-20 text-[1.7rem] font-bold tracking-[-0.02em] text-gray-900 mb-2 md:mt-2 md:text-3xl">Create account.</h2>
+          <h2 className="text-[1.7rem] font-bold tracking-[-0.02em] text-gray-900 mb-2 md:text-3xl">Create account.</h2>
           <p className="text-gray-600 mb-4 text-[13px] md:text-sm">
             Already have account? <Link to="/login" className="text-yellow-600 font-medium cursor-pointer">Log In</Link>
           </p>
