@@ -99,13 +99,21 @@ export default function RegisterPage() {
   };
 
   const handleCreateAccount = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
+    await requestRegistrationOtp();
+  };
+
+  const requestRegistrationOtp = async () => {
     setLoading(true);
     setError('');
+    setMessage('');
     setShake(false);
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = fullName.trim();
+    const normalizedUsername = username.trim();
 
-    if (!fullName || !username || !email || !password || !confirmPassword) {
+    if (!normalizedName || !normalizedUsername || !normalizedEmail || !password || !confirmPassword) {
       setError('All fields are required');
       setShake(true);
       setTimeout(() => setShake(false), 500);
@@ -135,9 +143,9 @@ export default function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email, 
-          name: fullName, 
-          username,
+          email: normalizedEmail,
+          name: normalizedName,
+          username: normalizedUsername,
           password,
           consent: {
             termsAccepted: true,
@@ -153,6 +161,10 @@ export default function RegisterPage() {
       console.log('Response data:', data);
 
       if (response.ok) {
+        setEmail(normalizedEmail);
+        setFullName(normalizedName);
+        setUsername(normalizedUsername);
+        setOtp(['', '', '', '', '', '']);
         setMessage(data.message || 'OTP sent to your email.');
         setShowOTPModal(true);
       } else {
@@ -640,7 +652,9 @@ export default function RegisterPage() {
             <p className="text-sm text-gray-600">
               Didn't receive any code?{' '}
               <button 
-                onClick={handleCreateAccount} 
+                type="button"
+                onClick={requestRegistrationOtp}
+                disabled={loading}
                 className="text-yellow-600 font-medium cursor-pointer hsi-hover-fill hsi-hover-fill-text"
               >
                 Resend

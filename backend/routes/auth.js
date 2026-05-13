@@ -94,6 +94,15 @@ function getGoogleAuthErrorResponse(err) {
     }
   }
 
+  if (
+    /email config|delivery failed|smtp|resend|gmail api|recipient rejection/i.test(message)
+  ) {
+    return {
+      status: 502,
+      message: 'Google sign-in worked, but we could not send the verification code. Please try again later or contact support.',
+    };
+  }
+
   return {
     status: 400,
     message: 'Google authentication failed',

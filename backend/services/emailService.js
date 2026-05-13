@@ -374,7 +374,6 @@ const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
 
 // Send OTP email
 const sendOTP = async (email, otp) => {
-  assertEmailConfig();
   const mailOptions = {
     from: formatFromAddress(process.env.EMAIL_USER),
     to: email,

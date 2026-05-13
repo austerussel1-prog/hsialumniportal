@@ -13,13 +13,16 @@ function generateOTP() {
 
 router.post('/send-otp', async (req, res) => {
   try {
-    const { email, name, username, password, consent } = req.body;
+    const rawEmail = String(req.body?.email || '').trim().toLowerCase();
+    const rawName = String(req.body?.name || '').trim();
+    const rawUsername = String(req.body?.username || '').trim();
+    const { password, consent } = req.body;
     const termsAccepted = Boolean(consent?.termsAccepted);
     const privacyAccepted = Boolean(consent?.privacyAccepted);
     const termsVersion = typeof consent?.termsVersion === 'string' ? consent.termsVersion : 'v1.0';
     const privacyVersion = typeof consent?.privacyVersion === 'string' ? consent.privacyVersion : 'v1.0';
 
-    if (!email || !name || !username || !password) {
+    if (!rawEmail || !rawName || !rawUsername || !password) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
@@ -28,12 +31,12 @@ router.post('/send-otp', async (req, res) => {
     }
 
 
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername && existingUsername.email !== email) {
+    const existingUsername = await User.findOne({ username: rawUsername });
+    if (existingUsername && existingUsername.email !== rawEmail) {
       return res.status(400).json({ message: 'Username already taken' });
     }
 
-    const existingUser = await User.findByEmail(email);
+    const existingUser = await User.findByEmail(rawEmail);
     if (existingUser && existingUser.status !== 'pending' && existingUser.status !== 'rejected') {
       return res.status(400).json({ message: 'Email already registered' });
     }
@@ -53,20 +56,20 @@ router.post('/send-otp', async (req, res) => {
     };
 
     if (existingUser) {
-      existingUser.name = name;
+      existingUser.name = rawName;
       existingUser.password = password;
       existingUser.otp = otp;
       existingUser.otpExpiry = otpExpiry;
-      existingUser.username = username;
+      existingUser.username = rawUsername;
       existingUser.status = 'pending'; // Reset status to pending for retry
       existingUser.registrationVerifiedAt = null;
       existingUser.consent = consentRecord;
       await existingUser.save();
     } else {
       const tempUser = new User({
-        email,
-        name,
-        username,
+        email: rawEmail,
+        name: rawName,
+        username: rawUsername,
         password,
         otp,
         otpExpiry,
@@ -77,14 +80,14 @@ router.post('/send-otp', async (req, res) => {
       await tempUser.save();
     }
 
-    await sendOTP(email, otp);
+    await sendOTP(rawEmail, otp);
 
     await logAuditEvent({
       req,
-      actorEmail: email,
+      actorEmail: rawEmail,
       action: 'REGISTER_OTP_SENT',
       entityType: 'User',
-      entityId: email,
+      entityId: rawEmail,
       status: 'success',
       metadata: { source: 'register_form' },
     });
