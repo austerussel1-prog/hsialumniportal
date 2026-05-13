@@ -151,6 +151,7 @@ export default function JobDetailsPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editDraft, setEditDraft] = useState(null);
   const [hoverButton, setHoverButton] = useState(null);
+  const [mapFailed, setMapFailed] = useState(false);
   const params = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -389,7 +390,13 @@ export default function JobDetailsPage() {
     }
     navigate('/job-application', { state: {} });
   };
-  const mapEmbed = `https://www.google.com/maps?q=${encodeURIComponent(jobLocation)}&output=embed`;
+  const normalizedMapLocation = String(jobLocation || '').trim();
+  const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(normalizedMapLocation)}`;
+  const mapEmbed = `https://maps.google.com/maps?hl=en&q=${encodeURIComponent(normalizedMapLocation)}&z=15&output=embed`;
+
+  useEffect(() => {
+    setMapFailed(false);
+  }, [mapEmbed]);
 
   const cardStyle = {
     background: '#ffffff',
@@ -626,14 +633,62 @@ export default function JobDetailsPage() {
 
               <div>
                 <div style={{ fontSize: '15px', fontWeight: '900', color: '#111827', marginBottom: '10px' }}>Location</div>
-                <div style={{ borderRadius: '12px', overflow: 'hidden', background: '#fff', border: '1px solid #ececec' }}>
-                  <iframe
-                    title="job-location"
-                    src={mapEmbed}
-                    style={{ border: 0, width: '100%', height: isMobile ? '180px' : '250px' }}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
+                <div style={{ borderRadius: '12px', overflow: 'hidden', background: '#ffffff', border: '1px solid #ececec' }}>
+                  <div style={{ padding: '10px 12px', borderBottom: '1px solid #ececec', color: '#374151', fontSize: '12.5px', lineHeight: 1.45 }}>
+                    {normalizedMapLocation}
+                  </div>
+                  <div style={{ position: 'relative', minHeight: isMobile ? '180px' : '250px', background: '#f3f4f6' }}>
+                    {!mapFailed ? (
+                      <iframe
+                        title="job-location"
+                        src={mapEmbed}
+                        style={{ border: 0, width: '100%', height: isMobile ? '180px' : '250px', display: 'block' }}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        onError={() => setMapFailed(true)}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          minHeight: isMobile ? '180px' : '250px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '18px',
+                          textAlign: 'center',
+                          color: '#4b5563',
+                          fontSize: '13px',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        Map preview is unavailable.
+                      </div>
+                    )}
+                    <a
+                      href={mapSearchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        bottom: '12px',
+                        height: '34px',
+                        padding: '0 12px',
+                        borderRadius: '9px',
+                        background: gold,
+                        color: '#ffffff',
+                        fontWeight: 900,
+                        fontSize: '11px',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 8px 18px rgba(17, 24, 39, 0.18)',
+                      }}
+                    >
+                      Open in Google Maps
+                    </a>
+                  </div>
                 </div>
               </div>
 
