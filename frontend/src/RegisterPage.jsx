@@ -66,7 +66,15 @@ export default function RegisterPage() {
         }),
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data = {};
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch {
+        data = {
+          message: responseText || `Google sign-in failed with status ${response.status}`,
+        };
+      }
 
       if (response.ok) {
 
@@ -91,7 +99,7 @@ export default function RegisterPage() {
         setError(data.message || 'Google sign-in failed. Please try again.');
       }
     } catch (err) {
-      setError('Google sign-in failed. Please try again.');
+      setError(err?.message || 'Google sign-in failed. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
