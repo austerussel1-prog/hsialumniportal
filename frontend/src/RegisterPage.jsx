@@ -31,6 +31,12 @@ export default function RegisterPage() {
   
   const navigate = useNavigate();
 
+  const showToast = (type, text) => {
+    window.dispatchEvent(new CustomEvent('hsi-toast', {
+      detail: { type, text },
+    }));
+  };
+
   const openPolicyModal = (type) => {
     setPolicyModalType(type === 'retention' ? 'retention' : 'terms');
     setShowTermsModal(true);
@@ -193,7 +199,7 @@ export default function RegisterPage() {
 
     const otpString = otp.join('');
     if (otpString.length !== 6) {
-      setError('Please enter all 6 digits');
+      showToast('warning', 'Please enter all 6 digits');
       setLoading(false);
       return;
     }
@@ -211,12 +217,12 @@ export default function RegisterPage() {
         setShowOTPModal(false);
         setShowPendingModal(true);
       } else {
-        setError(data.message || 'Invalid OTP');
+        showToast('error', data.message || 'Invalid OTP');
         setInvalidOtp(true);
         setTimeout(() => setInvalidOtp(false), 500);
       }
     } catch (err) {
-      setError('Error verifying OTP');
+      showToast('error', 'Error verifying OTP');
       console.error(err);
     } finally {
       setLoading(false);
@@ -610,12 +616,6 @@ export default function RegisterPage() {
                 Change it
               </button>
             </p>
-
-            {error && (
-              <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                {error}
-              </div>
-            )}
 
             <form onSubmit={handleVerifyOTP}>
         
