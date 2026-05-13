@@ -140,6 +140,20 @@ function toMultiline(value) {
   return toLineList(value).join('\n');
 }
 
+function getKnownLocationCoordinates(value) {
+  const normalized = String(value || '').toLowerCase();
+  if (
+    normalized.includes('royal plaza')
+    || normalized.includes('domingo m. guevarra')
+    || normalized.includes('domingo m guevarra')
+    || normalized.includes('mandaluyong')
+  ) {
+    return { lat: 14.5798, lng: 121.0509 };
+  }
+
+  return null;
+}
+
 export default function JobDetailsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
@@ -392,7 +406,10 @@ export default function JobDetailsPage() {
   };
   const normalizedMapLocation = String(jobLocation || '').trim();
   const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(normalizedMapLocation)}`;
-  const mapEmbed = `https://maps.google.com/maps?hl=en&q=${encodeURIComponent(normalizedMapLocation)}&z=15&output=embed`;
+  const mapCoordinates = getKnownLocationCoordinates(normalizedMapLocation);
+  const mapEmbed = mapCoordinates
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(`${mapCoordinates.lng - 0.004},${mapCoordinates.lat - 0.003},${mapCoordinates.lng + 0.004},${mapCoordinates.lat + 0.003}`)}&layer=mapnik&marker=${encodeURIComponent(`${mapCoordinates.lat},${mapCoordinates.lng}`)}`
+    : '';
 
   useEffect(() => {
     setMapFailed(false);
@@ -638,7 +655,7 @@ export default function JobDetailsPage() {
                     {normalizedMapLocation}
                   </div>
                   <div style={{ position: 'relative', minHeight: isMobile ? '180px' : '250px', background: '#f3f4f6' }}>
-                    {!mapFailed ? (
+                    {mapEmbed && !mapFailed ? (
                       <iframe
                         title="job-location"
                         src={mapEmbed}
@@ -661,7 +678,7 @@ export default function JobDetailsPage() {
                           lineHeight: 1.5,
                         }}
                       >
-                        Map preview is unavailable.
+                        Map preview is unavailable. Open the address in Google Maps for directions.
                       </div>
                     )}
                     <a
