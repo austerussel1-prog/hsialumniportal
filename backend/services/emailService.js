@@ -15,6 +15,7 @@ const gmailOauthClientId = String(process.env.GMAIL_OAUTH_CLIENT_ID || '').trim(
 const gmailOauthClientSecret = String(process.env.GMAIL_OAUTH_CLIENT_SECRET || '').trim();
 const gmailOauthRefreshToken = String(process.env.GMAIL_OAUTH_REFRESH_TOKEN || '').trim();
 const gmailSenderEmail = String(process.env.GMAIL_SENDER_EMAIL || process.env.EMAIL_USER || '').trim();
+const emailProvider = String(process.env.EMAIL_PROVIDER || '').trim().toLowerCase();
 
 const formatFromAddress = (rawEmail) => {
   const safeEmail = String(rawEmail || '').trim();
@@ -89,7 +90,9 @@ const hasUsableSmtp = () => Boolean(emailUser && emailPassword);
 const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
-const activeEmailMode = hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp');
+const activeEmailMode = ['resend', 'gmail_api', 'smtp'].includes(emailProvider)
+  ? emailProvider
+  : (hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp'));
 console.log('[email] Provider mode:', activeEmailMode);
 
 const shouldFallbackFromResend = (error) => {
@@ -238,7 +241,11 @@ const sendViaResend = async (mailOptions) => {
 };
 
 const sendMail = async (mailOptions) => {
-  if (hasUsableResend()) {
+  if (activeEmailMode === 'resend') {
+    if (!hasUsableResend()) {
+      throw new Error('Resend email provider selected, but RESEND_API_KEY is missing or invalid');
+    }
+
     try {
       return await sendViaResend(mailOptions);
     } catch (error) {
@@ -256,7 +263,11 @@ const sendMail = async (mailOptions) => {
     }
   }
 
-  if (hasUsableGmailApi()) {
+  if (activeEmailMode === 'gmail_api') {
+    if (!hasUsableGmailApi()) {
+      throw new Error('Gmail API email provider selected, but Gmail OAuth config is incomplete');
+    }
+
     try {
       return await sendViaGmailApi(mailOptions);
     } catch (error) {
