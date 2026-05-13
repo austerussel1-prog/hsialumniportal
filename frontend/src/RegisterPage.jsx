@@ -37,6 +37,11 @@ export default function RegisterPage() {
     }));
   };
 
+  const showFormError = (text, type = 'error') => {
+    setError(text);
+    showToast(type, text);
+  };
+
   const openPolicyModal = (type) => {
     setPolicyModalType(type === 'retention' ? 'retention' : 'terms');
     setShowTermsModal(true);
@@ -44,12 +49,12 @@ export default function RegisterPage() {
 
   const handleGoogleSuccess = async (credentialResponse) => {
     if (!agree) {
-      setError('You must agree to the Terms of Service and Data Retention Policy');
+      showFormError('You must agree to the Terms of Service and Data Retention Policy', 'warning');
       return;
     }
 
     if (!credentialResponse?.credential) {
-      setError('Google sign-in failed. Please try again.');
+      showFormError('Google sign-in failed. Please try again.');
       return;
     }
 
@@ -98,14 +103,14 @@ export default function RegisterPage() {
           } else if (data.role === 'user' && data.user.status === 'approved') {
             navigate('/alumni-dashboard');
           } else {
-            setError('Your account is not approved yet');
+            showFormError('Your account is not approved yet', 'warning');
           }
         }
       } else {
-        setError(data.message || 'Google sign-in failed. Please try again.');
+        showFormError(data.message || 'Google sign-in failed. Please try again.');
       }
     } catch (err) {
-      setError(err?.message || 'Google sign-in failed. Please try again.');
+      showFormError(err?.message || 'Google sign-in failed. Please try again.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -128,7 +133,7 @@ export default function RegisterPage() {
     const normalizedUsername = username.trim();
 
     if (!normalizedName || !normalizedUsername || !normalizedEmail || !password || !confirmPassword) {
-      setError('All fields are required');
+      showFormError('All fields are required', 'warning');
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setLoading(false);
@@ -136,7 +141,7 @@ export default function RegisterPage() {
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      showFormError('Passwords do not match');
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setLoading(false);
@@ -144,7 +149,7 @@ export default function RegisterPage() {
     }
 
     if (!agree) {
-      setError('You must agree to the Terms of Service and Data Retention Policy');
+      showFormError('You must agree to the Terms of Service and Data Retention Policy', 'warning');
       setShake(true);
       setTimeout(() => setShake(false), 500);
       setLoading(false);
@@ -182,10 +187,10 @@ export default function RegisterPage() {
         setMessage(data.message || 'OTP sent to your email.');
         setShowOTPModal(true);
       } else {
-        setError(data.message || 'Failed to send OTP');
+        showFormError(data.message || 'Failed to send OTP');
       }
     } catch (err) {
-      setError('Error connecting to server: ' + err.message);
+      showFormError('Error connecting to server: ' + err.message);
       console.error('Full error:', err);
     } finally {
       setLoading(false);
@@ -288,12 +293,6 @@ export default function RegisterPage() {
           <p className="text-gray-600 mb-4 text-[13px] md:text-sm">
             Already have account? <Link to="/login" className="text-yellow-600 font-medium cursor-pointer">Log In</Link>
           </p>
-
-          {error && !showOTPModal && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-              {error}
-            </div>
-          )}
 
           {message && !showOTPModal && (
             <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
@@ -460,7 +459,7 @@ export default function RegisterPage() {
             {isGoogleAuthConfigured ? (
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
-                onError={() => setError('Google sign-in failed. Please try again.')}
+                onError={() => showFormError('Google sign-in failed. Please try again.')}
                 shape="rectangular"
                 theme="filled_black"
                 size="large"
