@@ -553,7 +553,14 @@ function AnimatedRoutes() {
         <Route path="/training/paths" element={<TrainingLearningPage />} />
         <Route path="/training/certification" element={<TrainingLearningPage />} />
         <Route path="/achievements" element={<AchievementsRecognitionPage />} />
-        <Route path="/analytics-and-report" element={<AnalyticsReportPage />} />
+        <Route
+          path="/analytics-and-report"
+          element={(
+            <AdminOnlyRoute>
+              <AnalyticsReportPage />
+            </AdminOnlyRoute>
+          )}
+        />
         <Route path="/referral-board" element={<ReferralJobBoard />} />
         <Route path="/internship-ojt" element={<InternshipOJT />} />
         <Route path="/refer-friend" element={<ReferFriend />} />

@@ -21,7 +21,7 @@ import {
 
 const navItems = [
   { name: 'Dashboard', icon: House, path: '/alumni-management' },
-  { name: 'Analytics & Reports', icon: BookOpen, path: '/analytics-and-report' },
+  { name: 'Analytics & Reports', icon: BookOpen, path: '/analytics-and-report', restricted: true },
   { name: 'Admin Dashboard', icon: User, path: '/admin-dashboard', restricted: true },
   { name: 'Directory & Networking', icon: AddressBook, path: '/directory' },
   { name: 'Career & Job Opportunities', icon: Briefcase, path: '/training' },
