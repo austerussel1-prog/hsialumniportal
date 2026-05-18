@@ -79,14 +79,17 @@ const getCareerDocumentUploadEndpoint = () => apiEndpoints.uploadCareerDocument 
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const fallbackProfileImage = '/Logo.jpg';
+  const fallbackProfileImage = '/Lion.png';
   const notificationAvatarCacheRef = useRef({});
   const resolveProfileImage = (value) => {
-    if (!value) return fallbackProfileImage;
-    if (String(value).includes('gear-icon.svg')) return fallbackProfileImage;
-    if (value.includes('via.placeholder.com')) return fallbackProfileImage;
-    return resolveApiAssetUrl(value);
+    const imageValue = String(value || '').trim();
+    if (!imageValue) return fallbackProfileImage;
+    if (imageValue.includes('gear-icon.svg')) return fallbackProfileImage;
+    if (imageValue.includes('via.placeholder.com')) return fallbackProfileImage;
+    if (['null', 'undefined'].includes(imageValue.toLowerCase())) return fallbackProfileImage;
+    return resolveApiAssetUrl(imageValue);
   };
+  const isFallbackProfileImage = (value) => resolveProfileImage(value) === fallbackProfileImage;
   const [isEditing, setIsEditing] = useState(false);
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth <= 900 : false
@@ -1817,13 +1820,19 @@ export default function ProfilePage() {
               }}
             >
               <img
-                src={profileData?.profileImage || '/Logo.jpg'}
+                src={resolveProfileImage(profileData?.profileImage)}
                 alt="Profile"
                 style={{
                   width: '36px',
                   height: '36px',
                   borderRadius: '999px',
-                  objectFit: 'cover',
+                  objectFit: isFallbackProfileImage(profileData?.profileImage) ? 'contain' : 'cover',
+                  padding: isFallbackProfileImage(profileData?.profileImage) ? '4px' : 0,
+                }}
+                onError={(event) => {
+                  event.currentTarget.src = fallbackProfileImage;
+                  event.currentTarget.style.objectFit = 'contain';
+                  event.currentTarget.style.padding = '4px';
                 }}
               />
             </button>
@@ -1943,12 +1952,15 @@ export default function ProfilePage() {
                   height: isMobile ? '88px' : '120px',
                   borderRadius: '12px',
                   border: '4px solid white',
-                  objectFit: 'cover',
+                  objectFit: isFallbackProfileImage(formData.profileImage) ? 'contain' : 'cover',
+                  padding: isFallbackProfileImage(formData.profileImage) ? '12px' : 0,
                   boxShadow: '0 6px 18px rgba(0,0,0,0.2)',
                   alignSelf: isMobile ? 'center' : 'auto',
                 }}
                 onError={(event) => {
                   event.currentTarget.src = fallbackProfileImage;
+                  event.currentTarget.style.objectFit = 'contain';
+                  event.currentTarget.style.padding = '12px';
                 }}
               />
               <div className="profile-identity" style={{ flex: 1, minWidth: 0, width: '100%' }}>
@@ -3045,14 +3057,20 @@ export default function ProfilePage() {
                 >
                   {profileImagePreview || !!formData.profileImage ? (
                     <img
-                      src={profileImagePreview || formData.profileImage}
+                      src={profileImagePreview || resolveProfileImage(formData.profileImage)}
                       alt="Profile"
                       style={{
                         width: '100px',
                         height: '100px',
                         borderRadius: '8px',
-                        objectFit: 'cover',
+                        objectFit: profileImagePreview || !isFallbackProfileImage(formData.profileImage) ? 'cover' : 'contain',
+                        padding: profileImagePreview || !isFallbackProfileImage(formData.profileImage) ? 0 : '10px',
                         margin: '0 auto 12px',
+                      }}
+                      onError={(event) => {
+                        event.currentTarget.src = fallbackProfileImage;
+                        event.currentTarget.style.objectFit = 'contain';
+                        event.currentTarget.style.padding = '10px';
                       }}
                     />
                   ) : null}

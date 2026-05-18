@@ -5,7 +5,6 @@ const emailUser = String(process.env.EMAIL_USER || '').trim();
 const emailPassword = String(process.env.EMAIL_PASSWORD || '').trim();
 const mailFromName = String(process.env.MAIL_FROM_NAME || 'Highly Succeed Portal').trim();
 
-// Prefer explicit SMTP config in production to avoid provider "service" auto-config issues.
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
 const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpSecure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || smtpPort === 465;
@@ -98,12 +97,6 @@ console.log('[email] Provider mode:', activeEmailMode);
 const shouldFallbackFromResend = (error) => {
   const message = String(error?.message || '');
   return /resend api error \(4\d{2}\)|validation_error|verify a domain|testing emails|change the "from" address/i.test(message);
-};
-
-const shouldFallbackFromSmtp = (error) => {
-  const message = String(error?.message || '');
-  const code = String(error?.code || '');
-  return /timeout|timed out|etimeout|econnrefused|ehostunreach|enetunreach|socket|greeting/i.test(`${code} ${message}`);
 };
 
 const toBase64Url = (input) => Buffer.from(input, 'utf8')
@@ -281,65 +274,34 @@ const sendMail = async (mailOptions) => {
     }
   }
 
-  const sendSmtp = async () => {
-    assertEmailConfig();
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      assertSmtpAcceptedRecipients(info, mailOptions);
-      return true;
-    } catch (error) {
-      // Gmail SMTP can be flaky or blocked on some hosts; retry with alternate Gmail configs.
-      const retries = [
-        createSmtpTransport({ host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true }),
-        createSmtpTransport({ host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false }),
-        nodemailer.createTransport({
-          service: 'gmail',
-          ...smtpTimeouts,
-          auth: { user: emailUser, pass: emailPassword },
-        }),
-      ];
-
-      for (const candidate of retries) {
-        try {
-          const info = await candidate.sendMail(mailOptions);
-          assertSmtpAcceptedRecipients(info, mailOptions);
-          return true;
-        } catch (_retryError) {
-          // try next transport
-        }
-      }
-
-      throw new Error(`SMTP delivery failed: ${error.message}`);
-    }
-  };
-
+  assertEmailConfig();
   try {
-    return await sendSmtp();
+    const info = await transporter.sendMail(mailOptions);
+    assertSmtpAcceptedRecipients(info, mailOptions);
+    return true;
   } catch (error) {
-    const canFallbackToGmailApi = hasUsableGmailApi() && shouldFallbackFromSmtp(error);
-    const canFallbackToResend = hasUsableResend() && shouldFallbackFromSmtp(error);
+    // Gmail SMTP can be flaky on some hosts; retry with alternate Gmail configs.
+    const retries = [
+      createSmtpTransport({ host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true }),
+      createSmtpTransport({ host: 'smtp.gmail.com', port: 465, secure: true, requireTLS: false }),
+      nodemailer.createTransport({
+        service: 'gmail',
+        ...smtpTimeouts,
+        auth: { user: emailUser, pass: emailPassword },
+      }),
+    ];
 
-    if (activeEmailMode === 'smtp' && canFallbackToGmailApi) {
-      console.warn('[email] SMTP failed, falling back to Gmail API', { reason: error.message });
+    for (const candidate of retries) {
       try {
-        return await sendViaGmailApi(mailOptions);
-      } catch (gmailApiError) {
-        if (!canFallbackToResend) {
-          throw new Error(`SMTP delivery failed and Gmail API fallback failed: ${gmailApiError.message}`);
-        }
-        console.warn('[email] Gmail API fallback failed, falling back to Resend', { reason: gmailApiError.message });
+        const info = await candidate.sendMail(mailOptions);
+        assertSmtpAcceptedRecipients(info, mailOptions);
+        return true;
+      } catch (_retryError) {
+        // try next transport
       }
     }
 
-    if (activeEmailMode === 'smtp' && canFallbackToResend) {
-      try {
-        return await sendViaResend(mailOptions);
-      } catch (resendError) {
-        throw new Error(`SMTP delivery failed and Resend fallback failed: ${resendError.message}`);
-      }
-    }
-
-    throw error;
+    throw new Error(`SMTP delivery failed: ${error.message}`);
   }
 };
 
