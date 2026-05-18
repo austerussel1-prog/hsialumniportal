@@ -381,28 +381,35 @@ export default function JobListingsPage() {
       responsibilities,
     };
 
+    const mergeSavedJob = (items, savedJob) => {
+      const savedKey = String(savedJob?.id || savedJob?._id || editingJobKey || '');
+      if (!savedKey) return [savedJob, ...items];
+
+      const exists = items.some((item) => String(item.id || item._id || '') === savedKey || String(item.id || item._id || '') === editingJobKey);
+      if (exists) {
+        return items.map((item) => (
+          String(item.id || item._id || '') === savedKey || String(item.id || item._id || '') === editingJobKey
+            ? savedJob
+            : item
+        ));
+      }
+
+      return [savedJob, ...items];
+    };
+
     const token = localStorage.getItem('token');
     const applyLocalSave = (savedJob = postedJob) => {
       const existing = getStoredJobs();
-      const savedKey = String(savedJob.id || savedJob._id || editingJobKey);
-      const nextJobs = editingJobKey || savedKey
-        ? [
-            savedJob,
-            ...existing.filter((item) => String(item.id || item._id || '') !== savedKey && String(item.id || item._id || '') !== editingJobKey),
-          ]
-        : [savedJob, ...existing];
+      const nextJobs = mergeSavedJob(existing, savedJob);
       localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(nextJobs));
       setServerJobs((prev) => {
-        if (!prev.length) return prev;
-        const exists = prev.some((item) => String(item.id || item._id || '') === savedKey || String(item.id || item._id || '') === editingJobKey);
-        return exists
-          ? prev.map((item) => (String(item.id || item._id || '') === savedKey || String(item.id || item._id || '') === editingJobKey ? savedJob : item))
-          : [savedJob, ...prev];
+        if (!prev.length) return nextJobs;
+        return mergeSavedJob(prev, savedJob);
       });
       setJobsVersion((prev) => prev + 1);
       closePostModal();
       showToast('success', editingJob ? 'Job updated successfully.' : 'Job posted successfully.');
-      navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
+      if (!editingJob) navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
     };
 
     if (!token) {
@@ -443,34 +450,14 @@ export default function JobListingsPage() {
           return;
         }
 
-        let latest = [];
-        try {
-          const refreshRes = await fetch(apiEndpoints.jobs, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const refreshData = await refreshRes.json().catch(() => ({}));
-          if (refreshRes.ok && Array.isArray(refreshData?.jobs)) {
-            latest = refreshData.jobs;
-          }
-        } catch (_error) {
-          // fallback below
-        }
-
-        if (!latest.length) {
-          const newJobKey = String(data.job.id || data.job._id || '');
-          const base = getStoredJobs();
-          latest = [
-            data.job,
-            ...base.filter((item) => String(item.id || item._id || '') !== newJobKey && String(item.id || item._id || '') !== editingJobKey),
-          ];
-        }
-
-        setServerJobs(latest);
-        localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(latest));
+        const savedJob = { ...data.job, id: data.job.id || data.job._id };
+        const nextLocalJobs = mergeSavedJob(getStoredJobs(), savedJob);
+        localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(nextLocalJobs));
+        setServerJobs((prev) => (prev.length ? mergeSavedJob(prev, savedJob) : nextLocalJobs));
         setJobsVersion((prev) => prev + 1);
         closePostModal();
         showToast('success', editingJob ? 'Job updated successfully.' : 'Job posted successfully.');
-        navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
+        if (!editingJob) navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
       })
       .catch(() => {
         applyLocalSave();
