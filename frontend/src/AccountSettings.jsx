@@ -476,6 +476,8 @@ export default function AccountSettings() {
 
   const REVIEWS_PER_PAGE = 5;
   const filteredFeedbackReviews = useMemo(() => {
+    if (reviewsRangeDays === 'all') return feedbackReviews;
+
     const now = Date.now();
     const maxAgeMs = reviewsRangeDays * 24 * 60 * 60 * 1000;
 
@@ -1565,7 +1567,7 @@ export default function AccountSettings() {
                 <select
                   value={String(reviewsRangeDays)}
                   onChange={(e) => {
-                    setReviewsRangeDays(Number(e.target.value));
+                    setReviewsRangeDays(e.target.value === 'all' ? 'all' : Number(e.target.value));
                     setReviewsPage(1);
                   }}
                   style={{
@@ -1582,6 +1584,7 @@ export default function AccountSettings() {
                   <option value="7">Last 7 days</option>
                   <option value="14">Last 14 days</option>
                   <option value="30">Last 30 days</option>
+                  <option value="all">All time</option>
                 </select>
               </div>
 
