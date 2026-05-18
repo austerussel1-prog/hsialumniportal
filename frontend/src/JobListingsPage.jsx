@@ -78,6 +78,7 @@ export default function JobListingsPage() {
   const navigate = useNavigate();
   const [jobsVersion, setJobsVersion] = useState(0);
   const [postModalOpen, setPostModalOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState(null);
   const [deleteModalJob, setDeleteModalJob] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [postQueryHandled, setPostQueryHandled] = useState(false);
@@ -271,6 +272,7 @@ export default function JobListingsPage() {
       showToast('error', 'Admin access required to post jobs.');
       return;
     }
+    setEditingJob(null);
     setPostModalOpen(true);
     setPostForm((prev) => ({
       ...prev,
@@ -290,6 +292,39 @@ export default function JobListingsPage() {
       requirementsText: '',
       responsibilitiesText: '',
     }));
+  };
+
+  const openEditModal = (job) => {
+    if (!isAdminUser) {
+      showToast('error', 'Admin access required to edit jobs.');
+      return;
+    }
+    if (!job) return;
+
+    setEditingJob(job);
+    setPostModalOpen(true);
+    setPostForm({
+      category: job.category || 'exclusive',
+      company: job.company || '',
+      position: job.position || '',
+      location: job.location || '',
+      type: job.type || 'Project-based',
+      department: job.department || 'General',
+      workMode: job.workMode || '',
+      experience: job.experience || '',
+      vacancies: job.vacancies || '',
+      salary: job.salary || '',
+      description: job.description || '',
+      aboutCompany: job.aboutCompany || '',
+      jobDescription: job.jobDescription || '',
+      requirementsText: Array.isArray(job.requirements) ? job.requirements.join('\n') : '',
+      responsibilitiesText: Array.isArray(job.responsibilities) ? job.responsibilities.join('\n') : '',
+    });
+  };
+
+  const closePostModal = () => {
+    setPostModalOpen(false);
+    setEditingJob(null);
   };
 
   const handlePostOpportunity = (event) => {
@@ -323,8 +358,10 @@ export default function JobListingsPage() {
       ? (postForm.type || 'Project-based')
       : undefined;
 
+    const editingJobKey = String(editingJob?.id || editingJob?._id || '');
     const postedJob = {
-      id: Date.now(),
+      ...(editingJob || {}),
+      id: editingJob?.id || editingJob?._id || Date.now(),
       category: nextCategory,
       company,
       position,
@@ -345,22 +382,36 @@ export default function JobListingsPage() {
     };
 
     const token = localStorage.getItem('token');
-    const fallbackPost = () => {
+    const applyLocalSave = (savedJob = postedJob) => {
       const existing = getStoredJobs();
-      localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify([...existing, postedJob]));
+      const savedKey = String(savedJob.id || savedJob._id || editingJobKey);
+      const nextJobs = editingJobKey || savedKey
+        ? [
+            savedJob,
+            ...existing.filter((item) => String(item.id || item._id || '') !== savedKey && String(item.id || item._id || '') !== editingJobKey),
+          ]
+        : [savedJob, ...existing];
+      localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(nextJobs));
+      setServerJobs((prev) => {
+        if (!prev.length) return prev;
+        const exists = prev.some((item) => String(item.id || item._id || '') === savedKey || String(item.id || item._id || '') === editingJobKey);
+        return exists
+          ? prev.map((item) => (String(item.id || item._id || '') === savedKey || String(item.id || item._id || '') === editingJobKey ? savedJob : item))
+          : [savedJob, ...prev];
+      });
       setJobsVersion((prev) => prev + 1);
-      setPostModalOpen(false);
-      showToast('success', 'Job posted successfully.');
+      closePostModal();
+      showToast('success', editingJob ? 'Job updated successfully.' : 'Job posted successfully.');
       navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
     };
 
     if (!token) {
-      fallbackPost();
+      applyLocalSave();
       return;
     }
 
-    fetch(apiEndpoints.jobs, {
-      method: 'POST',
+    fetch(editingJob?._id ? apiEndpoints.jobById(encodeURIComponent(String(editingJob._id))) : apiEndpoints.jobs, {
+      method: editingJob?._id ? 'PATCH' : 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -388,7 +439,7 @@ export default function JobListingsPage() {
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.job) {
-          fallbackPost();
+          applyLocalSave();
           return;
         }
 
@@ -410,19 +461,19 @@ export default function JobListingsPage() {
           const base = getStoredJobs();
           latest = [
             data.job,
-            ...base.filter((item) => String(item.id || item._id || '') !== newJobKey),
+            ...base.filter((item) => String(item.id || item._id || '') !== newJobKey && String(item.id || item._id || '') !== editingJobKey),
           ];
         }
 
         setServerJobs(latest);
         localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(latest));
         setJobsVersion((prev) => prev + 1);
-        setPostModalOpen(false);
-        showToast('success', 'Job posted successfully.');
+        closePostModal();
+        showToast('success', editingJob ? 'Job updated successfully.' : 'Job posted successfully.');
         navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
       })
       .catch(() => {
-        fallbackPost();
+        applyLocalSave();
       });
   };
 
@@ -874,7 +925,7 @@ export default function JobListingsPage() {
                   <img src="/Lion.png" alt="HSI logo small" style={{ width: isMobile ? '20px' : '34px', height: isMobile ? '20px' : '34px', opacity: 0.9 }} />
                 </div>
 
-                <div style={{ marginTop: '2px', display: 'grid', gridTemplateColumns: canDeleteJob(job) ? '1fr auto' : '1fr', gap: '8px', alignItems: 'center' }}>
+                <div style={{ marginTop: '2px', display: 'grid', gridTemplateColumns: canDeleteJob(job) ? '1fr auto auto' : '1fr', gap: '8px', alignItems: 'center' }}>
                   <Link
                     to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
                     onMouseEnter={() => setHoverButton(`view-details-${String(job.id)}`)}
@@ -913,6 +964,53 @@ export default function JobListingsPage() {
                       {job.category === 'freelance' ? 'View Project Details' : 'View Job Details'}
                     </span>
                   </Link>
+                  {canDeleteJob(job) ? (
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(job)}
+                      onMouseEnter={() => setHoverButton(`edit-${String(job.id)}`)}
+                      onMouseLeave={() => setHoverButton(null)}
+                      title="Edit job"
+                      aria-label="Edit job"
+                      style={{
+                        width: isMobile ? '34px' : '36px',
+                        height: isMobile ? '34px' : '36px',
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#8a5a00',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {hoverButton === `edit-${String(job.id)}` ? (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            width: '100%',
+                            height: '100%',
+                            background: 'rgba(138, 90, 0, 0.1)',
+                            borderRadius: '8px',
+                            transform: 'scaleX(0)',
+                            transformOrigin: 'left',
+                            animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                          }}
+                        />
+                      ) : null}
+                      <span style={{ position: 'relative', zIndex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width={isMobile ? 16 : 17} height={isMobile ? 16 : 17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                        </svg>
+                      </span>
+                    </button>
+                  ) : null}
                   {canDeleteJob(job) ? (
                     <button
                       type="button"
@@ -986,7 +1084,7 @@ export default function JobListingsPage() {
                 <div style={{ fontSize: '12px', color: '#b07a15', fontWeight: '700' }}>{job.company}</div>
                 <div style={{ fontSize: '19px', color: '#111827', fontWeight: '800' }}>{job.position}</div>
                 <div style={{ fontSize: '13px', color: '#6b7280' }}>{job.location}</div>
-                <div style={{ marginTop: '6px', display: 'grid', gridTemplateColumns: canDeleteJob(job) ? '1fr auto' : '1fr', gap: '8px', alignItems: 'center' }}>
+                <div style={{ marginTop: '6px', display: 'grid', gridTemplateColumns: canDeleteJob(job) ? '1fr auto auto' : '1fr', gap: '8px', alignItems: 'center' }}>
                   <Link
                     to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
                     onMouseEnter={() => setHoverButton(`view-details-small-${String(job.id)}`)}
@@ -1022,6 +1120,31 @@ export default function JobListingsPage() {
                     ) : null}
                     <span style={{ position: 'relative', zIndex: 1 }}>View Details</span>
                   </Link>
+                  {canDeleteJob(job) ? (
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(job)}
+                      title="Edit job"
+                      aria-label="Edit job"
+                      style={{
+                        width: isMobile ? '34px' : '36px',
+                        height: isMobile ? '34px' : '36px',
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#8a5a00',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <svg width={isMobile ? 16 : 17} height={isMobile ? 16 : 17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                  ) : null}
                   {canDeleteJob(job) ? (
                     <button
                       type="button"
@@ -1064,7 +1187,7 @@ export default function JobListingsPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            onClick={() => setPostModalOpen(false)}
+            onClick={closePostModal}
             style={{
               position: 'fixed',
               inset: 0,
@@ -1097,14 +1220,16 @@ export default function JobListingsPage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                 <div style={{ minWidth: isMobile ? '100%' : 'auto' }}>
-                  <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', color: '#111827' }}>Post an Opportunity</div>
+                  <div style={{ fontSize: isMobile ? '16px' : '18px', fontWeight: '900', color: '#111827' }}>
+                    {editingJob ? 'Edit Opportunity' : 'Post an Opportunity'}
+                  </div>
                   <div style={{ marginTop: '4px', fontSize: isMobile ? '11px' : '12px', color: '#6b7280' }}>
-                    Post OJT, project-based, part-time, contract, and full-time openings.
+                    {editingJob ? 'Update the selected career or job opportunity.' : 'Post OJT, project-based, part-time, contract, and full-time openings.'}
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setPostModalOpen(false)}
+                  onClick={closePostModal}
                   onMouseEnter={() => setHoverButton('postModalClose')}
                   onMouseLeave={() => setHoverButton(null)}
                   style={{
@@ -1433,7 +1558,7 @@ export default function JobListingsPage() {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '4px', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                   <button
                     type="button"
-                    onClick={() => setPostModalOpen(false)}
+                    onClick={closePostModal}
                     onMouseEnter={() => setHoverButton('postModalCancel')}
                     onMouseLeave={() => setHoverButton(null)}
                     style={{
@@ -1502,7 +1627,7 @@ export default function JobListingsPage() {
                         }}
                       />
                     ) : null}
-                    <span style={{ position: 'relative', zIndex: 1 }}>Post</span>
+                    <span style={{ position: 'relative', zIndex: 1 }}>{editingJob ? 'Save Changes' : 'Post'}</span>
                   </button>
                 </div>
               </form>

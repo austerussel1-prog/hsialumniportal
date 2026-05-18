@@ -96,6 +96,10 @@ export const apiEndpoints = {
   feedbackEvent: (id) => `${API_URL}/api/events/${id}/feedback`,
   attendees: (id) => `${API_URL}/api/events/${id}/attendees`,
 
+  // Jobs endpoints
+  jobs: `${API_URL}/api/jobs`,
+  jobById: (id) => `${API_URL}/api/jobs/${id}`,
+
   // Achievements endpoints
   achievements: `${API_URL}/api/achievements`,
   awardAchievement: `${API_URL}/api/achievements/award`,
