@@ -2,7 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints } from './config/api';
+import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 import {
   File,
   Stack,
@@ -15,18 +15,21 @@ import {
 
 export default function AlumniDashboard() {
   const RECENT_ITEMS_LIMIT = 3;
+  const fallbackProfileImage = '/Logo.jpg';
 
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const resolveProfileImage = (value) => {
-    if (!value) return '/Logo.jpg';
-    if (String(value).includes('gear-icon.svg')) return '/Logo.jpg';
-    if (typeof value === 'string' && value.startsWith('/')) {
-      return `${import.meta.env.VITE_API_URL}${value}`;
-    }
-    return value;
+    const imageValue = String(value || '').trim();
+    if (!imageValue) return fallbackProfileImage;
+    if (imageValue.includes('gear-icon.svg')) return fallbackProfileImage;
+    if (imageValue.includes('via.placeholder.com')) return fallbackProfileImage;
+    if (imageValue === fallbackProfileImage) return fallbackProfileImage;
+    if (['null', 'undefined'].includes(imageValue.toLowerCase())) return fallbackProfileImage;
+    return resolveApiAssetUrl(imageValue);
   };
+  const isFallbackProfileImage = (value) => resolveProfileImage(value) === fallbackProfileImage;
 
   // Get user data from localStorage
   const userData = localStorage.getItem('user');
@@ -218,8 +221,18 @@ export default function AlumniDashboard() {
                           <img
                             src={resolveProfileImage(c.participant?.profileImage)}
                             alt={displayName}
-                            style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                            onError={(e) => { e.currentTarget.src = '/Logo.jpg'; }}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: isFallbackProfileImage(c.participant?.profileImage) ? 'contain' : 'cover',
+                              padding: isFallbackProfileImage(c.participant?.profileImage) ? '5px' : 0,
+                              background: '#f7eddb',
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.src = fallbackProfileImage;
+                              e.currentTarget.style.objectFit = 'contain';
+                              e.currentTarget.style.padding = '5px';
+                            }}
                           />
                         </div>
                         <div style={{flex: 1}}>

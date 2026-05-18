@@ -2,7 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
-import { apiEndpoints } from './config/api';
+import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 import {
   File,
   Stack,
@@ -18,6 +18,7 @@ import {
 
 export default function AlumniManagement() {
   const RECENT_ITEMS_LIMIT = 3;
+  const fallbackProfileImage = '/Logo.jpg';
 
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -25,13 +26,15 @@ export default function AlumniManagement() {
   const [userNotifications, setUserNotifications] = useState([]);
 
   const resolveProfileImage = (value) => {
-    if (!value) return '/Logo.jpg';
-    if (String(value).includes('gear-icon.svg')) return '/Logo.jpg';
-    if (typeof value === 'string' && value.startsWith('/')) {
-      return `${import.meta.env.VITE_API_URL}${value}`;
-    }
-    return value;
+    const imageValue = String(value || '').trim();
+    if (!imageValue) return fallbackProfileImage;
+    if (imageValue.includes('gear-icon.svg')) return fallbackProfileImage;
+    if (imageValue.includes('via.placeholder.com')) return fallbackProfileImage;
+    if (imageValue === fallbackProfileImage) return fallbackProfileImage;
+    if (['null', 'undefined'].includes(imageValue.toLowerCase())) return fallbackProfileImage;
+    return resolveApiAssetUrl(imageValue);
   };
+  const isFallbackProfileImage = (value) => resolveProfileImage(value) === fallbackProfileImage;
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -470,12 +473,22 @@ export default function AlumniManagement() {
                             style={{display: 'flex', gap: '12px', alignItems: 'center', border: 'none', background: 'none', padding: 0, textAlign: 'left', cursor: 'pointer'}}
                           >
                             <div className="am-convo-avatar" style={{width: '44px', height: '44px', borderRadius: '10px', overflow: 'hidden', flexShrink: 0}}>
-                              <img
-                                src={resolveProfileImage(c.participant?.profileImage)}
-                                alt={displayName}
-                                style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                                onError={(e) => { e.currentTarget.src = '/Logo.jpg'; }}
-                              />
+                            <img
+                              src={resolveProfileImage(c.participant?.profileImage)}
+                              alt={displayName}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: isFallbackProfileImage(c.participant?.profileImage) ? 'contain' : 'cover',
+                                padding: isFallbackProfileImage(c.participant?.profileImage) ? '5px' : 0,
+                                background: '#f7eddb',
+                              }}
+                              onError={(e) => {
+                                e.currentTarget.src = fallbackProfileImage;
+                                e.currentTarget.style.objectFit = 'contain';
+                                e.currentTarget.style.padding = '5px';
+                              }}
+                            />
                             </div>
                             <div style={{flex: 1}}>
                               <div style={{fontWeight: '600', color: '#111827', marginBottom: '4px', fontSize: '13px'}}>{displayName}</div>
@@ -570,19 +583,28 @@ export default function AlumniManagement() {
               <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
                 {user?.profileImage ? (
                   <img
-                    src={user.profileImage}
+                    src={resolveProfileImage(user.profileImage)}
                     alt="Profile"
                     style={{
                       width: '44px',
                       height: '44px',
                       borderRadius: '999px',
-                      objectFit: 'cover',
+                      objectFit: isFallbackProfileImage(user.profileImage) ? 'contain' : 'cover',
+                      padding: isFallbackProfileImage(user.profileImage) ? '5px' : 0,
+                      background: '#f7eddb',
+                    }}
+                    onError={(event) => {
+                      event.currentTarget.src = fallbackProfileImage;
+                      event.currentTarget.style.objectFit = 'contain';
+                      event.currentTarget.style.padding = '5px';
                     }}
                   />
                 ) : (
-                  <div style={{width: '44px', height: '44px', background: '#f7eddb', borderRadius: '999px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                    <User size={20} color="#a86b00" />
-                  </div>
+                  <img
+                    src={fallbackProfileImage}
+                    alt="Profile"
+                    style={{width: '44px', height: '44px', background: '#f7eddb', borderRadius: '999px', objectFit: 'contain', padding: '5px'}}
+                  />
                 )}
                 <div>
                   <div style={{fontWeight: '600', color: '#111827', fontSize: '13px'}}>{user?.fullName || 'You'}</div>

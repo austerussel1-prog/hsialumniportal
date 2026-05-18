@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LinkedinLogo, TwitterLogo, InstagramLogo, Phone, EnvelopeSimple, ChatCircleText, GraduationCap, Star, BookOpen, Briefcase, DownloadSimple } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
-import { API_URL, apiEndpoints } from './config/api';
+import { API_URL, apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 const normalizeCareerDocument = (file, index = 0) => {
   if (!file) return null;
@@ -57,11 +57,15 @@ export default function DirectoryProfileView() {
   const { userId } = useParams();
   const fallbackProfileImage = '/Logo.jpg';
   const resolveProfileImage = (value) => {
-    if (!value) return fallbackProfileImage;
-    if (String(value).includes('gear-icon.svg')) return fallbackProfileImage;
-    if (value.includes('via.placeholder.com')) return fallbackProfileImage;
-    return value;
+    const imageValue = String(value || '').trim();
+    if (!imageValue) return fallbackProfileImage;
+    if (imageValue.includes('gear-icon.svg')) return fallbackProfileImage;
+    if (imageValue.includes('via.placeholder.com')) return fallbackProfileImage;
+    if (imageValue === fallbackProfileImage) return fallbackProfileImage;
+    if (['null', 'undefined'].includes(imageValue.toLowerCase())) return fallbackProfileImage;
+    return resolveApiAssetUrl(imageValue);
   };
+  const isFallbackProfileImage = (value) => resolveProfileImage(value) === fallbackProfileImage;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth <= 900 : false
@@ -326,11 +330,14 @@ export default function DirectoryProfileView() {
                         height: isMobile ? '86px' : '120px',
                         borderRadius: '12px',
                         border: '4px solid white',
-                        objectFit: 'cover',
+                        objectFit: isFallbackProfileImage(profileData.profileImage) ? 'contain' : 'cover',
+                        padding: isFallbackProfileImage(profileData.profileImage) ? '12px' : 0,
                         boxShadow: '0 6px 18px rgba(0,0,0,0.2)',
                       }}
                       onError={(event) => {
                         event.currentTarget.src = fallbackProfileImage;
+                        event.currentTarget.style.objectFit = 'contain';
+                        event.currentTarget.style.padding = '12px';
                       }}
                     />
                     <div style={{ flex: 1, minWidth: 0, width: '100%' }}>

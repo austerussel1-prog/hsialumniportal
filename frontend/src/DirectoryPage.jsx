@@ -7,6 +7,7 @@ import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 
 const sortOptions = ['Sort By', 'Name', 'Department', 'Role'];
 const DETAIL_PREVIEW_LIMIT = 140;
+const fallbackProfileImage = '/Logo.jpg';
 
 const isLongDetail = (value) => String(value || '').trim().length > DETAIL_PREVIEW_LIMIT;
 
@@ -31,6 +32,12 @@ export default function DirectoryPage() {
 
   const mapUsersToProfiles = (users) => users.map((user) => {
     const userId = user.id || user._id;
+    const profileImageValue = String(user.profileImage || '').trim();
+    const avatarIsFallback = !profileImageValue
+      || profileImageValue.includes('gear-icon.svg')
+      || profileImageValue.includes('via.placeholder.com')
+      || profileImageValue === fallbackProfileImage
+      || ['null', 'undefined'].includes(profileImageValue.toLowerCase());
     const skills = typeof user.skills === 'string'
       ? user.skills.split(',').map((item) => item.trim()).filter(Boolean)
       : [];
@@ -62,9 +69,10 @@ export default function DirectoryPage() {
       previewSkills,
       hasDetails,
       hasOverflowDetails,
-      avatar: (user.profileImage && !String(user.profileImage).includes('gear-icon.svg'))
-        ? resolveApiAssetUrl(user.profileImage)
-        : '/Logo.jpg',
+      avatar: !avatarIsFallback
+        ? resolveApiAssetUrl(profileImageValue)
+        : fallbackProfileImage,
+      avatarIsFallback,
       email: user.email || '',
     };
   });
@@ -440,8 +448,19 @@ export default function DirectoryPage() {
                 <img
                   src={profile.avatar}
                   alt={profile.name}
-                  onError={(event) => { event.currentTarget.src = '/Logo.jpg'; }}
-                  style={{ width: isMobile ? '36px' : '54px', height: isMobile ? '36px' : '54px', borderRadius: isMobile ? '10px' : '14px', objectFit: 'cover' }}
+                  onError={(event) => {
+                    event.currentTarget.src = fallbackProfileImage;
+                    event.currentTarget.style.objectFit = 'contain';
+                    event.currentTarget.style.padding = isMobile ? '4px' : '6px';
+                  }}
+                  style={{
+                    width: isMobile ? '36px' : '54px',
+                    height: isMobile ? '36px' : '54px',
+                    borderRadius: isMobile ? '10px' : '14px',
+                    objectFit: profile.avatarIsFallback ? 'contain' : 'cover',
+                    padding: profile.avatarIsFallback ? (isMobile ? '4px' : '6px') : 0,
+                    background: profile.avatarIsFallback ? '#fff' : 'transparent',
+                  }}
                 />
                 <div>
                   <div style={{ fontWeight: 700, fontSize: isMobile ? '12px' : '16px' }}>{profile.name}</div>

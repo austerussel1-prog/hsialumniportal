@@ -79,13 +79,14 @@ const getCareerDocumentUploadEndpoint = () => apiEndpoints.uploadCareerDocument 
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const fallbackProfileImage = '/Lion.png';
+  const fallbackProfileImage = '/Logo.jpg';
   const notificationAvatarCacheRef = useRef({});
   const resolveProfileImage = (value) => {
     const imageValue = String(value || '').trim();
     if (!imageValue) return fallbackProfileImage;
     if (imageValue.includes('gear-icon.svg')) return fallbackProfileImage;
     if (imageValue.includes('via.placeholder.com')) return fallbackProfileImage;
+    if (imageValue === fallbackProfileImage) return fallbackProfileImage;
     if (['null', 'undefined'].includes(imageValue.toLowerCase())) return fallbackProfileImage;
     return resolveApiAssetUrl(imageValue);
   };
