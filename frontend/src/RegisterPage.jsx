@@ -277,7 +277,7 @@ export default function RegisterPage() {
 
   return (
     <motion.div 
-      className="min-h-screen min-h-[100dvh] flex flex-col md:flex-row overflow-x-hidden bg-white"
+      className="min-h-[100dvh] flex flex-col md:flex-row overflow-x-hidden bg-white"
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}

@@ -407,7 +407,7 @@ export default function LoginPage() {
 
   return (
     <motion.div 
-      className="min-h-screen min-h-[100dvh] flex flex-col md:flex-row relative overflow-x-hidden bg-white"
+      className="min-h-[100dvh] flex flex-col md:flex-row relative overflow-x-hidden bg-white"
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
@@ -607,7 +607,7 @@ export default function LoginPage() {
                 <>
                   <p className="font-semibold text-sm md:text-base mb-3">Data Retention Policy</p>
                   <p className="mb-3">
-                    This system retains alumni data only as necessary to support engagement and communication. User accounts remain active as long as they are in use. Accounts that remain inactive for more than one (1) year may be deleted or archived.
+                    This system retains users data only as necessary to support engagement and communication. User accounts remain active as long as they are in use. Accounts that remain inactive for more than one (1) year may be deleted or archived.
                   </p>
                   <p className="mb-3">
                     User-generated content such as posts and messages is retained while the account is active and is permanently removed upon account deletion. System logs, including login activity, are stored for a maximum of ninety (90) days for security and monitoring purposes.
@@ -619,7 +619,7 @@ export default function LoginPage() {
               ) : (
                 <>
                   <p className="font-semibold text-sm md:text-base mb-3">
-                    Welcome to Highly Succeed Alumni-Portal ("we," "us," or "our"). These Terms of Service ("Terms") govern your access to and use of the website located at https://alumni-portal-xi-amber.vercel.app/ and all related services, features, and content provided by the Platform (collectively, the "Service"). By accessing or using the Service, you acknowledge that you have read, understood, and agree to be legally bound by these Terms. If you do not agree to any part of these Terms, you must discontinue use of the Service immediately.
+                    Welcome to HSI Career & Workforce Portal ("we," "us," or "our"). These Terms of Service ("Terms") govern your access to and use of the website located at https://hsi-portal-xi-amber.vercel.app/ and all related services, features, and content provided by the Platform (collectively, the "Service"). By accessing or using the Service, you acknowledge that you have read, understood, and agree to be legally bound by these Terms. If you do not agree to any part of these Terms, you must discontinue use of the Service immediately.
                   </p>
                   <p className="mb-3">
                     By visiting, accessing, browsing, registering, or using the Platform, you confirm that you agree to comply with these Terms, our Privacy Policy, and all applicable laws and regulations. You represent that you are at least eighteen (18) years of age and capable of forming a binding agreement. If you create an account, you agree to provide accurate, current, and complete information and to keep your account information updated. You are solely responsible for maintaining the confidentiality of your login credentials and for all activities that occur under your account, whether authorized or unauthorized.
@@ -628,7 +628,7 @@ export default function LoginPage() {
                     You agree to use the Service only for lawful purposes and in a manner consistent with these Terms. You must not upload, post, transmit, or distribute any content that is unlawful, harmful, offensive, defamatory, obscene, misleading, or otherwise inappropriate. You must not attempt to interfere with the proper operation, security, or integrity of the Platform, including attempting to gain unauthorized access to systems or data. Any misuse of the Service may result in suspension or termination of your access.
                   </p>
                   <p className="mb-3">
-                    You retain ownership of any content that you submit, post, or upload to the Platform. However, by submitting content, you grant Highly Succeed Alumni-Portal a non-exclusive, worldwide, royalty-free license to use, reproduce, modify, display, distribute, and store such content solely for the purpose of operating, improving, and promoting the Service. We reserve the right to remove or modify any content that violates these Terms or that we consider inappropriate, without prior notice.
+                    You retain ownership of any content that you submit, post, or upload to the Platform. However, by submitting content, you grant HSI Career & Workforce Portal a non-exclusive, worldwide, royalty-free license to use, reproduce, modify, display, distribute, and store such content solely for the purpose of operating, improving, and promoting the Service. We reserve the right to remove or modify any content that violates these Terms or that we consider inappropriate, without prior notice.
                   </p>
                   <p className="mb-3">
                     The Service may contain links to third-party websites or services that are not owned or controlled by us. We do not assume responsibility for the content, policies, or practices of any third-party websites or services. Your interactions with third parties are solely between you and the third party, and you agree that we shall not be liable for any damages or losses arising from such interactions.
