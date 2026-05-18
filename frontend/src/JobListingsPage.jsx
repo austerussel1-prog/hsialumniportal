@@ -253,7 +253,15 @@ export default function JobListingsPage() {
 
         setServerJobs(jobs);
         if (jobs.length > 0) {
-          localStorage.setItem(USER_POSTED_JOBS_KEY, JSON.stringify(jobs));
+          const existingLocal = getStoredJobs();
+          const serverKeys = new Set(jobs.map((item) => String(item.id || item._id || '')));
+          localStorage.setItem(
+            USER_POSTED_JOBS_KEY,
+            JSON.stringify([
+              ...jobs,
+              ...existingLocal.filter((item) => !serverKeys.has(String(item.id || item._id || ''))),
+            ]),
+          );
         }
         setJobsVersion((prev) => prev + 1);
       } catch (_error) {
@@ -409,7 +417,6 @@ export default function JobListingsPage() {
       setJobsVersion((prev) => prev + 1);
       closePostModal();
       showToast('success', editingJob ? 'Job updated successfully.' : 'Job posted successfully.');
-      if (!editingJob) navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
     };
 
     if (!token) {
@@ -457,7 +464,6 @@ export default function JobListingsPage() {
         setJobsVersion((prev) => prev + 1);
         closePostModal();
         showToast('success', editingJob ? 'Job updated successfully.' : 'Job posted successfully.');
-        if (!editingJob) navigate(`/training?category=${encodeURIComponent(nextCategory)}`);
       })
       .catch(() => {
         applyLocalSave();
@@ -529,7 +535,15 @@ export default function JobListingsPage() {
 
   const jobs = useMemo(() => {
     const localJobs = getStoredJobs();
-    const sourceJobs = serverJobs.length > 0 ? serverJobs : localJobs;
+    const sourceJobs = [];
+    const seenKeys = new Set();
+
+    [...localJobs, ...serverJobs].forEach((job) => {
+      const key = String(job?.id || job?._id || '');
+      if (!key || seenKeys.has(key)) return;
+      seenKeys.add(key);
+      sourceJobs.push(job);
+    });
 
     return sourceJobs
       .map((job) => ({
