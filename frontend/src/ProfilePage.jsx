@@ -3691,6 +3691,14 @@ export default function ProfilePage() {
                   setProjectForm({ name: '', link: '', industry: '', role: '' });
                 }}
                 style={{
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '999px',
+                  padding: '10px 20px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
                   position: 'relative',
                   overflow: 'hidden',
                 }}
