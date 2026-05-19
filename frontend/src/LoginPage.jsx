@@ -500,6 +500,13 @@ export default function LoginPage() {
             >
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
+            <button
+              type="button"
+              onClick={handleGuestLogin}
+              className="hsi-hover-fill mb-3 w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-700 transition hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-700 md:py-3 md:text-base"
+            >
+              Login as Guest
+            </button>
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 mb-3 mt-3">
               <label htmlFor="login-terms" className="flex items-center gap-2 text-[13px] md:text-sm text-gray-700 min-w-0">
                 <input
@@ -558,13 +565,6 @@ export default function LoginPage() {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handleGuestLogin}
-            className="hsi-hover-fill mb-3 w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-700 transition hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-700 md:py-3 md:text-base"
-          >
-            Login as Guest
-          </button>
           <div className="flex flex-col md:flex-row justify-center md:justify-between text-[11px] md:text-sm mt-1 gap-1 md:gap-0">
             <span className="text-gray-500">No account yet?</span>
             <Link to="/register" className="text-yellow-600 font-medium cursor-pointer">Create account</Link>
