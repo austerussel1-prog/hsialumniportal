@@ -27,8 +27,8 @@ import AchievementsRecognitionPage from './AchievementsRecognitionPage.jsx';
 import AnalyticsReportPage from './AnalyticsReportPage.jsx';
 import Toast from './components/Toast.jsx';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
+import { ADMIN_ROLES, isGuestUser, safelyParseUser } from './config/session';
 
-const ADMIN_ROLES = ['super_admin', 'admin', 'hr', 'alumni_officer'];
 const AUTH_PAGES = ['/login', '/register'];
 const FOOTER_VISIBLE_PATHS = ['/login', '/register', '/account'];
 
@@ -511,10 +511,17 @@ function ReminderModal({ reminders, onClose, onOpenPrimary, onViewEventDetails }
 }
 
 function AdminOnlyRoute({ children }) {
-  const rawUser = localStorage.getItem('user');
-  const user = rawUser ? JSON.parse(rawUser) : null;
+  const user = safelyParseUser();
   if (!user) return <Navigate to="/login" replace />;
+  if (isGuestUser(user)) return <Navigate to="/alumni-management" replace />;
   if (!ADMIN_ROLES.includes(user.role)) return <Navigate to="/alumni-management" replace />;
+  return children;
+}
+
+function ProtectedRoute({ children, guestAllowed = false }) {
+  const user = safelyParseUser();
+  if (!user) return <Navigate to="/login" replace />;
+  if (isGuestUser(user) && !guestAllowed) return <Navigate to="/alumni-management" replace />;
   return children;
 }
 
@@ -535,24 +542,24 @@ function AnimatedRoutes() {
             </AdminOnlyRoute>
           )}
         />
-        <Route path="/alumni-dashboard" element={<AlumniDashboard />} />
-        <Route path="/alumni-management" element={<AlumniManagement />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/account" element={<AccountSettings />} />
-        <Route path="/documents" element={<DocumentsPage />} />
-        <Route path="/mentorship" element={<MentorshipPage />} />
-        <Route path="/training" element={<JobListingsPage />} />
-        <Route path="/training/hub" element={<CareerJobsPage />} />
-        <Route path="/training/jobs" element={<JobListingsPage />} />
-        <Route path="/training/job-details" element={<JobDetailsPage />} />
-        <Route path="/training/job-details/:jobId" element={<JobDetailsPage />} />
-        <Route path="/career/job-details" element={<JobDetailsPage />} />
-        <Route path="/career/job-details/:jobId" element={<JobDetailsPage />} />
-        <Route path="/job-application" element={<JobApplicationForm />} />
-        <Route path="/job-application/:jobId" element={<JobApplicationForm />} />
-        <Route path="/training/paths" element={<TrainingLearningPage />} />
-        <Route path="/training/certification" element={<TrainingLearningPage />} />
-        <Route path="/achievements" element={<AchievementsRecognitionPage />} />
+        <Route path="/alumni-dashboard" element={<ProtectedRoute><AlumniDashboard /></ProtectedRoute>} />
+        <Route path="/alumni-management" element={<ProtectedRoute guestAllowed><AlumniManagement /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/account" element={<ProtectedRoute><AccountSettings /></ProtectedRoute>} />
+        <Route path="/documents" element={<ProtectedRoute><DocumentsPage /></ProtectedRoute>} />
+        <Route path="/mentorship" element={<ProtectedRoute><MentorshipPage /></ProtectedRoute>} />
+        <Route path="/training" element={<ProtectedRoute guestAllowed><JobListingsPage /></ProtectedRoute>} />
+        <Route path="/training/hub" element={<ProtectedRoute guestAllowed><CareerJobsPage /></ProtectedRoute>} />
+        <Route path="/training/jobs" element={<ProtectedRoute guestAllowed><JobListingsPage /></ProtectedRoute>} />
+        <Route path="/training/job-details" element={<ProtectedRoute guestAllowed><JobDetailsPage /></ProtectedRoute>} />
+        <Route path="/training/job-details/:jobId" element={<ProtectedRoute guestAllowed><JobDetailsPage /></ProtectedRoute>} />
+        <Route path="/career/job-details" element={<ProtectedRoute guestAllowed><JobDetailsPage /></ProtectedRoute>} />
+        <Route path="/career/job-details/:jobId" element={<ProtectedRoute guestAllowed><JobDetailsPage /></ProtectedRoute>} />
+        <Route path="/job-application" element={<ProtectedRoute><JobApplicationForm /></ProtectedRoute>} />
+        <Route path="/job-application/:jobId" element={<ProtectedRoute><JobApplicationForm /></ProtectedRoute>} />
+        <Route path="/training/paths" element={<ProtectedRoute><TrainingLearningPage /></ProtectedRoute>} />
+        <Route path="/training/certification" element={<ProtectedRoute><TrainingLearningPage /></ProtectedRoute>} />
+        <Route path="/achievements" element={<ProtectedRoute><AchievementsRecognitionPage /></ProtectedRoute>} />
         <Route
           path="/analytics-and-report"
           element={(
@@ -561,14 +568,14 @@ function AnimatedRoutes() {
             </AdminOnlyRoute>
           )}
         />
-        <Route path="/referral-board" element={<ReferralJobBoard />} />
-        <Route path="/internship-ojt" element={<InternshipOJT />} />
-        <Route path="/refer-friend" element={<ReferFriend />} />
-        <Route path="/inbox" element={<InboxPage />} />
-        <Route path="/events" element={<EventsPage />} />
-        <Route path="/directory" element={<DirectoryPage />} />
-        <Route path="/directory/profile/:userId" element={<DirectoryProfileView />} />
-        <Route path="/announcements" element={<AnnouncementsPage />} />
+        <Route path="/referral-board" element={<ProtectedRoute><ReferralJobBoard /></ProtectedRoute>} />
+        <Route path="/internship-ojt" element={<ProtectedRoute><InternshipOJT /></ProtectedRoute>} />
+        <Route path="/refer-friend" element={<ProtectedRoute><ReferFriend /></ProtectedRoute>} />
+        <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
+        <Route path="/events" element={<ProtectedRoute guestAllowed><EventsPage /></ProtectedRoute>} />
+        <Route path="/directory" element={<ProtectedRoute><DirectoryPage /></ProtectedRoute>} />
+        <Route path="/directory/profile/:userId" element={<ProtectedRoute><DirectoryProfileView /></ProtectedRoute>} />
+        <Route path="/announcements" element={<ProtectedRoute guestAllowed><AnnouncementsPage /></ProtectedRoute>} />
       </Routes>
     </AnimatePresence>
   );
@@ -585,12 +592,7 @@ function AppShell() {
   const [selectedReminderEvent, setSelectedReminderEvent] = useState(null);
   const toastCenterOffsetPx = location.pathname.startsWith('/job-application') ? -120 : 0;
   const currentUser = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('user');
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+    return safelyParseUser();
   }, [location.pathname]);
   const reminderUserKey = String(currentUser?.id || currentUser?._id || currentUser?.email || '').trim();
 

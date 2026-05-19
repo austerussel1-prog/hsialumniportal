@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
+import { isGuestUser } from './config/session';
 import {
   File,
   Stack,
@@ -14,6 +15,7 @@ import {
   User,
   Handshake,
   Bell,
+  ChatCircleText,
 } from '@phosphor-icons/react';
 
 export default function AlumniManagement() {
@@ -24,6 +26,7 @@ export default function AlumniManagement() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [userNotifications, setUserNotifications] = useState([]);
+  const isGuest = isGuestUser(user);
 
   const resolveProfileImage = (value) => {
     const imageValue = String(value || '').trim();
@@ -50,12 +53,19 @@ export default function AlumniManagement() {
     navigate('/login');
   };
 
-  const quickActions = [
+  const alumniQuickActions = [
     { icon: File, label: 'Request a document', onClick: () => navigate('/documents') },
     { icon: Stack, label: 'Find a mentor', onClick: () => navigate('/mentorship') },
     { icon: Target, label: 'Browse jobs', onClick: () => navigate('/training') },
     { icon: CalendarBlank, label: 'View events', onClick: () => navigate('/events') },
   ];
+  const guestQuickActions = [
+    { icon: Target, label: 'Browse jobs', onClick: () => navigate('/training') },
+    { icon: CalendarBlank, label: 'View events', onClick: () => navigate('/events') },
+    { icon: Bell, label: 'View announcements', onClick: () => navigate('/announcements') },
+    { icon: ChatCircleText, label: 'Contact admin', onClick: () => { window.location.href = 'mailto:highlysucceedincportal@gmail.com'; } },
+  ];
+  const quickActions = isGuest ? guestQuickActions : alumniQuickActions;
 
   const [announcements, setAnnouncements] = useState([]);
 
@@ -64,7 +74,7 @@ export default function AlumniManagement() {
     async function fetchAnnouncements() {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(apiEndpoints.announcements, {
+        const res = await fetch(token ? apiEndpoints.announcements : apiEndpoints.publicAnnouncements, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
         if (!res.ok) return;
@@ -221,7 +231,7 @@ export default function AlumniManagement() {
     ? announcements.slice(0, RECENT_ITEMS_LIMIT)
     : [];
 
-  const jumpTo = [
+  const alumniJumpTo = [
     { icon: User, label: 'Profile', onClick: () => navigate('/profile') },
     { icon: Folder, label: 'Documents', onClick: () => navigate('/documents') },
     { icon: Briefcase, label: 'Career', onClick: () => navigate('/training') },
@@ -229,6 +239,14 @@ export default function AlumniManagement() {
     { icon: Users, label: 'Directory', onClick: () => navigate('/directory') },
     { icon: Handshake, label: 'Mentorship', onClick: () => navigate('/mentorship') },
   ];
+  const guestJumpTo = [
+    { icon: Briefcase, label: 'Career', onClick: () => navigate('/training') },
+    { icon: CalendarBlank, label: 'Events', onClick: () => navigate('/events') },
+    { icon: Bell, label: 'Announcements', onClick: () => navigate('/announcements') },
+    { icon: ChatCircleText, label: 'Contact Admin', onClick: () => { window.location.href = 'mailto:highlysucceedincportal@gmail.com'; } },
+    { icon: User, label: 'Register', onClick: () => navigate('/register') },
+  ];
+  const jumpTo = isGuest ? guestJumpTo : alumniJumpTo;
   const welcomeNameRaw = String(user?.fullName || user?.name || '').trim();
   const welcomeName = welcomeNameRaw ? welcomeNameRaw.split(/\s+/)[0] : '';
 
@@ -402,9 +420,13 @@ export default function AlumniManagement() {
                         {/* Career & Job Opportunities section removed */}
             <div className="am-welcome" style={{background: '#fffaf2', border: '1px solid #efe4d3', borderRadius: '12px', padding: '22px 24px', marginBottom: '24px'}}>
               <h1 className="am-welcome-title" style={{fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '6px'}}>
-                Welcome back{welcomeName ? `, ${welcomeName}` : ''}
+                {isGuest ? 'Welcome, Guest' : `Welcome back${welcomeName ? `, ${welcomeName}` : ''}`}
               </h1>
-              <p className="am-welcome-subtitle" style={{color: '#6b7280', marginBottom: '14px', fontSize: '13px'}}>Here's what's happening and quick access to everything you need.</p>
+              <p className="am-welcome-subtitle" style={{color: '#6b7280', marginBottom: '14px', fontSize: '13px'}}>
+                {isGuest
+                  ? 'You can browse public jobs, announcements, and events. Create an account to apply, message alumni, and access private records.'
+                  : "Here's what's happening and quick access to everything you need."}
+              </p>
               <div style={{width: '40px', height: '3px', background: '#e0b245', borderRadius: '3px'}} />
             </div>
 

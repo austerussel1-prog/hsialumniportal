@@ -4,6 +4,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import { apiEndpoints } from './config/api';
 import { isGoogleAuthConfigured } from './config/auth';
+import { startGuestSession } from './config/session';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -405,6 +406,15 @@ export default function LoginPage() {
     }
   };
 
+  const handleGuestLogin = () => {
+    startGuestSession();
+    sessionStorage.setItem('hsi_toast', JSON.stringify({
+      type: 'info',
+      text: 'Browsing as guest. Some alumni features are locked until you create an account.',
+    }));
+    navigate('/alumni-management');
+  };
+
   return (
     <motion.div 
       className="min-h-[100dvh] flex flex-col md:flex-row relative overflow-x-hidden bg-white"
@@ -548,6 +558,13 @@ export default function LoginPage() {
               </div>
             )}
           </div>
+          <button
+            type="button"
+            onClick={handleGuestLogin}
+            className="hsi-hover-fill mb-3 w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-700 transition hover:border-yellow-500 hover:bg-yellow-50 hover:text-yellow-700 md:py-3 md:text-base"
+          >
+            Login as Guest
+          </button>
           <div className="flex flex-col md:flex-row justify-center md:justify-between text-[11px] md:text-sm mt-1 gap-1 md:gap-0">
             <span className="text-gray-500">No account yet?</span>
             <Link to="/register" className="text-yellow-600 font-medium cursor-pointer">Create account</Link>

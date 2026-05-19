@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { resolveApiAssetUrl } from '../config/api';
+import { isAdminUser, isGuestUser, safelyParseUser } from '../config/session';
 
 import {
   House,
@@ -15,6 +16,8 @@ import {
   ChatCircleText,
   ChatText,
   User,
+  UserPlus,
+  SignOut,
   List,
   X,
 } from '@phosphor-icons/react';
@@ -34,6 +37,8 @@ const navItems = [
   { name: 'Documents & Records', icon: Folder, path: '/documents' },
 ];
 
+const guestNavPaths = new Set(['/alumni-management', '/training', '/events', '/announcements']);
+
 function Sidebar(props) {
   const controlledOpen = typeof props.isOpen === 'boolean' ? props.isOpen : !!props.sidebarOpen;
   const toggle = typeof props.toggle === 'function'
@@ -47,9 +52,9 @@ function Sidebar(props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const sidebarRef = useRef(null);
   const location = useLocation();
-  const userData = localStorage.getItem('user');
-  const user = userData ? JSON.parse(userData) : null;
-  const canAccessAdmin = ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(user?.role);
+  const user = safelyParseUser();
+  const guest = isGuestUser(user);
+  const canAccessAdmin = isAdminUser(user);
   const profileImage = typeof user?.profileImage === 'string' && user.profileImage.trim()
     ? resolveApiAssetUrl(user.profileImage)
     : null;
@@ -162,7 +167,7 @@ function Sidebar(props) {
           </div>
 
           <div className="flex h-full items-center gap-2 bg-[#7b6a1e] px-3">
-            <Link to="/profile" aria-label="Profile" className="block">
+            <Link to={guest ? '/register' : '/profile'} aria-label={guest ? 'Create account' : 'Profile'} className="block">
               {profileImage ? (
                 <img
                   src={profileImage}
@@ -231,6 +236,7 @@ function Sidebar(props) {
           <nav className={`flex-1 p-4 ${expanded ? (isMobile ? 'mt-2' : 'mt-9') : 'mt-4'}`}>
             {navItems.map((item, index) => {
               if (item.restricted && !canAccessAdmin) return null;
+              if (guest && !guestNavPaths.has(item.path)) return null;
 
               return (
                 <div key={index}>
@@ -258,26 +264,42 @@ function Sidebar(props) {
 
           <div className={`p-4 ${expanded ? 'mt-4' : ''}`}>
             <Link
-              to="/profile"
+              to={guest ? '/register' : '/profile'}
               className={`flex items-center py-3 px-4 mb-2 rounded-md transition-all hover:bg-[#7D7D7D]
-                ${isActivePath('/profile') ? 'bg-[#F2C94C] text-[#2f2f2f]' : ''}
+                ${isActivePath(guest ? '/register' : '/profile') ? 'bg-[#F2C94C] text-[#2f2f2f]' : ''}
                 ${expanded ? 'justify-start' : 'justify-center'}
               `}
             >
-              <User size={20} />
-              {expanded && <span className="ml-4">Profile</span>}
+              {guest ? <UserPlus size={20} /> : <User size={20} />}
+              {expanded && <span className="ml-4">{guest ? 'Create Account' : 'Profile'}</span>}
             </Link>
 
-            <Link
-              to="/account?tab=feedback"
-              className={`flex items-center py-3 px-4 mb-2 rounded-md transition-all hover:bg-[#7D7D7D]
-                ${location.pathname === '/account' && location.search.includes('tab=feedback') ? 'bg-[#F2C94C] text-[#2f2f2f]' : ''}
-                ${expanded ? 'justify-start' : 'justify-center'}
-              `}
-            >
-              <ChatText size={20} />
-              {expanded && <span className="ml-4">Feedback & Surveys</span>}
-            </Link>
+            {guest ? (
+              <Link
+                to="/login"
+                onClick={() => {
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                }}
+                className={`flex items-center py-3 px-4 mb-2 rounded-md transition-all hover:bg-[#7D7D7D]
+                  ${expanded ? 'justify-start' : 'justify-center'}
+                `}
+              >
+                <SignOut size={20} />
+                {expanded && <span className="ml-4">Exit Guest Mode</span>}
+              </Link>
+            ) : (
+              <Link
+                to="/account?tab=feedback"
+                className={`flex items-center py-3 px-4 mb-2 rounded-md transition-all hover:bg-[#7D7D7D]
+                  ${location.pathname === '/account' && location.search.includes('tab=feedback') ? 'bg-[#F2C94C] text-[#2f2f2f]' : ''}
+                  ${expanded ? 'justify-start' : 'justify-center'}
+                `}
+              >
+                <ChatText size={20} />
+                {expanded && <span className="ml-4">Feedback & Surveys</span>}
+              </Link>
+            )}
           </div>
         </div>
       </div>

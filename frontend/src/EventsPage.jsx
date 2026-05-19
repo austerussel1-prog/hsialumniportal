@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
+import { isGuestUser } from './config/session';
 
 export default function EventsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -66,6 +67,7 @@ export default function EventsPage() {
   const GRID_EVENTS_PER_PAGE = 6;
 
   const isAdmin = user && ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(user.role);
+  const isGuest = isGuestUser(user);
 
   const steps = [
     { id: 1, label: 'Events' },
@@ -356,6 +358,10 @@ export default function EventsPage() {
   };
 
   const openRegisterModal = (ev) => {
+    if (isGuest) {
+      notify('warning', 'Please create an alumni account before registering for events.');
+      return;
+    }
     setSelectedEvent(ev);
     setShowRegister(true);
   };

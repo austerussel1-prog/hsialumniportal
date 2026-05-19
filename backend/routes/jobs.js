@@ -64,7 +64,7 @@ router.get('/_route_check', (req, res) => {
   res.json({ ok: true, router: 'jobs' });
 });
 
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const status = String(req.query.status || '').trim();
     const category = String(req.query.category || '').trim().toLowerCase();
@@ -80,7 +80,7 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/:id', verifyToken, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const job = await JobPosting.findById(req.params.id).lean();
     if (!job) return res.status(404).json({ message: 'Job not found' });

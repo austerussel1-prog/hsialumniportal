@@ -81,6 +81,7 @@ export const apiEndpoints = {
 
   // Announcements endpoints
   announcements: `${API_URL}/api/announcements`,
+  publicAnnouncements: `${API_URL}/api/announcements/public`,
   announcement: (id) => `${API_URL}/api/announcements/${id}`,
   heartAnnouncement: (id) => `${API_URL}/api/announcements/${id}/heart`,
   commentAnnouncement: (id) => `${API_URL}/api/announcements/${id}/comment`,

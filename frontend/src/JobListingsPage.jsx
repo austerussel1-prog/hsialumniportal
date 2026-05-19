@@ -188,21 +188,17 @@ export default function JobListingsPage() {
 
     async function fetchJobs() {
       const token = localStorage.getItem('token');
-      if (!token) {
-        if (mounted) setServerJobs([]);
-        return;
-      }
 
       try {
         const response = await fetch(apiEndpoints.jobs, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) return;
 
         let jobs = Array.isArray(data?.jobs) ? data.jobs : [];
 
-        if (jobs.length === 0) {
+        if (token && jobs.length === 0) {
           const localJobs = getStoredJobs();
           if (localJobs.length > 0) {
             const migratedResults = await Promise.all(localJobs.map(async (item) => {
