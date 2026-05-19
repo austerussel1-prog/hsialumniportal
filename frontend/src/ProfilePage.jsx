@@ -3727,7 +3727,7 @@ export default function ProfilePage() {
                   background: '#eab308',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '6px',
+                  borderRadius: '999px',
                   padding: '10px 20px',
                   cursor: 'pointer',
                   fontSize: '14px',
