@@ -3744,7 +3744,7 @@ export default function ProfilePage() {
                     width: '100%',
                     height: '100%',
                     background: 'rgba(0, 0, 0, 0.15)',
-                    borderRadius: '6px',
+                    borderRadius: '999px',
                     transform: 'scaleX(0)',
                     transformOrigin: 'left',
                     animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
