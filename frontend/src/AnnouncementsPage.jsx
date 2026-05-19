@@ -5,9 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createProfileBackLink } from './config/profileNavigation';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
-import { isGuestUser } from './config/session';
 
-// Small inline SVG icons
 const PhotoIcon = () => (
   <svg className="inline align-middle mr-1" width="18" height="18" fill="none" stroke="#6b7280" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="12.5" r="1.5"/></svg>
 );
@@ -218,7 +216,7 @@ export default function AnnouncementsPage() {
       setLoading(true);
       setError('');
       const token = localStorage.getItem('token');
-      const res = await fetch(token ? apiEndpoints.announcements : apiEndpoints.publicAnnouncements, {
+      const res = await fetch(apiEndpoints.announcements, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (!res.ok) {
@@ -246,7 +244,6 @@ export default function AnnouncementsPage() {
   };
 
   const isAdmin = user && ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(user.role);
-  const isGuest = isGuestUser(user);
   const currentUserId = user?._id || user?.id;
   const navigate = useNavigate();
 
@@ -318,8 +315,8 @@ export default function AnnouncementsPage() {
   };
 
   const handleToggleHeart = async (id) => {
-    if (!currentUserId || isGuest) {
-      showToast('warning', 'Please create an alumni account to react to announcements.');
+    if (!currentUserId) {
+      setError('Please sign in to react');
       return;
     }
 
@@ -357,10 +354,6 @@ export default function AnnouncementsPage() {
   };
 
   const handleOpenComment = (id) => {
-    if (isGuest) {
-      showToast('warning', 'Please create an alumni account to comment on announcements.');
-      return;
-    }
     setOpenCommentId(prev => (prev === id ? null : id));
   };
 
@@ -371,10 +364,6 @@ export default function AnnouncementsPage() {
   const submitComment = async (id, textParam) => {
     const text = (typeof textParam === 'string' ? textParam : (commentDrafts[id] || '')).trim();
     if (!text) return;
-    if (isGuest) {
-      showToast('warning', 'Please create an alumni account to comment on announcements.');
-      return;
-    }
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(apiEndpoints.commentAnnouncement(id), {

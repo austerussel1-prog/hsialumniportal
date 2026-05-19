@@ -1,4 +1,4 @@
-# Data Retention Policy (HSI Alumni Portal)
+# Data Retention Policy (HSI Career & Workforce Portal)
 
 ## 1) User and Alumni Profiles
 - Data covered: name, email, graduation batch/year, bio, employment/company information, profile details.

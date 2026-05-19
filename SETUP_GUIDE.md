@@ -1,4 +1,4 @@
-# HSI Alumni Portal - Setup Instructions
+# HSI Career & Workforce Portal - Setup Instructions
 
 ## ✅ Complete Registration & Admin Approval System
 
