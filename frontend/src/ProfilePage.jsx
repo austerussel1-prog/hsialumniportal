@@ -3724,8 +3724,8 @@ export default function ProfilePage() {
                 onMouseLeave={() => setHoverButton(null)}
                 onClick={handleAddProject}
                 style={{
-                  background: '#FFED4E',
-                  color: '#333',
+                  background: '#eab308',
+                  color: '#ffffff',
                   border: 'none',
                   borderRadius: '6px',
                   padding: '10px 20px',
