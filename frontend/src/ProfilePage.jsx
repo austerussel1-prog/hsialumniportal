@@ -3691,14 +3691,6 @@ export default function ProfilePage() {
                   setProjectForm({ name: '', link: '', industry: '', role: '' });
                 }}
                 style={{
-                  background: '#f3f4f6',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '10px 20px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
                   position: 'relative',
                   overflow: 'hidden',
                 }}
@@ -3711,7 +3703,7 @@ export default function ProfilePage() {
                     width: '100%',
                     height: '100%',
                     background: 'rgba(0, 0, 0, 0.1)',
-                    borderRadius: '6px',
+                    borderRadius: '999px',
                     transform: 'scaleX(0)',
                     transformOrigin: 'left',
                     animation: 'fillBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
