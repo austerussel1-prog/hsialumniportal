@@ -8,6 +8,7 @@ const User = require('../models/User');
 const { verifyToken } = require('./auth');
 const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured, isRemoteFileUrl, fetchRemoteFile } = require('../services/mediaStorage');
 const { createUserNotification } = require('../services/userNotificationService');
+const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const router = express.Router();
 
@@ -76,6 +77,30 @@ const resolveCategory = (originalName, explicit) => {
 const toDownloadName = (value) => String(value || 'document')
   .replace(/[\r\n"]/g, '_')
   .trim() || 'document';
+
+const revealField = (value) => {
+  if (value === null || typeof value === 'undefined') return value;
+  const text = String(value);
+  if (!isEncryptedValue(text)) return value;
+  return decryptField(text);
+};
+
+const sanitizeRequester = (requester) => {
+  if (!requester || typeof requester !== 'object') return requester;
+  return {
+    ...requester,
+    name: revealField(requester.name),
+    email: revealField(requester.email),
+  };
+};
+
+const sanitizeDocumentRequest = (request) => {
+  if (!request || typeof request !== 'object') return request;
+  return {
+    ...request,
+    requester: sanitizeRequester(request.requester),
+  };
+};
 
 const storeUploadedDocumentFile = async (file) => {
   if (!file?.filename) {
@@ -254,7 +279,7 @@ router.get('/requests', verifyToken, async (req, res) => {
       .populate('fulfilledDocument', '_id originalName category sizeBytes createdAt')
       .select('_id requestType notes status createdAt fulfilledAt rejectedAt rejectionReason fulfilledDocument')
       .lean();
-    return res.json({ requests });
+    return res.json({ requests: requests.map(sanitizeDocumentRequest) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Failed to load document requests' });
@@ -296,7 +321,7 @@ router.get('/admin/requests', verifyToken, ensureAdmin, async (req, res) => {
       .select('_id requester requestType notes status createdAt fulfilledAt rejectedAt rejectionReason fulfilledDocument')
       .lean();
 
-    return res.json({ requests });
+    return res.json({ requests: requests.map(sanitizeDocumentRequest) });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Failed to load admin requests' });
