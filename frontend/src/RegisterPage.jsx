@@ -93,6 +93,9 @@ export default function RegisterPage() {
           setEmail(data.email);
           setMessage(data.message);
           setShowOTPModal(true);
+        } else if (data.requiresApproval) {
+          setEmail(data.email || '');
+          setShowPendingModal(true);
         } else {
 
           localStorage.setItem('token', data.token);
