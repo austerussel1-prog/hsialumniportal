@@ -4,12 +4,16 @@ const { OAuth2Client } = require('google-auth-library');
 const emailUser = String(process.env.EMAIL_USER || '').trim();
 const emailPassword = String(process.env.EMAIL_PASSWORD || '').trim();
 const mailFromName = String(process.env.MAIL_FROM_NAME || 'Highly Succeed Portal').trim();
+const mailFromEmail = String(process.env.MAIL_FROM_EMAIL || '').trim();
 
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
 const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpSecure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || smtpPort === 465;
 const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
 const resendFrom = String(process.env.RESEND_FROM || process.env.EMAIL_USER || 'onboarding@resend.dev').trim();
+const brevoSmtpUser = String(process.env.BREVO_SMTP_USER || '').trim();
+const brevoSmtpPassword = String(process.env.BREVO_SMTP_PASSWORD || '').trim();
+const brevoFromEmail = String(process.env.BREVO_FROM_EMAIL || '').trim();
 const gmailOauthClientId = String(process.env.GMAIL_OAUTH_CLIENT_ID || '').trim();
 const gmailOauthClientSecret = String(process.env.GMAIL_OAUTH_CLIENT_SECRET || '').trim();
 const gmailOauthRefreshToken = String(process.env.GMAIL_OAUTH_REFRESH_TOKEN || '').trim();
@@ -86,12 +90,13 @@ const hasUsableGmailApi = () => Boolean(
   gmailOauthClientId && gmailOauthClientSecret && gmailOauthRefreshToken && gmailSenderEmail,
 );
 const hasUsableSmtp = () => Boolean(emailUser && emailPassword);
+const hasUsableBrevo = () => Boolean(brevoSmtpUser && brevoSmtpPassword && (brevoFromEmail || mailFromEmail));
 const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
-const activeEmailMode = ['resend', 'gmail_api', 'smtp'].includes(emailProvider)
+const activeEmailMode = ['brevo', 'resend', 'gmail_api', 'smtp'].includes(emailProvider)
   ? emailProvider
-  : (hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp'));
+  : (hasUsableBrevo() ? 'brevo' : (hasUsableResend() ? 'resend' : (hasUsableGmailApi() ? 'gmail_api' : 'smtp')));
 console.log('[email] Provider mode:', activeEmailMode);
 
 const shouldFallbackFromResend = (error) => {
@@ -100,7 +105,7 @@ const shouldFallbackFromResend = (error) => {
 };
 
 const getSenderAddress = () => (
-  emailUser || gmailSenderEmail || resendFrom
+  mailFromEmail || brevoFromEmail || emailUser || gmailSenderEmail || resendFrom
 );
 
 const toBase64Url = (input) => Buffer.from(input, 'utf8')
@@ -275,6 +280,35 @@ const sendViaSmtp = async (mailOptions) => {
   }
 };
 
+const sendViaBrevo = async (mailOptions) => {
+  if (!hasUsableBrevo()) {
+    throw new Error('Brevo email provider selected, but BREVO_SMTP_USER, BREVO_SMTP_PASSWORD, and BREVO_FROM_EMAIL are required');
+  }
+
+  const brevoTransporter = nodemailer.createTransport({
+    host: 'smtp-relay.brevo.com',
+    port: Number(process.env.BREVO_SMTP_PORT || 587),
+    secure: String(process.env.BREVO_SMTP_SECURE || '').toLowerCase() === 'true',
+    requireTLS: true,
+    ...smtpTimeouts,
+    auth: {
+      user: brevoSmtpUser,
+      pass: brevoSmtpPassword,
+    },
+  });
+
+  try {
+    const info = await brevoTransporter.sendMail({
+      ...mailOptions,
+      from: mailOptions?.from || formatFromAddress(getSenderAddress()),
+    });
+    assertSmtpAcceptedRecipients(info, mailOptions);
+    return true;
+  } catch (error) {
+    throw new Error(`Brevo delivery failed: ${error.message}`);
+  }
+};
+
 const getProviderOrder = () => {
   const ordered = [];
   const add = (provider) => {
@@ -282,6 +316,7 @@ const getProviderOrder = () => {
   };
 
   add(activeEmailMode);
+  if (hasUsableBrevo()) add('brevo');
   if (hasUsableResend()) add('resend');
   if (hasUsableGmailApi()) add('gmail_api');
   if (hasUsableSmtp()) add('smtp');
@@ -292,6 +327,7 @@ const getEmailDeliveryStatus = () => ({
   activeEmailMode,
   configuredProviders: getProviderOrder(),
   hasSmtp: hasUsableSmtp(),
+  hasBrevo: hasUsableBrevo(),
   hasGmailApi: hasUsableGmailApi(),
   hasResend: hasUsableResend(),
   senderConfigured: Boolean(getSenderAddress()),
@@ -305,6 +341,10 @@ const sendMail = async (mailOptions) => {
       if (provider === 'resend') {
         if (!hasUsableResend()) throw new Error('RESEND_API_KEY is missing or invalid');
         return await sendViaResend(mailOptions);
+      }
+
+      if (provider === 'brevo') {
+        return await sendViaBrevo(mailOptions);
       }
 
       if (provider === 'gmail_api') {
