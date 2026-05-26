@@ -99,6 +99,10 @@ const shouldFallbackFromResend = (error) => {
   return /resend api error \(4\d{2}\)|validation_error|verify a domain|testing emails|change the "from" address/i.test(message);
 };
 
+const getSenderAddress = () => (
+  emailUser || gmailSenderEmail || resendFrom
+);
+
 const toBase64Url = (input) => Buffer.from(input, 'utf8')
   .toString('base64')
   .replace(/\+/g, '-')
@@ -239,41 +243,7 @@ const sendViaResend = async (mailOptions) => {
   return true;
 };
 
-const sendMail = async (mailOptions) => {
-  if (activeEmailMode === 'resend') {
-    if (!hasUsableResend()) {
-      throw new Error('Resend email provider selected, but RESEND_API_KEY is missing or invalid');
-    }
-
-    try {
-      return await sendViaResend(mailOptions);
-    } catch (error) {
-      const wrappedError = new Error(`Resend delivery failed: ${error.message}`);
-      const canFallback = hasUsableGmailApi() || hasUsableSmtp();
-
-      if (!canFallback || !shouldFallbackFromResend(error)) {
-        throw wrappedError;
-      }
-
-      console.warn('[email] Resend failed, falling back to alternate provider', {
-        reason: error.message,
-        fallback: hasUsableGmailApi() ? 'gmail_api' : 'smtp',
-      });
-    }
-  }
-
-  if (activeEmailMode === 'gmail_api') {
-    if (!hasUsableGmailApi()) {
-      throw new Error('Gmail API email provider selected, but Gmail OAuth config is incomplete');
-    }
-
-    try {
-      return await sendViaGmailApi(mailOptions);
-    } catch (error) {
-      throw new Error(`Gmail API delivery failed: ${error.message}`);
-    }
-  }
-
+const sendViaSmtp = async (mailOptions) => {
   assertEmailConfig();
   try {
     const info = await transporter.sendMail(mailOptions);
@@ -303,6 +273,51 @@ const sendMail = async (mailOptions) => {
 
     throw new Error(`SMTP delivery failed: ${error.message}`);
   }
+};
+
+const getProviderOrder = () => {
+  const ordered = [];
+  const add = (provider) => {
+    if (!ordered.includes(provider)) ordered.push(provider);
+  };
+
+  add(activeEmailMode);
+  if (hasUsableResend()) add('resend');
+  if (hasUsableGmailApi()) add('gmail_api');
+  if (hasUsableSmtp()) add('smtp');
+  return ordered;
+};
+
+const sendMail = async (mailOptions) => {
+  const errors = [];
+
+  for (const provider of getProviderOrder()) {
+    try {
+      if (provider === 'resend') {
+        if (!hasUsableResend()) throw new Error('RESEND_API_KEY is missing or invalid');
+        return await sendViaResend(mailOptions);
+      }
+
+      if (provider === 'gmail_api') {
+        if (!hasUsableGmailApi()) throw new Error('Gmail OAuth config is incomplete');
+        return await sendViaGmailApi(mailOptions);
+      }
+
+      if (provider === 'smtp') {
+        return await sendViaSmtp(mailOptions);
+      }
+    } catch (error) {
+      errors.push(`${provider}: ${error.message}`);
+      const hasMoreProviders = getProviderOrder().some((item) => !errors.some((entry) => entry.startsWith(`${item}:`)));
+      if (provider === 'resend' && !shouldFallbackFromResend(error) && !hasMoreProviders) break;
+      console.warn('[email] Provider failed, trying next configured provider', {
+        provider,
+        reason: error.message,
+      });
+    }
+  }
+
+  throw new Error(`Email delivery failed through all configured providers. ${errors.join(' | ')}`);
 };
 
 const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
@@ -385,7 +400,7 @@ const sendJobApplicationEmail = async ({ applicant, job, resume }) => {
 // Send OTP email
 const sendOTP = async (email, otp) => {
   const mailOptions = {
-    from: formatFromAddress(process.env.EMAIL_USER),
+    from: formatFromAddress(getSenderAddress()),
     to: email,
     subject: 'HSI Alumni Portal - Email Verification OTP',
     html: `

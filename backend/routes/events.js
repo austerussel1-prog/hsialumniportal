@@ -235,7 +235,7 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
         console.error('Event image cloud upload failed:', uploadErr.message);
       }
     }
-    // allow admin to set virtual/onsite via isVirtual boolean, location or virtualLink
+  
     const event = new Event({
       title,
       description,
@@ -260,7 +260,7 @@ router.post('/', verifyUser, verifyAdmin, (req, res, next) => {
   }
 });
 
-// Delete an event (admin only)
+
 router.delete('/:id', verifyUser, verifyAdmin, async (req, res) => {
   try {
     const deleted = await Event.findByIdAndDelete(req.params.id).lean();
@@ -272,7 +272,7 @@ router.delete('/:id', verifyUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// Register for an event
+
 router.post('/:id/register', async (req, res) => {
   try {
     const authUser = await resolveOptionalAuthenticatedUser(req);
@@ -296,7 +296,7 @@ router.post('/:id/register', async (req, res) => {
 
     const activeRegistrations = event.registrations.filter((registration) => String(registration?.status || 'pending').toLowerCase() !== 'rejected');
 
-    // basic capacity check
+   
     if (event.capacity && activeRegistrations.length >= event.capacity) {
       return res.status(400).json({ message: 'Event capacity reached' });
     }
@@ -334,7 +334,7 @@ router.post('/:id/register', async (req, res) => {
   }
 });
 
-// List registrations for an event (admin only)
+
 router.get('/:id/registrations', verifyUser, verifyAdmin, async (req, res) => {
   try {
     const status = String(req.query.status || '').trim().toLowerCase();
@@ -358,7 +358,7 @@ router.get('/:id/registrations', verifyUser, verifyAdmin, async (req, res) => {
   }
 });
 
-// Approve event registration (admin only)
+
 router.patch('/:id/registrations/:registrationId/approve', verifyUser, verifyAdmin, async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -402,7 +402,7 @@ router.patch('/:id/registrations/:registrationId/approve', verifyUser, verifyAdm
   }
 });
 
-// Reject event registration (admin only)
+
 router.patch('/:id/registrations/:registrationId/reject', verifyUser, verifyAdmin, async (req, res) => {
   try {
     const reason = String(req.body?.reason || '').trim();

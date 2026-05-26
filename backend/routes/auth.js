@@ -642,7 +642,12 @@ router.post('/google', async (req, res) => {
       });
 
       await user.save();
-      await sendOTP(email, otp);
+      try {
+        await sendOTP(email, otp);
+      } catch (sendErr) {
+        await User.deleteOne({ _id: user._id });
+        throw sendErr;
+      }
 
       await logAuditEvent({
         req,
@@ -680,6 +685,15 @@ router.post('/google', async (req, res) => {
         // On registration page, send OTP
         const otp = generateOTP();
         const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+        const previousOtpState = {
+          otp: user.otp,
+          otpExpiry: user.otpExpiry,
+          status: user.status,
+          registrationVerifiedAt: user.registrationVerifiedAt,
+          googleId: user.googleId,
+          provider: user.provider,
+          consent: user.consent,
+        };
         
         user.otp = otp;
         user.otpExpiry = otpExpiry;
@@ -689,7 +703,32 @@ router.post('/google', async (req, res) => {
         user.provider = 'google';
         if (consentRecord) user.consent = consentRecord;
         await user.save();
-        await sendOTP(user.email, otp);
+        try {
+          await sendOTP(user.email, otp);
+        } catch (sendErr) {
+          const unsetFields = {};
+          if (!previousOtpState.googleId) unsetFields.googleId = 1;
+          if (!previousOtpState.otp) unsetFields.otp = 1;
+          if (!previousOtpState.otpExpiry) unsetFields.otpExpiry = 1;
+          const restoreUpdate = {
+            $set: {
+              status: previousOtpState.status,
+              registrationVerifiedAt: previousOtpState.registrationVerifiedAt,
+              provider: previousOtpState.provider,
+              consent: previousOtpState.consent,
+              ...(previousOtpState.googleId ? { googleId: previousOtpState.googleId } : {}),
+              ...(previousOtpState.otp ? { otp: previousOtpState.otp } : {}),
+              ...(previousOtpState.otpExpiry ? { otpExpiry: previousOtpState.otpExpiry } : {}),
+            },
+          };
+          if (Object.keys(unsetFields).length) restoreUpdate.$unset = unsetFields;
+
+          await User.updateOne(
+            { _id: user._id },
+            restoreUpdate,
+          );
+          throw sendErr;
+        }
 
         await logAuditEvent({
           req,

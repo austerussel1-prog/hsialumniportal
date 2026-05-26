@@ -55,6 +55,21 @@ router.post('/send-otp', async (req, res) => {
       userAgent: req.headers['user-agent'] || '',
     };
 
+    let userForOtp = existingUser;
+    const previousOtpState = existingUser
+      ? {
+          name: existingUser.name,
+          password: existingUser.password,
+          otp: existingUser.otp,
+          otpExpiry: existingUser.otpExpiry,
+          username: existingUser.username,
+          status: existingUser.status,
+          registrationVerifiedAt: existingUser.registrationVerifiedAt,
+          consent: existingUser.consent,
+        }
+      : null;
+    let createdNewUser = false;
+
     if (existingUser) {
       existingUser.name = rawName;
       existingUser.password = password;
@@ -66,7 +81,7 @@ router.post('/send-otp', async (req, res) => {
       existingUser.consent = consentRecord;
       await existingUser.save();
     } else {
-      const tempUser = new User({
+      userForOtp = new User({
         email: rawEmail,
         name: rawName,
         username: rawUsername,
@@ -77,10 +92,40 @@ router.post('/send-otp', async (req, res) => {
         registrationVerifiedAt: null,
         consent: consentRecord,
       });
-      await tempUser.save();
+      await userForOtp.save();
+      createdNewUser = true;
     }
 
-    await sendOTP(rawEmail, otp);
+    try {
+      await sendOTP(rawEmail, otp);
+    } catch (sendErr) {
+      if (createdNewUser && userForOtp?._id) {
+        await User.deleteOne({ _id: userForOtp._id });
+      } else if (existingUser && previousOtpState) {
+        const unsetFields = {};
+        if (!previousOtpState.otp) unsetFields.otp = 1;
+        if (!previousOtpState.otpExpiry) unsetFields.otpExpiry = 1;
+        const restoreUpdate = {
+          $set: {
+            name: previousOtpState.name,
+            password: previousOtpState.password,
+            username: previousOtpState.username,
+            status: previousOtpState.status,
+            registrationVerifiedAt: previousOtpState.registrationVerifiedAt,
+            consent: previousOtpState.consent,
+            ...(previousOtpState.otp ? { otp: previousOtpState.otp } : {}),
+            ...(previousOtpState.otpExpiry ? { otpExpiry: previousOtpState.otpExpiry } : {}),
+          },
+        };
+        if (Object.keys(unsetFields).length) restoreUpdate.$unset = unsetFields;
+
+        await User.updateOne(
+          { _id: existingUser._id },
+          restoreUpdate,
+        );
+      }
+      throw sendErr;
+    }
 
     await logAuditEvent({
       req,
