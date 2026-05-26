@@ -60,9 +60,9 @@ if (!emailUser || !emailPassword) {
 }
 
 const smtpTimeouts = {
-  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 30000),
-  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 30000),
-  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 30000),
+  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT || 8000),
+  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 8000),
+  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 8000),
 };
 
 const createSmtpTransport = (overrides = {}) => nodemailer.createTransport({
@@ -316,6 +316,8 @@ const getProviderOrder = () => {
   };
 
   add(activeEmailMode);
+  if (emailProvider) return ordered;
+
   if (hasUsableBrevo()) add('brevo');
   if (hasUsableResend()) add('resend');
   if (hasUsableGmailApi()) add('gmail_api');
