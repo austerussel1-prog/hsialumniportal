@@ -619,6 +619,9 @@ router.post('/google', async (req, res) => {
         });
       }
       
+      // On registration page, send OTP before moving to admin approval.
+      const otp = generateOTP();
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
       const baseUsername = buildGoogleUsernameBase(email);
       const username = await generateUniqueUsername(baseUsername);
       const randomPassword = crypto.randomBytes(32).toString('hex');
@@ -632,27 +635,34 @@ router.post('/google', async (req, res) => {
         password: randomPassword,
         role: 'user',
         status: 'pending',
-        registrationVerifiedAt: new Date(),
+        registrationVerifiedAt: null,
+        otp,
+        otpExpiry,
         consent: consentRecord || undefined,
       });
 
       await user.save();
+      try {
+        await sendOTP(email, otp);
+      } catch (sendErr) {
+        await User.deleteOne({ _id: user._id });
+        throw sendErr;
+      }
 
       await logAuditEvent({
         req,
         actorId: user._id,
         actorEmail: user.email,
-        action: 'GOOGLE_REGISTER_VERIFIED',
+        action: 'GOOGLE_REGISTER_OTP_SENT',
         entityType: 'User',
         entityId: String(user._id),
         status: 'success',
       });
 
       return res.status(200).json({
-        message: 'Google registration successful. Your account is pending admin approval.',
-        requiresApproval: true,
+        message: 'OTP sent to your email',
+        requiresOTP: true,
         email,
-        status: 'pending',
       });
     } else {
       // Existing user
@@ -672,21 +682,59 @@ router.post('/google', async (req, res) => {
           return res.status(403).json({ message: msg });
         }
         
-        // Google already verifies email ownership, so no separate OTP is needed here.
+        // On registration page, send OTP before moving to admin approval.
+        const otp = generateOTP();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+        const previousOtpState = {
+          otp: user.otp,
+          otpExpiry: user.otpExpiry,
+          status: user.status,
+          registrationVerifiedAt: user.registrationVerifiedAt,
+          googleId: user.googleId,
+          provider: user.provider,
+          consent: user.consent,
+        };
+
         user.status = 'pending';
-        user.registrationVerifiedAt = new Date();
+        user.registrationVerifiedAt = null;
         user.googleId = googleId;
         user.provider = 'google';
         if (consentRecord) user.consent = consentRecord;
-        user.otp = undefined;
-        user.otpExpiry = undefined;
+        user.otp = otp;
+        user.otpExpiry = otpExpiry;
         await user.save();
+        try {
+          await sendOTP(user.email, otp);
+        } catch (sendErr) {
+          const unsetFields = {};
+          if (!previousOtpState.googleId) unsetFields.googleId = 1;
+          if (!previousOtpState.otp) unsetFields.otp = 1;
+          if (!previousOtpState.otpExpiry) unsetFields.otpExpiry = 1;
+          const restoreUpdate = {
+            $set: {
+              status: previousOtpState.status,
+              registrationVerifiedAt: previousOtpState.registrationVerifiedAt,
+              provider: previousOtpState.provider,
+              consent: previousOtpState.consent,
+              ...(previousOtpState.googleId ? { googleId: previousOtpState.googleId } : {}),
+              ...(previousOtpState.otp ? { otp: previousOtpState.otp } : {}),
+              ...(previousOtpState.otpExpiry ? { otpExpiry: previousOtpState.otpExpiry } : {}),
+            },
+          };
+          if (Object.keys(unsetFields).length) restoreUpdate.$unset = unsetFields;
+
+          await User.updateOne(
+            { _id: user._id },
+            restoreUpdate,
+          );
+          throw sendErr;
+        }
 
         await logAuditEvent({
           req,
           actorId: user._id,
           actorEmail: user.email,
-          action: 'GOOGLE_REGISTER_VERIFIED',
+          action: 'GOOGLE_REGISTER_OTP_SENT',
           entityType: 'User',
           entityId: String(user._id),
           status: 'success',
@@ -694,10 +742,9 @@ router.post('/google', async (req, res) => {
         });
 
         return res.status(200).json({
-          message: 'Google registration successful. Your account is pending admin approval.',
-          requiresApproval: true,
+          message: 'OTP sent to your email',
+          requiresOTP: true,
           email: user.email,
-          status: 'pending',
         });
       }
       
