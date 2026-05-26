@@ -23,6 +23,7 @@ const notificationsRoutes = require('./routes/notifications');
 const { scheduleDataRetentionJob } = require('./services/privacyRetentionService');
 const { scheduleEventLifecycleJob } = require('./services/eventLifecycleService');
 const { hasEncryptionKey, getEncryptionKeyFingerprint } = require('./utils/fieldEncryption');
+const { getEmailDeliveryStatus } = require('./services/emailService');
 
 const app = express();
 
@@ -94,6 +95,7 @@ app.get('/api/health', (req, res) => {
     nodeEnv: process.env.NODE_ENV || 'unset',
     encryptionConfigured: hasEncryptionKey(),
     encryptionKeyFingerprint: hasEncryptionKey() ? getEncryptionKeyFingerprint() : null,
+    email: getEmailDeliveryStatus(),
     commit:
       process.env.RENDER_GIT_COMMIT
       || process.env.RENDER_GIT_BRANCH

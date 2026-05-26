@@ -288,6 +288,15 @@ const getProviderOrder = () => {
   return ordered;
 };
 
+const getEmailDeliveryStatus = () => ({
+  activeEmailMode,
+  configuredProviders: getProviderOrder(),
+  hasSmtp: hasUsableSmtp(),
+  hasGmailApi: hasUsableGmailApi(),
+  hasResend: hasUsableResend(),
+  senderConfigured: Boolean(getSenderAddress()),
+});
+
 const sendMail = async (mailOptions) => {
   const errors = [];
 
@@ -822,4 +831,5 @@ module.exports = {
   sendJobApplicationEmail,
   sendEventFeedbackEmail,
   sendAccountFeedbackEmail,
+  getEmailDeliveryStatus,
 };
