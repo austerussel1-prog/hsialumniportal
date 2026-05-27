@@ -11,6 +11,7 @@ const smtpPort = Number(process.env.SMTP_PORT || 587);
 const smtpSecure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || smtpPort === 465;
 const resendApiKey = String(process.env.RESEND_API_KEY || '').trim();
 const resendFrom = String(process.env.RESEND_FROM || process.env.EMAIL_USER || 'onboarding@resend.dev').trim();
+const brevoApiKey = String(process.env.BREVO_API_KEY || '').trim();
 const brevoSmtpUser = String(process.env.BREVO_SMTP_USER || '').trim();
 const brevoSmtpPassword = String(process.env.BREVO_SMTP_PASSWORD || '').trim();
 const brevoFromEmail = String(process.env.BREVO_FROM_EMAIL || '').trim();
@@ -90,7 +91,9 @@ const hasUsableGmailApi = () => Boolean(
   gmailOauthClientId && gmailOauthClientSecret && gmailOauthRefreshToken && gmailSenderEmail,
 );
 const hasUsableSmtp = () => Boolean(emailUser && emailPassword);
-const hasUsableBrevo = () => Boolean(brevoSmtpUser && brevoSmtpPassword && (brevoFromEmail || mailFromEmail));
+const hasUsableBrevoApi = () => Boolean(brevoApiKey && (brevoFromEmail || mailFromEmail || emailUser));
+const hasUsableBrevoSmtp = () => Boolean(brevoSmtpUser && brevoSmtpPassword && (brevoFromEmail || mailFromEmail || emailUser));
+const hasUsableBrevo = () => hasUsableBrevoApi() || hasUsableBrevoSmtp();
 const hasUsableResend = () => Boolean(
   resendApiKey && resendApiKey.startsWith('re_'),
 );
@@ -248,6 +251,78 @@ const sendViaResend = async (mailOptions) => {
   return true;
 };
 
+const htmlToText = (html) => String(html || '')
+  .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+  .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const parseEmailAddress = (value) => {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(.*?)\s*<([^>]+)>$/);
+  if (!match) return { email: raw, name: '' };
+
+  return {
+    name: match[1].replace(/^"|"$/g, '').trim(),
+    email: match[2].trim(),
+  };
+};
+
+const sendViaBrevoApi = async (mailOptions) => {
+  if (!hasUsableBrevoApi()) {
+    throw new Error('BREVO_API_KEY and a sender email are required for Brevo API delivery');
+  }
+
+  const to = String(mailOptions?.to || '')
+    .split(',')
+    .map((item) => parseEmailAddress(item))
+    .filter((item) => item.email);
+
+  if (!to.length) {
+    throw new Error('No recipient configured for email delivery');
+  }
+
+  const sender = parseEmailAddress(mailOptions?.from || formatFromAddress(getSenderAddress()));
+  if (!sender.email) {
+    throw new Error('No sender configured for Brevo API delivery');
+  }
+
+  const attachments = Array.isArray(mailOptions?.attachments)
+    ? mailOptions.attachments.map((att) => ({
+      name: att.filename || 'attachment',
+      content: Buffer.isBuffer(att.content)
+        ? att.content.toString('base64')
+        : Buffer.from(String(att.content || ''), 'utf8').toString('base64'),
+    }))
+    : [];
+
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': brevoApiKey,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender,
+      to,
+      replyTo: mailOptions?.replyTo ? parseEmailAddress(mailOptions.replyTo) : undefined,
+      subject: mailOptions?.subject || 'HSI Alumni Portal',
+      htmlContent: mailOptions?.html || undefined,
+      textContent: mailOptions?.text || htmlToText(mailOptions?.html),
+      attachment: attachments.length ? attachments : undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Brevo API error (${response.status}): ${body || 'Unknown error'}`);
+  }
+
+  return true;
+};
+
 const sendViaSmtp = async (mailOptions) => {
   assertEmailConfig();
   try {
@@ -282,7 +357,18 @@ const sendViaSmtp = async (mailOptions) => {
 
 const sendViaBrevo = async (mailOptions) => {
   if (!hasUsableBrevo()) {
-    throw new Error('Brevo email provider selected, but BREVO_SMTP_USER, BREVO_SMTP_PASSWORD, and BREVO_FROM_EMAIL are required');
+    throw new Error('Brevo email provider selected, but Brevo API or SMTP credentials are missing');
+  }
+
+  if (hasUsableBrevoApi()) {
+    try {
+      return await sendViaBrevoApi(mailOptions);
+    } catch (error) {
+      if (!hasUsableBrevoSmtp()) throw error;
+      console.warn('[email] Brevo API failed, trying Brevo SMTP', {
+        reason: error.message,
+      });
+    }
   }
 
   const brevoTransporter = nodemailer.createTransport({
@@ -314,9 +400,10 @@ const getProviderOrder = () => {
   const add = (provider) => {
     if (!ordered.includes(provider)) ordered.push(provider);
   };
+  const strictProvider = String(process.env.EMAIL_PROVIDER_STRICT || '').toLowerCase() === 'true';
 
   add(activeEmailMode);
-  if (emailProvider) return ordered;
+  if (emailProvider && strictProvider) return ordered;
 
   if (hasUsableBrevo()) add('brevo');
   if (hasUsableResend()) add('resend');
@@ -330,6 +417,8 @@ const getEmailDeliveryStatus = () => ({
   configuredProviders: getProviderOrder(),
   hasSmtp: hasUsableSmtp(),
   hasBrevo: hasUsableBrevo(),
+  hasBrevoApi: hasUsableBrevoApi(),
+  hasBrevoSmtp: hasUsableBrevoSmtp(),
   hasGmailApi: hasUsableGmailApi(),
   hasResend: hasUsableResend(),
   senderConfigured: Boolean(getSenderAddress()),
