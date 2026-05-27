@@ -1351,7 +1351,10 @@ router.post('/feedback', verifyToken, async (req, res) => {
 
     try {
       await sendAccountFeedbackEmail({
-        user,
+        user: {
+          ...user,
+          name: displayName(user.name) || user.email || 'Unknown User',
+        },
         feedback: {
           feedbackType,
           subject,
@@ -1359,7 +1362,7 @@ router.post('/feedback', verifyToken, async (req, res) => {
           rating: Number.isFinite(rating) ? rating : 0,
           npsScore: normalizedNpsScore,
           program: normalizedProgram,
-          targetUserName: targetUser?.name || '',
+          targetUserName: displayName(targetUser?.name) || '',
           targetUserEmail: targetUser?.email || '',
         },
       });

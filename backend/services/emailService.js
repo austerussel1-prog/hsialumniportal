@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
+const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const emailUser = String(process.env.EMAIL_USER || '').trim();
 const emailPassword = String(process.env.EMAIL_PASSWORD || '').trim();
@@ -742,6 +743,12 @@ const formatDateTime = (value) => {
   });
 };
 
+const revealEncryptedText = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return isEncryptedValue(raw) ? decryptField(raw) : raw;
+};
+
 const sendDataRemovalDecisionEmail = async ({
   email,
   name,
@@ -816,7 +823,7 @@ const sendAccountFeedbackEmail = async ({ user, feedback }) => {
     throw new Error('No feedback recipient email configured');
   }
 
-  const name = String(user?.name || '').trim() || 'Unknown User';
+  const name = revealEncryptedText(user?.name) || 'Unknown User';
   const email = String(user?.email || '').trim() || 'N/A';
   const role = String(user?.role || '').trim() || 'user';
   const subject = String(feedback?.subject || '').trim() || 'Account Feedback';
@@ -824,7 +831,7 @@ const sendAccountFeedbackEmail = async ({ user, feedback }) => {
   const rating = Number(feedback?.rating || 0);
   const feedbackType = String(feedback?.feedbackType || '').trim();
   const program = String(feedback?.program || '').trim();
-  const targetUserName = String(feedback?.targetUserName || '').trim();
+  const targetUserName = revealEncryptedText(feedback?.targetUserName);
   const targetUserEmail = String(feedback?.targetUserEmail || '').trim();
   const npsScore = feedback?.npsScore === null || typeof feedback?.npsScore === 'undefined'
     ? null
