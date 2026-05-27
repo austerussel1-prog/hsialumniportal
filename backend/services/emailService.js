@@ -262,11 +262,12 @@ const htmlToText = (html) => String(html || '')
 const parseEmailAddress = (value) => {
   const raw = String(value || '').trim();
   const match = raw.match(/^(.*?)\s*<([^>]+)>$/);
-  if (!match) return { email: raw, name: '' };
+  if (!match) return { email: raw };
 
+  const name = match[1].replace(/^"|"$/g, '').trim();
   return {
-    name: match[1].replace(/^"|"$/g, '').trim(),
     email: match[2].trim(),
+    ...(name ? { name } : {}),
   };
 };
 
