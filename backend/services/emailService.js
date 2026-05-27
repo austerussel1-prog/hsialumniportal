@@ -65,6 +65,7 @@ const smtpTimeouts = {
   greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT || 8000),
   socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT || 8000),
 };
+const allowBrevoSmtpFallback = String(process.env.BREVO_ALLOW_SMTP_FALLBACK || '').toLowerCase() === 'true';
 
 const createSmtpTransport = (overrides = {}) => nodemailer.createTransport({
   host: smtpHost,
@@ -364,7 +365,7 @@ const sendViaBrevo = async (mailOptions) => {
     try {
       return await sendViaBrevoApi(mailOptions);
     } catch (error) {
-      if (!hasUsableBrevoSmtp()) throw error;
+      if (!hasUsableBrevoSmtp() || !allowBrevoSmtpFallback) throw error;
       console.warn('[email] Brevo API failed, trying Brevo SMTP', {
         reason: error.message,
       });
