@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
@@ -233,54 +233,63 @@ export default function JobApplicationForm() {
 
   const labelStyle = { fontSize: '14px', fontWeight: '700', color: '#111827' };
   const helperStyle = { marginTop: '6px', fontSize: '12px', color: '#9ca3af' };
-  const toastNode = toast && typeof document !== 'undefined'
+  const toastNode = typeof document !== 'undefined'
     ? createPortal(
-      <div
-        style={{
-          position: 'fixed',
-          top: 16,
-          left: 0,
-          right: 0,
-          display: 'flex',
-          justifyContent: 'center',
-          zIndex: 9999,
-          pointerEvents: 'none',
-          padding: isMobile ? '0 20px' : '0 12px',
-        }}
-      >
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '10px 14px',
-            background: '#dcfce7',
-            border: '1px solid #bbf7d0',
-            borderRadius: 12,
-            boxShadow: '0 10px 18px rgba(17, 24, 39, 0.10)',
-          }}
-        >
+      <AnimatePresence mode="wait">
+        {toast && (
           <div
             style={{
-              width: 22,
-              height: 22,
-              borderRadius: 999,
-              background: '#22c55e',
-              display: 'inline-flex',
-              alignItems: 'center',
+              position: 'fixed',
+              top: 16,
+              left: 0,
+              right: 0,
+              display: 'flex',
               justifyContent: 'center',
-              flexShrink: 0,
+              zIndex: 9999,
+              pointerEvents: 'none',
+              padding: isMobile ? '0 20px' : '0 12px',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
+            <motion.div
+              key={toast.id || `${Date.now()}_${Math.random().toString(16).slice(2)}`}
+              initial={{ opacity: 0, y: -14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -14 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 14px',
+                background: '#dcfce7',
+                border: '1px solid #bbf7d0',
+                borderRadius: 12,
+                boxShadow: '0 10px 18px rgba(17, 24, 39, 0.10)',
+              }}
+            >
+              <div
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 999,
+                  background: '#22c55e',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#065f46' }}>
+                {toast.text}
+              </div>
+            </motion.div>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#065f46' }}>
-            {toast.text}
-          </div>
-        </div>
-      </div>,
+        )}
+      </AnimatePresence>,
       document.body,
     )
     : null;
