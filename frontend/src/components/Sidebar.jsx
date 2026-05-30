@@ -20,11 +20,13 @@ import {
   SignOut,
   List,
   X,
+  Trophy,
 } from '@phosphor-icons/react';
 
 const navItems = [
   { name: 'Dashboard', icon: House, path: '/alumni-management' },
   { name: 'Analytics & Reports', icon: BookOpen, path: '/analytics-and-report', restricted: true },
+  { name: 'KPI Dashboard', icon: Trophy, path: '/kpi-dashboard', restricted: true },
   { name: 'Admin Dashboard', icon: User, path: '/admin-dashboard', restricted: true },
   { name: 'Directory & Networking', icon: AddressBook, path: '/directory' },
   { name: 'Career & Job Opportunities', icon: Briefcase, path: '/training' },

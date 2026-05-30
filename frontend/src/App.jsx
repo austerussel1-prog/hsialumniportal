@@ -25,6 +25,7 @@ import InboxPage from './InboxPage.jsx';
 import TrainingLearningPage from './TrainingLearningPage.jsx';
 import AchievementsRecognitionPage from './AchievementsRecognitionPage.jsx';
 import AnalyticsReportPage from './AnalyticsReportPage.jsx';
+import KPIDashboard from './KPIDashboard.jsx';
 import Toast from './components/Toast.jsx';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 import { ADMIN_ROLES, isGuestUser, safelyParseUser } from './config/session';
@@ -565,6 +566,14 @@ function AnimatedRoutes() {
           element={(
             <AdminOnlyRoute>
               <AnalyticsReportPage />
+            </AdminOnlyRoute>
+          )}
+        />
+        <Route
+          path="/kpi-dashboard"
+          element={(
+            <AdminOnlyRoute>
+              <KPIDashboard />
             </AdminOnlyRoute>
           )}
         />
