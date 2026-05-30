@@ -148,11 +148,4 @@ export const apiEndpoints = {
   volunteerAdminLogs: (status = 'pending') => `${API_URL}/api/mentorship/volunteer/admin/logs?status=${encodeURIComponent(status)}`,
   volunteerApproveLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/approve`,
   volunteerRejectLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/reject`,
-
-  // KPI endpoints
-  kpi: `${API_URL}/api/kpi`,
-  kpiUser: (userId) => `${API_URL}/api/kpi/user/${userId}`,
-  kpiRefresh: (userId) => `${API_URL}/api/kpi/user/${userId}/refresh`,
-  kpiLeaderboard: (userType) => `${API_URL}/api/kpi/leaderboard/${userType}`,
-  kpiStats: `${API_URL}/api/kpi/stats/summary`,
 };

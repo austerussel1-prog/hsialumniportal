@@ -20,7 +20,6 @@ const mentorshipRoutes = require('./routes/mentorship');
 const jobApplicationRoutes = require('./routes/jobApplications');
 const jobRoutes = require('./routes/jobs');
 const notificationsRoutes = require('./routes/notifications');
-const kpiRoutes = require('./routes/kpi');
 const { scheduleDataRetentionJob } = require('./services/privacyRetentionService');
 const { scheduleEventLifecycleJob } = require('./services/eventLifecycleService');
 const { hasEncryptionKey, getEncryptionKeyFingerprint } = require('./utils/fieldEncryption');
@@ -87,7 +86,6 @@ app.use('/api/mentorship', mentorshipRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/job-applications', jobApplicationRoutes);
 app.use('/api/jobs', jobRoutes);
-app.use('/api/kpi', kpiRoutes);
 
 
 app.get('/api/health', (req, res) => {

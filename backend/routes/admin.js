@@ -7,7 +7,6 @@ const Achievement = require('../models/Achievement');
 const AuditLog = require('../models/AuditLog');
 const { sendApprovalEmail, sendRejectionEmail, sendDataRemovalDecisionEmail, sendAdminInviteEmail } = require('../services/emailService');
 const { hardDeleteUsersByIds } = require('../services/userDeletionService');
-const { initializeUserKPI } = require('../services/kpiService');
 const { verifyToken } = require('./auth');
 const { logAuditEvent } = require('../utils/auditLogger');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
@@ -337,13 +336,6 @@ router.post('/approve/:userId', verifyAdmin, async (req, res) => {
     user.status = 'approved';
     user.approvedAt = new Date();
     await user.save();
-
-    // Initialize KPI for the approved user
-    try {
-      await initializeUserKPI(userId, user.role);
-    } catch (kpiErr) {
-      console.error('[admin] Failed to initialize KPI:', kpiErr.message);
-    }
 
     let notificationSent = true;
     try {
