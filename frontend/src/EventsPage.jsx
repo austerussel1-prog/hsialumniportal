@@ -358,10 +358,6 @@ export default function EventsPage() {
   };
 
   const openRegisterModal = (ev) => {
-    if (isGuest) {
-      notify('warning', 'Please create an alumni account before registering for events.');
-      return;
-    }
     setSelectedEvent(ev);
     setShowRegister(true);
   };
@@ -1370,7 +1366,7 @@ export default function EventsPage() {
                         required
                         type="email"
                         defaultValue={registrationDefaults.email}
-                        readOnly
+                        readOnly={!isGuest}
                         style={{
                           padding: '12px 14px',
                           borderRadius: 8,
@@ -1378,7 +1374,7 @@ export default function EventsPage() {
                           background: '#f3f4f6',
                           fontSize: 14,
                           outline: 'none',
-                          cursor: 'not-allowed',
+                          cursor: isGuest ? 'text' : 'not-allowed',
                         }}
                       />
                     </div>
@@ -2314,7 +2310,7 @@ export default function EventsPage() {
                           required
                           type="email"
                           defaultValue={registrationDefaults.email}
-                          readOnly
+                          readOnly={!isGuest}
                           style={{
                             width: '100%',
                             padding: '12px 14px',
@@ -2323,7 +2319,7 @@ export default function EventsPage() {
                             background: '#f3f4f6',
                             fontSize: 14,
                             outline: 'none',
-                            cursor: 'not-allowed',
+                            cursor: isGuest ? 'text' : 'not-allowed',
                           }}
                         />
                       </div>

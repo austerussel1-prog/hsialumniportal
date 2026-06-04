@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createProfileBackLink } from './config/profileNavigation';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
+import { isGuestUser, safelyParseUser } from './config/session';
 
 const PhotoIcon = () => (
   <svg className="inline align-middle mr-1" width="18" height="18" fill="none" stroke="#6b7280" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="12.5" r="1.5"/></svg>
@@ -144,8 +145,7 @@ export default function AnnouncementsPage() {
   const searchRowRef = useRef(null);
 
   useEffect(() => {
-    const u = localStorage.getItem('user');
-    if (u) setUser(JSON.parse(u));
+    setUser(safelyParseUser());
     fetchAnnouncements();
   }, []);
 
@@ -244,6 +244,7 @@ export default function AnnouncementsPage() {
   };
 
   const isAdmin = user && ['super_admin', 'admin', 'hr', 'alumni_officer'].includes(user.role);
+  const isGuest = isGuestUser(user);
   const currentUserId = user?._id || user?.id;
   const navigate = useNavigate();
 
@@ -315,6 +316,9 @@ export default function AnnouncementsPage() {
   };
 
   const handleToggleHeart = async (id) => {
+    if (isGuest) {
+      return;
+    }
     if (!currentUserId) {
       setError('Please sign in to react');
       return;
@@ -354,6 +358,9 @@ export default function AnnouncementsPage() {
   };
 
   const handleOpenComment = (id) => {
+    if (isGuest) {
+      return;
+    }
     setOpenCommentId(prev => (prev === id ? null : id));
   };
 
@@ -362,6 +369,9 @@ export default function AnnouncementsPage() {
   };
 
   const submitComment = async (id, textParam) => {
+    if (isGuest) {
+      return;
+    }
     const text = (typeof textParam === 'string' ? textParam : (commentDrafts[id] || '')).trim();
     if (!text) return;
     try {
@@ -610,10 +620,12 @@ export default function AnnouncementsPage() {
                             <div className="text-xs text-[#888]">{new Date(a.createdAt).toLocaleString()}</div>
                           </div>
                           <div className="relative">
-                            <button onClick={(e) => { e.stopPropagation(); toggleMenu(a._id); }} className="p-2 rounded hover:bg-gray-100">
-                              <svg width="18" height="6" viewBox="0 0 24 6" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="4" cy="3" r="1.2"/><circle cx="12" cy="3" r="1.2"/><circle cx="20" cy="3" r="1.2"/></svg>
-                            </button>
-                            {menuOpenId === a._id && (
+                            {!isGuest && (
+                              <button onClick={(e) => { e.stopPropagation(); toggleMenu(a._id); }} className="p-2 rounded hover:bg-gray-100">
+                                <svg width="18" height="6" viewBox="0 0 24 6" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="4" cy="3" r="1.2"/><circle cx="12" cy="3" r="1.2"/><circle cx="20" cy="3" r="1.2"/></svg>
+                              </button>
+                            )}
+                            {!isGuest && menuOpenId === a._id && (
                               <div onClick={(e) => e.stopPropagation()} className="absolute right-0 mt-2 w-44 bg-white border rounded shadow-md z-10">
                                 <button onClick={(e) => { e.stopPropagation(); setSelectedAnnouncement(a); setMenuOpenId(null); }} className="w-full text-left px-4 py-2 hover:bg-gray-50">View Full Post</button>
                                 {(isAdmin || (a.author && String(a.author._id || a.author) === String(currentUserId))) && (
@@ -639,19 +651,21 @@ export default function AnnouncementsPage() {
                             ))}
                           </div>
                         )}
-                        <div className="flex items-center text-sm text-[#6b7280]">
-                          <div className="flex items-center gap-4">
-                            <button onClick={(e) => { e.stopPropagation(); handleToggleHeart(a._id); }} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
-                              <ReactionHeartIcon liked={(a.hearts || []).some((h) => String(h) === String(currentUserId))} />
-                              {a.hearts?.length > 0 && <span>{a.hearts.length}</span>}
-                            </button>
+                        {!isGuest && (
+                          <div className="flex items-center text-sm text-[#6b7280]">
+                            <div className="flex items-center gap-4">
+                              <button onClick={(e) => { e.stopPropagation(); handleToggleHeart(a._id); }} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
+                                <ReactionHeartIcon liked={(a.hearts || []).some((h) => String(h) === String(currentUserId))} />
+                                {a.hearts?.length > 0 && <span>{a.hearts.length}</span>}
+                              </button>
 
-                            <button onClick={(e) => { e.stopPropagation(); handleOpenComment(a._id); }} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                              {a.comments?.length > 0 && <span>({a.comments.length})</span>}
-                            </button>
+                              <button onClick={(e) => { e.stopPropagation(); handleOpenComment(a._id); }} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                {a.comments?.length > 0 && <span>({a.comments.length})</span>}
+                              </button>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         {/* Comments list and composer */}
                         <div className="mt-3">
@@ -677,7 +691,7 @@ export default function AnnouncementsPage() {
                           )}
 
                           <AnimatePresence>
-                            {openCommentId === a._id && (
+                            {!isGuest && openCommentId === a._id && (
                               <motion.div
                                 key={`composer-${a._id}`}
                                 initial={{ opacity: 0, y: -6, scale: 0.98 }}
@@ -734,7 +748,7 @@ export default function AnnouncementsPage() {
         </div>
       </main>
       {selectedAnnouncement && (
-        <FullPostModal post={selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)} onHeart={handleToggleHeart} onCommentSubmit={submitComment} currentUserId={currentUserId} />
+        <FullPostModal post={selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)} onHeart={handleToggleHeart} onCommentSubmit={submitComment} currentUserId={currentUserId} readOnly={isGuest} />
       )}
       {confirmDeleteId && (
         <motion.div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -752,7 +766,7 @@ export default function AnnouncementsPage() {
   );
 }
 
-function FullPostModal({ post, onClose, onHeart, onCommentSubmit, currentUserId }) {
+function FullPostModal({ post, onClose, onHeart, onCommentSubmit, currentUserId, readOnly = false }) {
   const commentRef = useRef(null);
   const navigate = useNavigate();
   const liked = (post?.hearts || []).some((heartId) => String(heartId) === String(currentUserId || ''));
@@ -794,13 +808,15 @@ function FullPostModal({ post, onClose, onHeart, onCommentSubmit, currentUserId 
               </div>
             )}
 
-            <div className="flex items-center gap-4 mb-4">
-              <button onClick={() => onHeart(post._id)} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
-                <ReactionHeartIcon liked={liked} />
-                {post.hearts?.length > 0 && <span>{post.hearts.length}</span>}
-              </button>
-              <div className="text-sm text-[#6b7280]">Comments {post.comments?.length ? `(${post.comments.length})` : ''}</div>
-            </div>
+            {!readOnly && (
+              <div className="flex items-center gap-4 mb-4">
+                <button onClick={() => onHeart(post._id)} className="flex items-center gap-2 text-[#6b7280] hover:text-[#111827]">
+                  <ReactionHeartIcon liked={liked} />
+                  {post.hearts?.length > 0 && <span>{post.hearts.length}</span>}
+                </button>
+                <div className="text-sm text-[#6b7280]">Comments {post.comments?.length ? `(${post.comments.length})` : ''}</div>
+              </div>
+            )}
 
             <div className="space-y-3 max-h-64 overflow-auto mb-4">
               {post.comments && post.comments.map(c => (
@@ -821,16 +837,18 @@ function FullPostModal({ post, onClose, onHeart, onCommentSubmit, currentUserId 
               ))}
             </div>
 
-            <div className="flex gap-2">
-              <input ref={commentRef} placeholder="Write a comment..." className="flex-1 px-3 py-2 rounded border border-gray-200 text-sm" id="fullpost-comment" />
-              <button onClick={async () => {
-                const el = document.getElementById('fullpost-comment');
-                const val = el?.value?.trim();
-                if (!val) return;
-                await onCommentSubmit(post._id, val);
-                if (el) el.value = '';
-              }} className="px-3 py-2 bg-[#F2C94C] text-[#222] rounded text-sm font-semibold">Comment</button>
-            </div>
+            {!readOnly && (
+              <div className="flex gap-2">
+                <input ref={commentRef} placeholder="Write a comment..." className="flex-1 px-3 py-2 rounded border border-gray-200 text-sm" id="fullpost-comment" />
+                <button onClick={async () => {
+                  const el = document.getElementById('fullpost-comment');
+                  const val = el?.value?.trim();
+                  if (!val) return;
+                  await onCommentSubmit(post._id, val);
+                  if (el) el.value = '';
+                }} className="px-3 py-2 bg-[#F2C94C] text-[#222] rounded text-sm font-semibold">Comment</button>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>

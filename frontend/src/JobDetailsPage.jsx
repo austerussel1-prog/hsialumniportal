@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
-import { isGuestUser, safelyParseUser } from './config/session';
 
 const USER_POSTED_JOBS_KEY = 'hsi_user_job_posts';
 const ADMIN_ROLES = ['super_admin', 'admin', 'hr', 'alumni_officer'];
@@ -398,11 +397,6 @@ export default function JobDetailsPage() {
   };
 
   const goToApplicationForm = () => {
-    const user = safelyParseUser();
-    if (!user || isGuestUser(user)) {
-      showToast('warning', 'Please create an alumni account before applying for jobs.');
-      return;
-    }
     if (jobId !== null) {
       navigate(`/job-application?id=${encodeURIComponent(String(jobId))}`, { state: { jobId: String(jobId) } });
       return;

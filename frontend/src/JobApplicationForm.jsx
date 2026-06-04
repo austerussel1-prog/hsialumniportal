@@ -78,11 +78,10 @@ export default function JobApplicationForm() {
       if (hasLocal) return;
 
       const token = localStorage.getItem('token');
-      if (!token) return;
 
       try {
         const response = await fetch(apiEndpoints.jobById(encodeURIComponent(String(jobId))), {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data?.job || !mounted) return;

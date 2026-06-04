@@ -276,16 +276,19 @@ router.delete('/:id', verifyUser, verifyAdmin, async (req, res) => {
 router.post('/:id/register', async (req, res) => {
   try {
     const authUser = await resolveOptionalAuthenticatedUser(req);
-    if (!authUser?._id) return res.status(401).json({ message: 'Please log in to register for this event' });
-
-    const accountUser = await User.findById(authUser._id).select('name email isDeleted').lean({ getters: true });
-    if (!accountUser || accountUser.isDeleted) return res.status(401).json({ message: 'Invalid user' });
+    const accountUser = authUser?._id
+      ? await User.findById(authUser._id).select('name email isDeleted').lean({ getters: true })
+      : null;
+    if (authUser?._id && (!accountUser || accountUser.isDeleted)) {
+      return res.status(401).json({ message: 'Invalid user' });
+    }
 
     const submittedName = String(req.body?.name || '').trim();
+    const submittedEmail = String(req.body?.email || '').trim().toLowerCase();
     const name = submittedName || String(accountUser?.name || '').trim();
-    const email = String(accountUser?.email || '').trim().toLowerCase();
+    const email = String(accountUser?.email || submittedEmail || '').trim().toLowerCase();
     const phone = String(req.body?.phone || '').trim();
-    if (!name || !email) return res.status(400).json({ message: 'Your account must have a valid name and email to register' });
+    if (!name || !email) return res.status(400).json({ message: 'Name and email are required to register' });
 
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
@@ -310,7 +313,7 @@ router.post('/:id/register', async (req, res) => {
     }
 
     if (existingRegistration && existingStatus === 'rejected') {
-      existingRegistration.user = authUser._id;
+      if (authUser?._id) existingRegistration.user = authUser._id;
       existingRegistration.name = name;
       existingRegistration.email = email;
       existingRegistration.phone = phone;
@@ -325,7 +328,13 @@ router.post('/:id/register', async (req, res) => {
       return res.json({ message: 'Registration resubmitted and pending admin approval', registrations: event.registrations });
     }
 
-    event.registrations.push({ user: authUser?._id, name, email, phone, status: 'pending' });
+    event.registrations.push({
+      ...(authUser?._id ? { user: authUser._id } : {}),
+      name,
+      email,
+      phone,
+      status: 'pending',
+    });
     await event.save();
     res.json({ message: 'Registration submitted and pending admin approval', registrations: event.registrations });
   } catch (err) {

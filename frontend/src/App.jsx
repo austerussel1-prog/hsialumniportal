@@ -555,8 +555,8 @@ function AnimatedRoutes() {
         <Route path="/training/job-details/:jobId" element={<ProtectedRoute guestAllowed><JobDetailsPage /></ProtectedRoute>} />
         <Route path="/career/job-details" element={<ProtectedRoute guestAllowed><JobDetailsPage /></ProtectedRoute>} />
         <Route path="/career/job-details/:jobId" element={<ProtectedRoute guestAllowed><JobDetailsPage /></ProtectedRoute>} />
-        <Route path="/job-application" element={<ProtectedRoute><JobApplicationForm /></ProtectedRoute>} />
-        <Route path="/job-application/:jobId" element={<ProtectedRoute><JobApplicationForm /></ProtectedRoute>} />
+        <Route path="/job-application" element={<ProtectedRoute guestAllowed><JobApplicationForm /></ProtectedRoute>} />
+        <Route path="/job-application/:jobId" element={<ProtectedRoute guestAllowed><JobApplicationForm /></ProtectedRoute>} />
         <Route path="/training/paths" element={<ProtectedRoute><TrainingLearningPage /></ProtectedRoute>} />
         <Route path="/training/certification" element={<ProtectedRoute><TrainingLearningPage /></ProtectedRoute>} />
         <Route path="/achievements" element={<ProtectedRoute><AchievementsRecognitionPage /></ProtectedRoute>} />

@@ -12,7 +12,7 @@ async function run(windowDays = 30) {
     const since = new Date(now.getTime() - (windowDays - 1) * dayMs);
 
     const activeUsers = await User.countDocuments({ role: { $in: ['user', 'alumni'] }, status: { $ne: 'rejected' } });
-
+  
     const eligibleUsers = await User.find({ role: { $in: ['user', 'alumni'] }, status: { $ne: 'rejected' } }).select('_id createdAt status').lean();
 
     const timelinePoints = 7;
