@@ -216,7 +216,9 @@ export default function AnnouncementsPage() {
       setLoading(true);
       setError('');
       const token = localStorage.getItem('token');
-      const res = await fetch(apiEndpoints.announcements, {
+      const guestUser = isGuestUser(safelyParseUser());
+      const endpoint = guestUser || !token ? apiEndpoints.publicAnnouncements : apiEndpoints.announcements;
+      const res = await fetch(endpoint, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (!res.ok) {
