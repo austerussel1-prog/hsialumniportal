@@ -10,6 +10,7 @@ export default function AnalyticsReportPage() {
   const [error, setError] = useState('');
   const [selectedWindowDays, setSelectedWindowDays] = useState(30);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedKpiKey, setSelectedKpiKey] = useState('totalRegisteredUsers');
   const [metrics, setMetrics] = useState({
     activeUsers: 0,
     totalRegisteredUsers: 0,
@@ -267,16 +268,61 @@ export default function AnalyticsReportPage() {
   const periodLabel = metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days`;
   const formatPercent = (value) => `${Number(value || 0).toFixed(1).replace(/\.0$/, '')}%`;
   const selectedRangeLabel = selectedWindowDays === 365 ? 'Last Year' : `Last ${selectedWindowDays} Days`;
+  const kpiDetails = {
+    totalRegisteredUsers: {
+      title: 'Total Registered Users',
+      description: 'Kabuuang bilang ng alumni at user accounts na nasa portal. Ginagamit ito para makita kung lumalaki ang user base ng system.',
+      formula: 'Count of all non-deleted alumni/user accounts.',
+      use: 'Kapag pataas ang trend, ibig sabihin mas maraming users ang nagreregister o nadadagdag sa portal.',
+    },
+    activeUsers: {
+      title: 'Active Users',
+      description: 'Approved users na puwedeng gumamit ng portal. Ipinapakita nito ang current usable population ng system.',
+      formula: 'Count of approved alumni/user accounts.',
+      use: 'Useful ito para malaman kung ilan ang may access after approval process.',
+    },
+    accountApprovalRate: {
+      title: 'Account Approval Rate',
+      description: 'Percent ng registered accounts na na-approve na ng admins.',
+      formula: 'Approved Accounts / Total Registered Accounts x 100.',
+      use: 'Mataas na rate means efficient ang approval flow; mababang rate means maraming pending/rejected accounts na kailangan silipin.',
+    },
+    monthlyActiveUsers: {
+      title: 'Monthly Active Users',
+      description: 'Bilang ng users na nag-login sa selected date range.',
+      formula: 'Count of users with login activity within the selected period.',
+      use: 'Ginagamit ito para makita kung gaano ka-active ang alumni community sa portal.',
+    },
+    userRetentionRate: {
+      title: 'User Retention Rate',
+      description: 'Percent ng active users na bumalik ulit, hindi lang bagong register.',
+      formula: 'Returning Users / Total Active Users x 100.',
+      use: 'Mataas na retention means may reason ang users bumalik sa system, tulad ng jobs, certifications, events, o networking.',
+    },
+    certificationsCompleted: {
+      title: 'Certifications Completed',
+      description: 'Kabuuang certification or badge completions na na-record sa portal.',
+      formula: 'Count of awarded certification events/badges.',
+      use: 'Nakakatulong ito para masukat kung ginagamit ng alumni ang learning and workforce development features.',
+    },
+    engagementRate: {
+      title: 'Engagement Rate',
+      description: 'Percent ng approved users na may engagement signal sa portal.',
+      formula: 'Engaged Users / Active Users x 100.',
+      use: 'Useful ito para makita kung hindi lang registered ang users, kundi nakikipag-interact din sila sa system.',
+    },
+  };
 
   const cards = [
-    { icon: Users, label: 'Total Registered Users', value: metrics.totalRegisteredUsers.toLocaleString(), trendMetric: metrics.totalRegisteredTrend, helper: 'vs previous period' },
-    { icon: Users, label: 'Active Users', value: metrics.activeUsers.toLocaleString(), trend: `+${metrics.newUsersInWindow || 0} created | +${metrics.approvalsInWindow || 0} approved`, helper: periodLabel },
-    { icon: TrendUp, label: 'Account Approval Rate', value: formatPercent(metrics.accountApprovalRate), trendMetric: metrics.accountApprovalTrend, helper: `${metrics.totalApprovedAccounts.toLocaleString()} approved accounts` },
-    { icon: Users, label: 'Monthly Active Users', value: metrics.monthlyActiveUsers.toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
-    { icon: TrendUp, label: 'User Retention Rate', value: formatPercent(metrics.userRetentionRate), trendMetric: metrics.userRetentionTrend, helper: `${metrics.returningUsers.toLocaleString()} returning users` },
-    { icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
-    { icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
+    { id: 'totalRegisteredUsers', icon: Users, label: 'Total Registered Users', value: metrics.totalRegisteredUsers.toLocaleString(), trendMetric: metrics.totalRegisteredTrend, helper: 'vs previous period' },
+    { id: 'activeUsers', icon: Users, label: 'Active Users', value: metrics.activeUsers.toLocaleString(), trend: `+${metrics.newUsersInWindow || 0} created | +${metrics.approvalsInWindow || 0} approved`, helper: periodLabel },
+    { id: 'accountApprovalRate', icon: TrendUp, label: 'Account Approval Rate', value: formatPercent(metrics.accountApprovalRate), trendMetric: metrics.accountApprovalTrend, helper: `${metrics.totalApprovedAccounts.toLocaleString()} approved accounts` },
+    { id: 'monthlyActiveUsers', icon: Users, label: 'Monthly Active Users', value: metrics.monthlyActiveUsers.toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
+    { id: 'userRetentionRate', icon: TrendUp, label: 'User Retention Rate', value: formatPercent(metrics.userRetentionRate), trendMetric: metrics.userRetentionTrend, helper: `${metrics.returningUsers.toLocaleString()} returning users` },
+    { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
+    { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
   ];
+  const selectedKpiDetail = kpiDetails[selectedKpiKey] || kpiDetails.totalRegisteredUsers;
 
   const windowDays = Math.max(
     1,
@@ -409,6 +455,33 @@ export default function AnalyticsReportPage() {
           min-width: 0;
           overflow: hidden;
         }
+        .ar-kpi-card {
+          width: 100%;
+          text-align: left;
+          cursor: pointer;
+          transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+        }
+        .ar-kpi-card:hover,
+        .ar-kpi-card:focus-visible {
+          border-color: #d9a520;
+          box-shadow: 0 8px 18px rgba(176, 122, 21, 0.13);
+          outline: none;
+          transform: translateY(-1px);
+        }
+        .ar-kpi-card.is-selected {
+          border-color: #d9a520;
+          box-shadow: inset 0 0 0 1px rgba(217, 165, 32, 0.28);
+        }
+        .ar-kpi-detail {
+          margin-top: 12px;
+          display: grid;
+          gap: 10px;
+          grid-template-columns: 1.15fr 1fr 1fr;
+          align-items: start;
+        }
+        .ar-kpi-detail-title { margin: 0; color: #1f2937; font-size: 18px; line-height: 1.2; }
+        .ar-kpi-detail-label { color: #a06c04; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0; }
+        .ar-kpi-detail-text { margin: 4px 0 0; color: #4b5563; font-size: 13px; line-height: 1.45; }
         .ar-middle-grid {
           margin-top: 14px;
           display: grid;
@@ -442,6 +515,7 @@ export default function AnalyticsReportPage() {
           .ar-title { font-size: 22px; line-height: 1.15; }
           .ar-subtitle { font-size: 12px; margin-top: 4px; }
           .ar-card { padding: 10px; border-radius: 14px; }
+          .ar-kpi-detail { grid-template-columns: 1fr; }
           .ar-chart-title { font-size: 21px; }
           .ar-chart-legend { font-size: 12px; gap: 8px; }
           .ar-filter, .ar-download { font-size: 12px; padding: 9px 12px; }
@@ -505,12 +579,21 @@ export default function AnalyticsReportPage() {
         <div className="ar-top-grid">
           {cards.map((item) => {
             const Icon = item.icon;
+            const isSelected = selectedKpiKey === item.id;
             const trendDirection = String(item.trendMetric?.direction || 'up').toLowerCase();
             const isDecline = trendDirection === 'down' || Number(item.trendMetric?.change || 0) < 0;
             const TrendIcon = isDecline ? TrendDown : TrendUp;
             const trendColor = isDecline ? '#dc2626' : '#15803d';
             return (
-              <div key={item.label} className="ar-card" style={{ minHeight: '118px' }}>
+              <button
+                key={item.label}
+                type="button"
+                className={`ar-card ar-kpi-card${isSelected ? ' is-selected' : ''}`}
+                onClick={() => setSelectedKpiKey(item.id)}
+                aria-pressed={isSelected}
+                aria-label={`Show details for ${item.label}`}
+                style={{ minHeight: '118px', font: 'inherit' }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '40px', height: '40px', borderRadius: '999px', background: '#f7eddb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Icon size={18} color="#a06c04" />
@@ -531,10 +614,35 @@ export default function AnalyticsReportPage() {
                   )}
                   <div style={{ color: '#6b7280', fontSize: '11px' }}>{item.helper}</div>
                 </div>
-              </div>
+                <div style={{ marginTop: 8, color: isSelected ? '#a06c04' : '#9ca3af', fontSize: 11, fontWeight: 700 }}>
+                  {isSelected ? 'Showing guide below' : 'Click for guide'}
+                </div>
+              </button>
             );
           })}
         </div>
+
+        <motion.div
+          key={selectedKpiKey}
+          className="ar-card ar-kpi-detail"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18 }}
+        >
+          <div>
+            <div className="ar-kpi-detail-label">Selected KPI</div>
+            <h2 className="ar-kpi-detail-title">{selectedKpiDetail.title}</h2>
+            <p className="ar-kpi-detail-text">{selectedKpiDetail.description}</p>
+          </div>
+          <div>
+            <div className="ar-kpi-detail-label">How It Is Computed</div>
+            <p className="ar-kpi-detail-text">{selectedKpiDetail.formula}</p>
+          </div>
+          <div>
+            <div className="ar-kpi-detail-label">Why It Matters</div>
+            <p className="ar-kpi-detail-text">{selectedKpiDetail.use}</p>
+          </div>
+        </motion.div>
 
         <div className="ar-middle-grid">
           <div className="ar-card">
