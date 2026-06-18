@@ -55,11 +55,12 @@ export default function AlumniDashboard() {
   const quickActions = [
     { icon: File, label: 'Request a document' },
     { icon: Stack, label: 'Find a mentor', onClick: () => navigate('/mentorship') },
-    { icon: Target, label: 'Browse jobs' },
+    { icon: Target, label: 'Browse jobs', onClick: () => navigate('/training/jobs') },
     { icon: CalendarBlank, label: 'View events' },
   ];
 
   const [conversations, setConversations] = useState(null);
+  const [recommendedJobs, setRecommendedJobs] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -79,6 +80,30 @@ export default function AlumniDashboard() {
       }
     }
     loadConversations();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadRecommendedJobs() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${apiEndpoints.recommendedJobs}?limit=3`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          if (mounted) setRecommendedJobs([]);
+          return;
+        }
+        const data = await res.json();
+        const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+        if (mounted) setRecommendedJobs(jobs);
+      } catch (err) {
+        if (mounted) setRecommendedJobs([]);
+      }
+    }
+    loadRecommendedJobs();
     return () => { mounted = false; };
   }, []);
 
@@ -179,6 +204,56 @@ export default function AlumniDashboard() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div style={{background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', padding: '24px', marginBottom: '32px'}}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '16px'}}>
+              <div>
+                <h2 style={{fontSize: '20px', fontWeight: 'bold', color: '#111827', margin: 0}}>Recommended jobs for you</h2>
+                <div style={{fontSize: '12px', color: '#6b7280', marginTop: '4px'}}>Suggestions are based on your profile skills, course, role, and career keywords.</div>
+              </div>
+              <button onClick={() => navigate('/training/jobs')} style={{fontSize: '12px', color: '#b07a15', fontWeight: '700', background: 'none', border: 'none', cursor: 'pointer'}}>View all jobs -&gt;</button>
+            </div>
+            {recommendedJobs === null ? (
+              <div style={{color: '#6b7280', fontSize: '13px'}}>Finding jobs that match your profile...</div>
+            ) : recommendedJobs.length === 0 ? (
+              <div style={{border: '1px dashed #d1d5db', borderRadius: '8px', padding: '16px', color: '#6b7280', fontSize: '13px'}}>
+                No recommendations yet. Update your profile skills and career details to improve job suggestions.
+              </div>
+            ) : (
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px'}}>
+                {recommendedJobs.map((job) => {
+                  const jobId = String(job?._id || job?.id || '');
+                  const keywords = Array.isArray(job?.matchedKeywords) ? job.matchedKeywords.slice(0, 3) : [];
+                  return (
+                    <button
+                      key={jobId || `${job.company}-${job.position}`}
+                      type="button"
+                      onClick={() => navigate(jobId ? `/training/job-details/${encodeURIComponent(jobId)}` : '/training/jobs')}
+                      style={{textAlign: 'left', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', cursor: 'pointer'}}
+                    >
+                      <div style={{display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start'}}>
+                        <div style={{fontSize: '15px', fontWeight: '800', color: '#111827', lineHeight: 1.2}}>{job.position || 'Job opening'}</div>
+                        <span style={{background: '#ecfdf5', color: '#047857', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap'}}>
+                          {Number(job.matchScore || 0)}% match
+                        </span>
+                      </div>
+                      <div style={{marginTop: '8px', fontSize: '13px', color: '#4b5563'}}>{job.company || 'Company'} - {job.location || 'Location not set'}</div>
+                      <div style={{marginTop: '8px', fontSize: '12px', color: '#6b7280'}}>{job.type || job.category || 'Opportunity'}</div>
+                      {keywords.length > 0 ? (
+                        <div style={{marginTop: '10px', display: 'flex', gap: '6px', flexWrap: 'wrap'}}>
+                          {keywords.map((keyword) => (
+                            <span key={keyword} style={{background: '#fef3c7', color: '#92400e', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: '700'}}>
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '32px'}}>

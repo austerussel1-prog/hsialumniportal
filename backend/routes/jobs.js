@@ -47,6 +47,68 @@ function sanitizePayload(payload = {}) {
   };
 }
 
+function tokenizeProfileText(value) {
+  const stopWords = new Set([
+    'and', 'the', 'for', 'with', 'from', 'that', 'this', 'your', 'you', 'are', 'was', 'were',
+    'has', 'have', 'had', 'job', 'role', 'work', 'team', 'staff', 'general', 'company',
+  ]);
+
+  return String(value || '')
+    .toLowerCase()
+    .split(/[^a-z0-9+#.]+/i)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2 && !stopWords.has(item));
+}
+
+function uniqueTokens(...values) {
+  return Array.from(new Set(values.flatMap((value) => tokenizeProfileText(value))));
+}
+
+function buildJobSuggestion(job, profileTokens) {
+  const jobTokenWeights = [
+    [job.position, 5],
+    [job.department, 3],
+    [job.role, 3],
+    [job.requirements, 4],
+    [job.responsibilities, 3],
+    [job.description, 2],
+    [job.jobDescription, 2],
+    [job.type, 1],
+    [job.workMode, 1],
+    [job.company, 1],
+  ];
+  const scoreMap = new Map();
+
+  for (const [value, weight] of jobTokenWeights) {
+    const sourceValue = Array.isArray(value) ? value.join(' ') : value;
+    for (const token of uniqueTokens(sourceValue)) {
+      scoreMap.set(token, Math.max(scoreMap.get(token) || 0, weight));
+    }
+  }
+
+  const matchedKeywords = [];
+  let weightedScore = 0;
+  let maxPossibleScore = 0;
+
+  for (const token of profileTokens) {
+    const weight = scoreMap.get(token) || 0;
+    maxPossibleScore += 5;
+    if (weight > 0) {
+      weightedScore += weight;
+      matchedKeywords.push(token);
+    }
+  }
+
+  const keywordScore = maxPossibleScore > 0 ? Math.round((weightedScore / maxPossibleScore) * 100) : 0;
+  const matchScore = Math.max(0, Math.min(100, keywordScore));
+
+  return {
+    ...job,
+    matchScore,
+    matchedKeywords: matchedKeywords.slice(0, 5),
+  };
+}
+
 async function ensureAdmin(req, res, next) {
   try {
     const user = await User.findById(req.user.id).select('role').lean();
@@ -77,6 +139,46 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('GET /api/jobs error', error);
     return res.status(500).json({ message: 'Failed to fetch jobs' });
+  }
+});
+
+router.get('/recommended', verifyToken, async (req, res) => {
+  try {
+    const limit = Math.min(10, Math.max(1, parseInt(req.query.limit, 10) || 3));
+    const user = await User.findById(req.user.id)
+      .select('skills major jobTitle education bio bio2 company languages')
+      .lean();
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const profileTokens = uniqueTokens(
+      user.skills,
+      user.major,
+      user.jobTitle,
+      user.education,
+      user.bio,
+      user.bio2,
+      user.company,
+      user.languages,
+    );
+
+    const jobs = await JobPosting.find({ status: /^open$/i })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(80)
+      .lean();
+
+    const recommendedJobs = jobs
+      .map((job) => buildJobSuggestion(job, profileTokens))
+      .sort((left, right) => {
+        if (right.matchScore !== left.matchScore) return right.matchScore - left.matchScore;
+        return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime();
+      })
+      .slice(0, limit);
+
+    return res.json({ jobs: recommendedJobs });
+  } catch (error) {
+    console.error('GET /api/jobs/recommended error', error);
+    return res.status(500).json({ message: 'Failed to fetch recommended jobs' });
   }
 });
 

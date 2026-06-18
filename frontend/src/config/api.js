@@ -100,6 +100,7 @@ export const apiEndpoints = {
 
   // Jobs endpoints
   jobs: `${API_URL}/api/jobs`,
+  recommendedJobs: `${API_URL}/api/jobs/recommended`,
   jobById: (id) => `${API_URL}/api/jobs/${id}`,
 
   // Achievements endpoints

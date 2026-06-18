@@ -485,19 +485,19 @@ export default function AnalyticsReportPage() {
           position: fixed;
           inset: 0;
           z-index: 80;
-          background: rgba(17, 24, 39, 0.42);
+          background: rgba(15, 23, 42, 0.45);
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 18px;
+          padding: 16px;
         }
         .ar-kpi-modal {
           width: min(640px, 100%);
-          border: 1px solid #eadfca;
-          border-radius: 14px;
+          border: 1px solid #e5e7eb;
+          border-radius: 16px;
           background: #fff;
-          padding: 18px;
-          box-shadow: 0 22px 60px rgba(17, 24, 39, 0.22);
+          padding: 16px;
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
         }
         .ar-kpi-modal-head {
           display: flex;
@@ -506,11 +506,11 @@ export default function AnalyticsReportPage() {
           align-items: flex-start;
         }
         .ar-kpi-modal-close {
-          border: 1px solid #eadfca;
-          border-radius: 999px;
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
           width: 32px;
           height: 32px;
-          background: #fffaf0;
+          background: #fff;
           color: #6b7280;
           cursor: pointer;
           display: inline-flex;
@@ -526,8 +526,8 @@ export default function AnalyticsReportPage() {
           grid-template-columns: 1fr;
           align-items: start;
         }
-        .ar-kpi-detail-title { margin: 0; color: #1f2937; font-size: 18px; line-height: 1.2; }
-        .ar-kpi-detail-label { color: #a06c04; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0; }
+        .ar-kpi-detail-title { margin: 0; color: #111827; font-size: 18px; line-height: 1.2; font-weight: 900; }
+        .ar-kpi-detail-label { color: #374151; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0; }
         .ar-kpi-detail-text { margin: 4px 0 0; color: #4b5563; font-size: 13px; line-height: 1.45; }
         .ar-middle-grid {
           margin-top: 14px;
