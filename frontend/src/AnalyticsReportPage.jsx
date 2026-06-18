@@ -513,8 +513,11 @@ export default function AnalyticsReportPage() {
           background: #fffaf0;
           color: #6b7280;
           cursor: pointer;
-          font-size: 20px;
-          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 32px;
+          padding: 0;
         }
         .ar-kpi-modal-body {
           margin-top: 14px;
