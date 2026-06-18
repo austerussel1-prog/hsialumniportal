@@ -675,6 +675,28 @@ router.get('/audit-logs', verifyAdmin, async (req, res) => {
   }
 });
 
+function percentChange(current, previous) {
+  const currentValue = Number(current || 0);
+  const previousValue = Number(previous || 0);
+  if (previousValue <= 0) return currentValue > 0 ? 100 : 0;
+  return Number((((currentValue - previousValue) / previousValue) * 100).toFixed(1));
+}
+
+function percentage(numerator, denominator) {
+  const n = Number(numerator || 0);
+  const d = Number(denominator || 0);
+  if (d <= 0) return 0;
+  return Number(((n / d) * 100).toFixed(1));
+}
+
+function periodTrend(current, previous) {
+  const change = percentChange(current, previous);
+  return {
+    change,
+    direction: change >= 0 ? 'up' : 'down',
+  };
+}
+
 router.get('/analytics-report', verifyToken, async (req, res) => {
   try {
     const dayMs = 24 * 60 * 60 * 1000;
@@ -690,12 +712,13 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
     };
 
     // Count currently approved users as active users
-    const activeUsers = await User.countDocuments({ role: { $in: ['user', 'alumni'] }, status: 'approved' });
+    const activeUsers = await User.countDocuments({ role: { $in: ['user', 'alumni'] }, status: 'approved', isDeleted: { $ne: true } });
 
     // Fetch users we can consider for growth (created or approved), exclude rejected
     const eligibleUsers = await User.find({
       role: { $in: ['user', 'alumni'] },
       status: { $ne: 'rejected' },
+      isDeleted: { $ne: true },
     }).select('_id createdAt approvedAt status').lean();
     const totalEligibleUsers = eligibleUsers.length;
     const eligibleUserIds = new Set(eligibleUsers.map((item) => String(item._id)));
@@ -755,6 +778,56 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       since = sinceStart;
       windowDays = Math.max(1, Math.ceil((todayStart.getTime() - sinceStart.getTime()) / dayMs) + 1);
     }
+
+    const previousStart = new Date(sinceStart.getTime() - (windowDays * dayMs));
+    const previousEnd = new Date(sinceStart);
+    const userRoleMatch = { role: { $in: ['user', 'alumni'] }, isDeleted: { $ne: true } };
+    const [accountKpiFacet = {}] = await User.aggregate([
+      { $match: userRoleMatch },
+      {
+        $facet: {
+          totalRegistered: [{ $count: 'count' }],
+          totalApproved: [{ $match: { status: 'approved' } }, { $count: 'count' }],
+          totalRegisteredBeforeWindow: [
+            { $match: { createdAt: { $lt: sinceStart } } },
+            { $count: 'count' },
+          ],
+          totalApprovedBeforeWindow: [
+            { $match: { status: 'approved', createdAt: { $lt: sinceStart } } },
+            { $count: 'count' },
+          ],
+          monthlyActiveUsers: [
+            { $match: { lastLoginAt: { $gte: sinceStart, $lte: now } } },
+            { $count: 'count' },
+          ],
+          previousMonthlyActiveUsers: [
+            { $match: { lastLoginAt: { $gte: previousStart, $lt: previousEnd } } },
+            { $count: 'count' },
+          ],
+          returningUsers: [
+            { $match: { createdAt: { $lt: sinceStart }, lastLoginAt: { $gte: sinceStart, $lte: now } } },
+            { $count: 'count' },
+          ],
+          previousReturningUsers: [
+            { $match: { createdAt: { $lt: previousStart }, lastLoginAt: { $gte: previousStart, $lt: previousEnd } } },
+            { $count: 'count' },
+          ],
+        },
+      },
+    ]);
+    const facetCount = (name) => Number(accountKpiFacet?.[name]?.[0]?.count || 0);
+    const totalRegisteredUsers = facetCount('totalRegistered');
+    const totalApprovedAccounts = facetCount('totalApproved');
+    const totalRegisteredBeforeWindow = facetCount('totalRegisteredBeforeWindow');
+    const totalApprovedBeforeWindow = facetCount('totalApprovedBeforeWindow');
+    const monthlyActiveUsers = facetCount('monthlyActiveUsers');
+    const previousMonthlyActiveUsers = facetCount('previousMonthlyActiveUsers');
+    const returningUsers = facetCount('returningUsers');
+    const previousReturningUsers = facetCount('previousReturningUsers');
+    const accountApprovalRate = percentage(totalApprovedAccounts, totalRegisteredUsers);
+    const previousAccountApprovalRate = percentage(totalApprovedBeforeWindow, totalRegisteredBeforeWindow);
+    const userRetentionRate = percentage(returningUsers, monthlyActiveUsers);
+    const previousUserRetentionRate = percentage(previousReturningUsers, previousMonthlyActiveUsers);
 
     const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
     const dailyLabels = Array.from({ length: windowDays }, (_, i) => {
@@ -886,12 +959,41 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       );
       certificationSeries[index] += certificationsCompleted;
     }
+    const certificationsInWindow = certificationSeries.reduce((sum, value) => sum + Number(value || 0), 0);
+    const previousCertificationsInWindow = certificationEvents.reduce((sum, event) => {
+      const eventDate = event?.createdAt ? new Date(event.createdAt) : null;
+      if (!eventDate || Number.isNaN(eventDate.getTime()) || eventDate < previousStart || eventDate >= previousEnd) {
+        return sum;
+      }
+      return sum + Number(event?.quantity || 0);
+    }, 0);
+    const certificationCompletionRate = percentage(certificationsInWindow, monthlyActiveUsers || activeUsers);
+    const previousCertificationCompletionRate = percentage(previousCertificationsInWindow, previousMonthlyActiveUsers || activeUsers);
+    const rateTrend = (current, previous) => {
+      const change = Number((Number(current || 0) - Number(previous || 0)).toFixed(1));
+      return {
+        change,
+        direction: change >= 0 ? 'up' : 'down',
+      };
+    };
 
     return res.json({
       activeUsers,
       engagedUsers,
       certificationsCompleted,
       engagementRate,
+      totalRegisteredUsers,
+      totalApprovedAccounts,
+      accountApprovalRate,
+      monthlyActiveUsers,
+      returningUsers,
+      userRetentionRate,
+      certificationCompletionRate,
+      totalRegisteredTrend: periodTrend(totalRegisteredUsers, totalRegisteredBeforeWindow),
+      accountApprovalTrend: rateTrend(accountApprovalRate, previousAccountApprovalRate),
+      monthlyActiveUsersTrend: periodTrend(monthlyActiveUsers, previousMonthlyActiveUsers),
+      userRetentionTrend: rateTrend(userRetentionRate, previousUserRetentionRate),
+      certificationCompletionTrend: rateTrend(certificationCompletionRate, previousCertificationCompletionRate),
       windowDays,
       windowMode,
       sinceStart: sinceStart.toISOString(),
@@ -899,6 +1001,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       totalEligibleUsers,
       newUsersInWindow: usersCreatedInWindow,
       approvalsInWindow: usersApprovedInWindow,
+      certificationsInWindow,
       dailyLabels,
       usersCreatedDaily,
       usersApprovedDaily,
@@ -915,6 +1018,95 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Error fetching analytics report' });
+  }
+});
+
+router.get('/analytics-report/kpis', verifyToken, async (req, res) => {
+  try {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const windowParam = String(req.query.windowDays || '30').trim().toLowerCase();
+    const requestedDays = windowParam === 'year' || windowParam === 'last_year'
+      ? 365
+      : parseInt(windowParam, 10);
+    const windowDays = [7, 30, 90, 365].includes(requestedDays) ? requestedDays : 30;
+    const sinceStart = new Date(todayStart.getTime() - (windowDays - 1) * dayMs);
+    const previousStart = new Date(sinceStart.getTime() - (windowDays * dayMs));
+    const previousEnd = new Date(sinceStart);
+    const userRoleMatch = { role: { $in: ['user', 'alumni'] }, isDeleted: { $ne: true } };
+
+    const [accountKpiFacet = {}, achievement] = await Promise.all([
+      User.aggregate([
+        { $match: userRoleMatch },
+        {
+          $facet: {
+            totalRegistered: [{ $count: 'count' }],
+            totalApproved: [{ $match: { status: 'approved' } }, { $count: 'count' }],
+            totalRegisteredBeforeWindow: [{ $match: { createdAt: { $lt: sinceStart } } }, { $count: 'count' }],
+            totalApprovedBeforeWindow: [{ $match: { status: 'approved', createdAt: { $lt: sinceStart } } }, { $count: 'count' }],
+            monthlyActiveUsers: [{ $match: { lastLoginAt: { $gte: sinceStart, $lte: now } } }, { $count: 'count' }],
+            previousMonthlyActiveUsers: [{ $match: { lastLoginAt: { $gte: previousStart, $lt: previousEnd } } }, { $count: 'count' }],
+            returningUsers: [{ $match: { createdAt: { $lt: sinceStart }, lastLoginAt: { $gte: sinceStart, $lte: now } } }, { $count: 'count' }],
+            previousReturningUsers: [{ $match: { createdAt: { $lt: previousStart }, lastLoginAt: { $gte: previousStart, $lt: previousEnd } } }, { $count: 'count' }],
+          },
+        },
+      ]),
+      Achievement.findOne().sort({ updatedAt: -1 }).lean(),
+    ]);
+
+    const facetCount = (name) => Number(accountKpiFacet?.[name]?.[0]?.count || 0);
+    const totalRegisteredUsers = facetCount('totalRegistered');
+    const totalApprovedAccounts = facetCount('totalApproved');
+    const totalRegisteredBeforeWindow = facetCount('totalRegisteredBeforeWindow');
+    const totalApprovedBeforeWindow = facetCount('totalApprovedBeforeWindow');
+    const monthlyActiveUsers = facetCount('monthlyActiveUsers');
+    const previousMonthlyActiveUsers = facetCount('previousMonthlyActiveUsers');
+    const returningUsers = facetCount('returningUsers');
+    const previousReturningUsers = facetCount('previousReturningUsers');
+    const accountApprovalRate = percentage(totalApprovedAccounts, totalRegisteredUsers);
+    const previousAccountApprovalRate = percentage(totalApprovedBeforeWindow, totalRegisteredBeforeWindow);
+    const userRetentionRate = percentage(returningUsers, monthlyActiveUsers);
+    const previousUserRetentionRate = percentage(previousReturningUsers, previousMonthlyActiveUsers);
+    const certificationEvents = Array.isArray(achievement?.certificationEvents) ? achievement.certificationEvents : [];
+    const certificationsInWindow = certificationEvents.reduce((sum, event) => {
+      const eventDate = event?.createdAt ? new Date(event.createdAt) : null;
+      if (!eventDate || Number.isNaN(eventDate.getTime()) || eventDate < sinceStart || eventDate > now) return sum;
+      return sum + Number(event?.quantity || 0);
+    }, 0);
+    const previousCertificationsInWindow = certificationEvents.reduce((sum, event) => {
+      const eventDate = event?.createdAt ? new Date(event.createdAt) : null;
+      if (!eventDate || Number.isNaN(eventDate.getTime()) || eventDate < previousStart || eventDate >= previousEnd) return sum;
+      return sum + Number(event?.quantity || 0);
+    }, 0);
+    const certificationCompletionRate = percentage(certificationsInWindow, monthlyActiveUsers || totalApprovedAccounts);
+    const previousCertificationCompletionRate = percentage(previousCertificationsInWindow, previousMonthlyActiveUsers || totalApprovedAccounts);
+    const rateTrend = (current, previous) => {
+      const change = Number((Number(current || 0) - Number(previous || 0)).toFixed(1));
+      return { change, direction: change >= 0 ? 'up' : 'down' };
+    };
+
+    return res.json({
+      windowDays,
+      sinceStart: sinceStart.toISOString(),
+      todayStart: todayStart.toISOString(),
+      totalRegisteredUsers,
+      totalApprovedAccounts,
+      accountApprovalRate,
+      monthlyActiveUsers,
+      returningUsers,
+      userRetentionRate,
+      certificationCompletionRate,
+      totalRegisteredTrend: periodTrend(totalRegisteredUsers, totalRegisteredBeforeWindow),
+      accountApprovalTrend: rateTrend(accountApprovalRate, previousAccountApprovalRate),
+      monthlyActiveUsersTrend: periodTrend(monthlyActiveUsers, previousMonthlyActiveUsers),
+      userRetentionTrend: rateTrend(userRetentionRate, previousUserRetentionRate),
+      certificationCompletionTrend: rateTrend(certificationCompletionRate, previousCertificationCompletionRate),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: 'Error fetching analytics KPIs' });
   }
 });
 

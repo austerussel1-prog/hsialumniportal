@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Certificate, TrendUp, DownloadSimple, CaretDown } from '@phosphor-icons/react';
+import { Users, Certificate, TrendUp, TrendDown, DownloadSimple, CaretDown } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
@@ -12,9 +12,21 @@ export default function AnalyticsReportPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [metrics, setMetrics] = useState({
     activeUsers: 0,
+    totalRegisteredUsers: 0,
+    totalApprovedAccounts: 0,
+    accountApprovalRate: 0,
+    monthlyActiveUsers: 0,
+    returningUsers: 0,
+    userRetentionRate: 0,
     engagedUsers: 0,
     certificationsCompleted: 0,
+    certificationCompletionRate: 0,
     engagementRate: 0,
+    totalRegisteredTrend: { change: 0, direction: 'up' },
+    accountApprovalTrend: { change: 0, direction: 'up' },
+    monthlyActiveUsersTrend: { change: 0, direction: 'up' },
+    userRetentionTrend: { change: 0, direction: 'up' },
+    certificationCompletionTrend: { change: 0, direction: 'up' },
     windowDays: 30,
     newUsersInWindow: 0,
     approvalsInWindow: 0,
@@ -60,8 +72,16 @@ export default function AnalyticsReportPage() {
 
       const totalEligibleUsers = Array.isArray(directoryData?.users) ? directoryData.users.length : 0;
       const activeUsers = totalEligibleUsers;
+      const totalRegisteredUsers = totalEligibleUsers;
+      const accountApprovalRate = totalRegisteredUsers > 0 ? 100 : 0;
+      const monthlyActiveUsers = activeUsers;
+      const returningUsers = activeUsers;
+      const userRetentionRate = activeUsers > 0 ? 100 : 0;
       const engagedUsers = Number(achievementsData?.stats?.activeAlumni || 0);
       const certificationsCompleted = Number(achievementsData?.stats?.totalBadgesAwarded || 0);
+      const certificationCompletionRate = activeUsers > 0
+        ? Number(((certificationsCompleted / activeUsers) * 100).toFixed(1))
+        : 0;
       const engagementRate = activeUsers > 0
         ? Number(((engagedUsers / activeUsers) * 100).toFixed(1))
         : 0;
@@ -101,9 +121,21 @@ export default function AnalyticsReportPage() {
 
       return {
         activeUsers,
+        totalRegisteredUsers,
+        totalApprovedAccounts: activeUsers,
+        accountApprovalRate,
+        monthlyActiveUsers,
+        returningUsers,
+        userRetentionRate,
         engagedUsers,
         certificationsCompleted,
+        certificationCompletionRate,
         engagementRate,
+        totalRegisteredTrend: { change: 0, direction: 'up' },
+        accountApprovalTrend: { change: 0, direction: 'up' },
+        monthlyActiveUsersTrend: { change: 0, direction: 'up' },
+        userRetentionTrend: { change: 0, direction: 'up' },
+        certificationCompletionTrend: { change: 0, direction: 'up' },
         windowDays,
         windowMode: selectedWindowDays === 'all' ? 'all_time' : 'last_n_days',
         sinceStart: since.toISOString(),
@@ -140,9 +172,21 @@ export default function AnalyticsReportPage() {
           if (!mounted) return;
           setMetrics({
             activeUsers: Number(data?.activeUsers || 0),
+            totalRegisteredUsers: Number(data?.totalRegisteredUsers || 0),
+            totalApprovedAccounts: Number(data?.totalApprovedAccounts || 0),
+            accountApprovalRate: Number(data?.accountApprovalRate || 0),
+            monthlyActiveUsers: Number(data?.monthlyActiveUsers || 0),
+            returningUsers: Number(data?.returningUsers || 0),
+            userRetentionRate: Number(data?.userRetentionRate || 0),
             engagedUsers: Number(data?.engagedUsers || 0),
             certificationsCompleted: Number(data?.certificationsCompleted || 0),
+            certificationCompletionRate: Number(data?.certificationCompletionRate || 0),
             engagementRate: Number(data?.engagementRate || 0),
+            totalRegisteredTrend: data?.totalRegisteredTrend || { change: 0, direction: 'up' },
+            accountApprovalTrend: data?.accountApprovalTrend || { change: 0, direction: 'up' },
+            monthlyActiveUsersTrend: data?.monthlyActiveUsersTrend || { change: 0, direction: 'up' },
+            userRetentionTrend: data?.userRetentionTrend || { change: 0, direction: 'up' },
+            certificationCompletionTrend: data?.certificationCompletionTrend || { change: 0, direction: 'up' },
             windowDays: Number(data?.windowDays || 30),
             windowMode: String(data?.windowMode || ''),
             sinceStart: typeof data?.sinceStart === 'string' ? data.sinceStart : '',
@@ -220,8 +264,16 @@ export default function AnalyticsReportPage() {
     }
   };
 
+  const periodLabel = metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days`;
+  const formatPercent = (value) => `${Number(value || 0).toFixed(1).replace(/\.0$/, '')}%`;
+  const selectedRangeLabel = selectedWindowDays === 365 ? 'Last Year' : `Last ${selectedWindowDays} Days`;
+
   const cards = [
-    { icon: Users, label: 'Active Users', value: metrics.activeUsers.toLocaleString(), trend: `+${metrics.newUsersInWindow || 0} created | +${metrics.approvalsInWindow || 0} approved`, helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
+    { icon: Users, label: 'Total Registered Users', value: metrics.totalRegisteredUsers.toLocaleString(), trendMetric: metrics.totalRegisteredTrend, helper: 'vs previous period' },
+    { icon: Users, label: 'Active Users', value: metrics.activeUsers.toLocaleString(), trend: `+${metrics.newUsersInWindow || 0} created | +${metrics.approvalsInWindow || 0} approved`, helper: periodLabel },
+    { icon: TrendUp, label: 'Account Approval Rate', value: formatPercent(metrics.accountApprovalRate), trendMetric: metrics.accountApprovalTrend, helper: `${metrics.totalApprovedAccounts.toLocaleString()} approved accounts` },
+    { icon: Users, label: 'Monthly Active Users', value: metrics.monthlyActiveUsers.toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
+    { icon: TrendUp, label: 'User Retention Rate', value: formatPercent(metrics.userRetentionRate), trendMetric: metrics.userRetentionTrend, helper: `${metrics.returningUsers.toLocaleString()} returning users` },
     { icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
     { icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
   ];
@@ -347,7 +399,7 @@ export default function AnalyticsReportPage() {
           margin-top: 20px;
           display: grid;
           gap: 14px;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
         }
         .ar-card {
           border: 1px solid #eadfca;
@@ -414,14 +466,14 @@ export default function AnalyticsReportPage() {
           <div className="ar-actions">
             <div className="ar-filter-wrap">
               <button type="button" className="ar-filter" onClick={() => setFilterOpen(!filterOpen)}>
-                {selectedWindowDays === 'all' ? 'All Time' : `Last ${selectedWindowDays} Days`}
+                {selectedRangeLabel}
                 <CaretDown size={14} />
               </button>
               {filterOpen && (
                 <div style={{ position: 'absolute', right: 0, marginTop: 8, background: '#fff', border: '1px solid #e6d7b5', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,0.08)', zIndex: 40 }}>
-                  {[7, 15, 30, 'all'].map((d) => (
+                  {[7, 30, 90, 365].map((d) => (
                     <div key={d} onClick={() => { setSelectedWindowDays(d); setFilterOpen(false); }} style={{ padding: '8px 12px', cursor: 'pointer', fontWeight: 600 }}>
-                      {d === 'all' ? 'All Time' : `Last ${d} Days`}
+                      {d === 365 ? 'Last Year' : `Last ${d} Days`}
                     </div>
                   ))}
                 </div>
@@ -453,6 +505,10 @@ export default function AnalyticsReportPage() {
         <div className="ar-top-grid">
           {cards.map((item) => {
             const Icon = item.icon;
+            const trendDirection = String(item.trendMetric?.direction || 'up').toLowerCase();
+            const isDecline = trendDirection === 'down' || Number(item.trendMetric?.change || 0) < 0;
+            const TrendIcon = isDecline ? TrendDown : TrendUp;
+            const trendColor = isDecline ? '#dc2626' : '#15803d';
             return (
               <div key={item.label} className="ar-card" style={{ minHeight: '118px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -465,7 +521,14 @@ export default function AnalyticsReportPage() {
                   <div style={{ fontSize: '24px', fontWeight: 800, color: '#111827', lineHeight: 1 }}>
                     {loading ? '...' : item.value}
                   </div>
-                  <div style={{ color: '#a06c04', fontSize: '11px', fontWeight: 700 }}>{item.trend}</div>
+                  {item.trendMetric ? (
+                    <div style={{ color: trendColor, fontSize: '11px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                      <TrendIcon size={13} weight="bold" />
+                      {formatPercent(Math.abs(Number(item.trendMetric.change || 0)))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#a06c04', fontSize: '11px', fontWeight: 700 }}>{item.trend}</div>
+                  )}
                   <div style={{ color: '#6b7280', fontSize: '11px' }}>{item.helper}</div>
                 </div>
               </div>
@@ -635,6 +698,11 @@ export default function AnalyticsReportPage() {
           <h2 className="ar-chart-title">Growth Snapshot</h2>
           <div className="ar-snapshot-chips">
             {[
+              `Total registered users: ${loading ? '...' : metrics.totalRegisteredUsers.toLocaleString()}`,
+              `Approval rate: ${loading ? '...' : formatPercent(metrics.accountApprovalRate)}`,
+              `Certification completion rate: ${loading ? '...' : formatPercent(metrics.certificationCompletionRate)}`,
+              `Monthly active users: ${loading ? '...' : metrics.monthlyActiveUsers.toLocaleString()}`,
+              `User retention rate: ${loading ? '...' : formatPercent(metrics.userRetentionRate)}`,
               `Active users: ${loading ? '...' : metrics.activeUsers.toLocaleString()}`,
               `Engaged users: ${loading ? '...' : metrics.engagedUsers.toLocaleString()}`,
               `Certifications completed: ${loading ? '...' : metrics.certificationsCompleted.toLocaleString()}`,

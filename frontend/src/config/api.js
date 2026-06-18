@@ -47,6 +47,7 @@ export const apiEndpoints = {
   pendingUsers: `${API_URL}/api/admin/pending-users`,
   stats: `${API_URL}/api/admin/stats`,
   analyticsReport: `${API_URL}/api/admin/analytics-report`,
+  analyticsReportKpis: `${API_URL}/api/admin/analytics-report/kpis`,
   analyticsReportExport: `${API_URL}/api/admin/analytics-report/export`,
   auditLogs: (page = 1, limit = 20, status = '', action = '') =>
     `${API_URL}/api/admin/audit-logs?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}${status ? `&status=${encodeURIComponent(status)}` : ''}${action ? `&action=${encodeURIComponent(action)}` : ''}`,
