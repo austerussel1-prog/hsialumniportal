@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CaretDown, MagnifyingGlass } from '@phosphor-icons/react';
+import { CaretDown, MagnifyingGlass, X } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
@@ -84,6 +84,8 @@ export default function JobListingsPage() {
   const [postQueryHandled, setPostQueryHandled] = useState(false);
   const [hoverButton, setHoverButton] = useState(null);
   const [serverJobs, setServerJobs] = useState([]);
+  const [recommendedJobs, setRecommendedJobs] = useState([]);
+  const [recommendedModalOpen, setRecommendedModalOpen] = useState(false);
   const [postForm, setPostForm] = useState({
     category: 'exclusive',
     company: '',
@@ -174,14 +176,53 @@ export default function JobListingsPage() {
   }, []);
 
   useEffect(() => {
-    const hasModalOpen = postModalOpen || Boolean(deleteModalJob);
+    const hasModalOpen = postModalOpen || Boolean(deleteModalJob) || recommendedModalOpen;
     if (!hasModalOpen) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [postModalOpen, deleteModalJob]);
+  }, [postModalOpen, deleteModalJob, recommendedModalOpen]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchRecommendedJobs() {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const response = await fetch(`${apiEndpoints.recommendedJobs}?limit=3`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !mounted) return;
+
+        const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+        setRecommendedJobs(jobs);
+        if (jobs.length > 0 && location.pathname.startsWith('/training')) {
+          setRecommendedModalOpen(true);
+        }
+      } catch (_error) {
+        // Recommendations should never block the job board.
+      }
+    }
+
+    fetchRecommendedJobs();
+    return () => {
+      mounted = false;
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!recommendedModalOpen) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setRecommendedModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [recommendedModalOpen]);
 
   useEffect(() => {
     let mounted = true;
@@ -1178,6 +1219,161 @@ export default function JobListingsPage() {
       </div>
 
       <AnimatePresence>
+        {recommendedModalOpen && recommendedJobs.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setRecommendedModalOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15,23,42,0.45)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 70,
+              padding: isMobile ? '12px' : '18px',
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="recommended-jobs-title"
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              onClick={(event) => event.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: isMobile ? '94vw' : '620px',
+                background: '#fff',
+                borderRadius: '16px',
+                border: '1px solid #e5e7eb',
+                padding: isMobile ? '16px' : '20px',
+                boxShadow: '0 24px 60px rgba(15,23,42,0.28)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#b07a15', textTransform: 'uppercase' }}>Recommended for you</div>
+                  <h2 id="recommended-jobs-title" style={{ margin: '4px 0 0', color: '#111827', fontSize: isMobile ? '22px' : '26px', lineHeight: 1.1, fontWeight: 900 }}>
+                    Jobs that match your profile
+                  </h2>
+                  <p style={{ margin: '8px 0 0', color: '#6b7280', fontSize: '13px', lineHeight: 1.45 }}>
+                    These suggestions are based on your skills, projects, bio, course, and career details.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRecommendedModalOpen(false)}
+                  aria-label="Close recommended jobs"
+                  style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '10px',
+                    border: '1px solid #e5e7eb',
+                    background: '#fff',
+                    color: '#6b7280',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flex: '0 0 34px',
+                  }}
+                >
+                  <X size={16} weight="bold" />
+                </button>
+              </div>
+
+              <div style={{ marginTop: '16px', display: 'grid', gap: '10px' }}>
+                {recommendedJobs.map((job) => {
+                  const jobId = String(job?._id || job?.id || '');
+                  const keywords = Array.isArray(job?.matchedKeywords) ? job.matchedKeywords.slice(0, 4) : [];
+                  return (
+                    <button
+                      key={jobId || `${job.company}-${job.position}`}
+                      type="button"
+                      onClick={() => {
+                        setRecommendedModalOpen(false);
+                        navigate(jobId ? `/career/job-details/${encodeURIComponent(jobId)}` : '/training');
+                      }}
+                      style={{
+                        width: '100%',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '12px',
+                        background: '#fff',
+                        padding: '14px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ color: '#111827', fontWeight: 900, fontSize: '15px', lineHeight: 1.2 }}>{job.position || 'Job opening'}</div>
+                          <div style={{ color: '#4b5563', fontSize: '13px', marginTop: '5px' }}>{job.company || 'Company'} - {job.location || 'Location not set'}</div>
+                        </div>
+                        <span style={{ background: '#ecfdf5', color: '#047857', borderRadius: '999px', padding: '5px 9px', fontSize: '11px', fontWeight: 900, whiteSpace: 'nowrap' }}>
+                          {Number(job.matchScore || 0)}% match
+                        </span>
+                      </div>
+                      {keywords.length > 0 ? (
+                        <div style={{ marginTop: '10px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {keywords.map((keyword) => (
+                            <span key={keyword} style={{ background: '#fef3c7', color: '#92400e', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: 800 }}>
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setRecommendedModalOpen(false)}
+                  style={{
+                    border: '1px solid #e5e7eb',
+                    background: '#fff',
+                    color: '#111827',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Maybe later
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecommendedModalOpen(false);
+                    setSearchTerm('');
+                    setSortOrder('newest');
+                  }}
+                  style={{
+                    border: 'none',
+                    background: '#e1aa18',
+                    color: '#111827',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '12px',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Browse all jobs
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
         {postModalOpen ? (
           <motion.div
             initial={{ opacity: 0 }}

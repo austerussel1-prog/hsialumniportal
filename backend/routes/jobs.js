@@ -146,7 +146,7 @@ router.get('/recommended', verifyToken, async (req, res) => {
   try {
     const limit = Math.min(10, Math.max(1, parseInt(req.query.limit, 10) || 3));
     const user = await User.findById(req.user.id)
-      .select('skills major jobTitle education bio bio2 company languages')
+      .select('skills major jobTitle education bio bio2 company languages projects')
       .lean();
 
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -160,6 +160,13 @@ router.get('/recommended', verifyToken, async (req, res) => {
       user.bio2,
       user.company,
       user.languages,
+      Array.isArray(user.projects)
+        ? user.projects.map((project) => [
+          project?.name,
+          project?.industry,
+          project?.role,
+        ].filter(Boolean).join(' ')).join(' ')
+        : '',
     );
 
     const jobs = await JobPosting.find({ status: /^open$/i })
@@ -169,6 +176,7 @@ router.get('/recommended', verifyToken, async (req, res) => {
 
     const recommendedJobs = jobs
       .map((job) => buildJobSuggestion(job, profileTokens))
+      .filter((job) => job.matchScore > 0)
       .sort((left, right) => {
         if (right.matchScore !== left.matchScore) return right.matchScore - left.matchScore;
         return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime();
