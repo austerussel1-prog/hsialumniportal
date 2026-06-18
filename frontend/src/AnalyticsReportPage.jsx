@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Certificate, TrendUp, TrendDown, DownloadSimple, CaretDown } from '@phosphor-icons/react';
+import { Users, Certificate, TrendUp, TrendDown, DownloadSimple, CaretDown, X } from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
@@ -10,7 +10,7 @@ export default function AnalyticsReportPage() {
   const [error, setError] = useState('');
   const [selectedWindowDays, setSelectedWindowDays] = useState(30);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedKpiKey, setSelectedKpiKey] = useState('totalRegisteredUsers');
+  const [selectedKpiKey, setSelectedKpiKey] = useState(null);
   const [metrics, setMetrics] = useState({
     activeUsers: 0,
     totalRegisteredUsers: 0,
@@ -239,6 +239,15 @@ export default function AnalyticsReportPage() {
     return () => { mounted = false; };
   }, [selectedWindowDays]);
 
+  useEffect(() => {
+    if (!selectedKpiKey) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setSelectedKpiKey(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedKpiKey]);
+
   const handleDownloadReport = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -271,45 +280,45 @@ export default function AnalyticsReportPage() {
   const kpiDetails = {
     totalRegisteredUsers: {
       title: 'Total Registered Users',
-      description: 'Kabuuang bilang ng alumni at user accounts na nasa portal. Ginagamit ito para makita kung lumalaki ang user base ng system.',
+      description: 'The total number of alumni and user accounts registered in the portal. It helps administrators understand whether the platform user base is growing.',
       formula: 'Count of all non-deleted alumni/user accounts.',
-      use: 'Kapag pataas ang trend, ibig sabihin mas maraming users ang nagreregister o nadadagdag sa portal.',
+      use: 'An upward trend means more users are joining or being added to the portal.',
     },
     activeUsers: {
       title: 'Active Users',
-      description: 'Approved users na puwedeng gumamit ng portal. Ipinapakita nito ang current usable population ng system.',
+      description: 'Approved users who can currently access and use the portal.',
       formula: 'Count of approved alumni/user accounts.',
-      use: 'Useful ito para malaman kung ilan ang may access after approval process.',
+      use: 'This shows how many users have usable access after the approval process.',
     },
     accountApprovalRate: {
       title: 'Account Approval Rate',
-      description: 'Percent ng registered accounts na na-approve na ng admins.',
+      description: 'The percentage of registered accounts that have been approved by administrators.',
       formula: 'Approved Accounts / Total Registered Accounts x 100.',
-      use: 'Mataas na rate means efficient ang approval flow; mababang rate means maraming pending/rejected accounts na kailangan silipin.',
+      use: 'A higher rate suggests an efficient approval flow, while a lower rate may indicate pending or rejected accounts that need review.',
     },
     monthlyActiveUsers: {
       title: 'Monthly Active Users',
-      description: 'Bilang ng users na nag-login sa selected date range.',
+      description: 'The number of users who logged in during the selected date range.',
       formula: 'Count of users with login activity within the selected period.',
-      use: 'Ginagamit ito para makita kung gaano ka-active ang alumni community sa portal.',
+      use: 'This helps measure how active the alumni community is on the portal.',
     },
     userRetentionRate: {
       title: 'User Retention Rate',
-      description: 'Percent ng active users na bumalik ulit, hindi lang bagong register.',
+      description: 'The percentage of active users who returned to the portal, excluding users who only just registered in the selected period.',
       formula: 'Returning Users / Total Active Users x 100.',
-      use: 'Mataas na retention means may reason ang users bumalik sa system, tulad ng jobs, certifications, events, o networking.',
+      use: 'Higher retention suggests users have a reason to come back, such as jobs, certifications, events, or networking.',
     },
     certificationsCompleted: {
       title: 'Certifications Completed',
-      description: 'Kabuuang certification or badge completions na na-record sa portal.',
+      description: 'The total number of certification or badge completions recorded in the portal.',
       formula: 'Count of awarded certification events/badges.',
-      use: 'Nakakatulong ito para masukat kung ginagamit ng alumni ang learning and workforce development features.',
+      use: 'This helps measure whether alumni are using learning and workforce development features.',
     },
     engagementRate: {
       title: 'Engagement Rate',
-      description: 'Percent ng approved users na may engagement signal sa portal.',
+      description: 'The percentage of approved users with recorded engagement activity in the portal.',
       formula: 'Engaged Users / Active Users x 100.',
-      use: 'Useful ito para makita kung hindi lang registered ang users, kundi nakikipag-interact din sila sa system.',
+      use: 'This shows whether users are not only registered, but also interacting with the system.',
     },
   };
 
@@ -322,7 +331,7 @@ export default function AnalyticsReportPage() {
     { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
     { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
   ];
-  const selectedKpiDetail = kpiDetails[selectedKpiKey] || kpiDetails.totalRegisteredUsers;
+  const selectedKpiDetail = selectedKpiKey ? kpiDetails[selectedKpiKey] : null;
 
   const windowDays = Math.max(
     1,
@@ -472,11 +481,46 @@ export default function AnalyticsReportPage() {
           border-color: #d9a520;
           box-shadow: inset 0 0 0 1px rgba(217, 165, 32, 0.28);
         }
-        .ar-kpi-detail {
-          margin-top: 12px;
+        .ar-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 80;
+          background: rgba(17, 24, 39, 0.42);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+        }
+        .ar-kpi-modal {
+          width: min(640px, 100%);
+          border: 1px solid #eadfca;
+          border-radius: 14px;
+          background: #fff;
+          padding: 18px;
+          box-shadow: 0 22px 60px rgba(17, 24, 39, 0.22);
+        }
+        .ar-kpi-modal-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+        }
+        .ar-kpi-modal-close {
+          border: 1px solid #eadfca;
+          border-radius: 999px;
+          width: 32px;
+          height: 32px;
+          background: #fffaf0;
+          color: #6b7280;
+          cursor: pointer;
+          font-size: 20px;
+          line-height: 1;
+        }
+        .ar-kpi-modal-body {
+          margin-top: 14px;
           display: grid;
           gap: 10px;
-          grid-template-columns: 1.15fr 1fr 1fr;
+          grid-template-columns: 1fr;
           align-items: start;
         }
         .ar-kpi-detail-title { margin: 0; color: #1f2937; font-size: 18px; line-height: 1.2; }
@@ -515,7 +559,6 @@ export default function AnalyticsReportPage() {
           .ar-title { font-size: 22px; line-height: 1.15; }
           .ar-subtitle { font-size: 12px; margin-top: 4px; }
           .ar-card { padding: 10px; border-radius: 14px; }
-          .ar-kpi-detail { grid-template-columns: 1fr; }
           .ar-chart-title { font-size: 21px; }
           .ar-chart-legend { font-size: 12px; gap: 8px; }
           .ar-filter, .ar-download { font-size: 12px; padding: 9px 12px; }
@@ -615,34 +658,58 @@ export default function AnalyticsReportPage() {
                   <div style={{ color: '#6b7280', fontSize: '11px' }}>{item.helper}</div>
                 </div>
                 <div style={{ marginTop: 8, color: isSelected ? '#a06c04' : '#9ca3af', fontSize: 11, fontWeight: 700 }}>
-                  {isSelected ? 'Showing guide below' : 'Click for guide'}
+                  {isSelected ? 'Guide open' : 'Click for guide'}
                 </div>
               </button>
             );
           })}
         </div>
 
-        <motion.div
-          key={selectedKpiKey}
-          className="ar-card ar-kpi-detail"
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.18 }}
-        >
-          <div>
-            <div className="ar-kpi-detail-label">Selected KPI</div>
-            <h2 className="ar-kpi-detail-title">{selectedKpiDetail.title}</h2>
-            <p className="ar-kpi-detail-text">{selectedKpiDetail.description}</p>
-          </div>
-          <div>
-            <div className="ar-kpi-detail-label">How It Is Computed</div>
-            <p className="ar-kpi-detail-text">{selectedKpiDetail.formula}</p>
-          </div>
-          <div>
-            <div className="ar-kpi-detail-label">Why It Matters</div>
-            <p className="ar-kpi-detail-text">{selectedKpiDetail.use}</p>
-          </div>
-        </motion.div>
+        {selectedKpiDetail && (
+          <motion.div
+            className="ar-modal-backdrop"
+            role="presentation"
+            onClick={() => setSelectedKpiKey(null)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="ar-kpi-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="ar-kpi-modal-title"
+              onClick={(event) => event.stopPropagation()}
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.18 }}
+            >
+              <div className="ar-kpi-modal-head">
+                <div>
+                  <div className="ar-kpi-detail-label">KPI Guide</div>
+                  <h2 id="ar-kpi-modal-title" className="ar-kpi-detail-title">{selectedKpiDetail.title}</h2>
+                </div>
+                <button type="button" className="ar-kpi-modal-close" onClick={() => setSelectedKpiKey(null)} aria-label="Close KPI guide">
+                  <X size={16} weight="bold" />
+                </button>
+              </div>
+              <div className="ar-kpi-modal-body">
+                <div>
+                  <div className="ar-kpi-detail-label">What It Means</div>
+                  <p className="ar-kpi-detail-text">{selectedKpiDetail.description}</p>
+                </div>
+                <div>
+                  <div className="ar-kpi-detail-label">How It Is Computed</div>
+                  <p className="ar-kpi-detail-text">{selectedKpiDetail.formula}</p>
+                </div>
+                <div>
+                  <div className="ar-kpi-detail-label">Why It Matters</div>
+                  <p className="ar-kpi-detail-text">{selectedKpiDetail.use}</p>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
 
         <div className="ar-middle-grid">
           <div className="ar-card">
