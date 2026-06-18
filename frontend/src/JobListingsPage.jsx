@@ -1248,7 +1248,10 @@ export default function JobListingsPage() {
               onClick={(event) => event.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: isMobile ? '94vw' : '620px',
+                maxWidth: isMobile ? 'calc(100vw - 24px)' : '620px',
+                maxHeight: isMobile ? 'calc(100dvh - 24px)' : 'calc(100vh - 48px)',
+                overflowY: 'auto',
+                boxSizing: 'border-box',
                 background: '#fff',
                 borderRadius: '16px',
                 border: '1px solid #e5e7eb',
@@ -1308,21 +1311,23 @@ export default function JobListingsPage() {
                         padding: '14px',
                         textAlign: 'left',
                         cursor: 'pointer',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ color: '#111827', fontWeight: 900, fontSize: '15px', lineHeight: 1.2 }}>{job.position || 'Job opening'}</div>
-                          <div style={{ color: '#4b5563', fontSize: '13px', marginTop: '5px' }}>{job.company || 'Company'} - {job.location || 'Location not set'}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                        <div style={{ minWidth: 0, flex: '1 1 220px' }}>
+                          <div style={{ color: '#111827', fontWeight: 900, fontSize: '15px', lineHeight: 1.2, overflowWrap: 'anywhere' }}>{job.position || 'Job opening'}</div>
+                          <div style={{ color: '#4b5563', fontSize: '13px', marginTop: '5px', overflowWrap: 'anywhere', lineHeight: 1.35 }}>{job.company || 'Company'} - {job.location || 'Location not set'}</div>
                         </div>
-                        <span style={{ background: '#ecfdf5', color: '#047857', borderRadius: '999px', padding: '5px 9px', fontSize: '11px', fontWeight: 900, whiteSpace: 'nowrap' }}>
+                        <span style={{ background: '#ecfdf5', color: '#047857', borderRadius: '999px', padding: '5px 9px', fontSize: '11px', fontWeight: 900, whiteSpace: 'nowrap', flex: '0 0 auto' }}>
                           {Number(job.matchScore || 0)}% match
                         </span>
                       </div>
                       {keywords.length > 0 ? (
                         <div style={{ marginTop: '10px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                           {keywords.map((keyword) => (
-                            <span key={keyword} style={{ background: '#fef3c7', color: '#92400e', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: 800 }}>
+                            <span key={keyword} style={{ background: '#fef3c7', color: '#92400e', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: 800, maxWidth: '100%', overflowWrap: 'anywhere' }}>
                               {keyword}
                             </span>
                           ))}

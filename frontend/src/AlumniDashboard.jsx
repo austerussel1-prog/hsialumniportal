@@ -230,20 +230,20 @@ export default function AlumniDashboard() {
                       key={jobId || `${job.company}-${job.position}`}
                       type="button"
                       onClick={() => navigate(jobId ? `/training/job-details/${encodeURIComponent(jobId)}` : '/training/jobs')}
-                      style={{textAlign: 'left', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', cursor: 'pointer'}}
+                      style={{textAlign: 'left', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', cursor: 'pointer', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box'}}
                     >
-                      <div style={{display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start'}}>
-                        <div style={{fontSize: '15px', fontWeight: '800', color: '#111827', lineHeight: 1.2}}>{job.position || 'Job opening'}</div>
-                        <span style={{background: '#ecfdf5', color: '#047857', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap'}}>
+                      <div style={{display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start', flexWrap: 'wrap'}}>
+                        <div style={{fontSize: '15px', fontWeight: '800', color: '#111827', lineHeight: 1.2, minWidth: 0, flex: '1 1 180px', overflowWrap: 'anywhere'}}>{job.position || 'Job opening'}</div>
+                        <span style={{background: '#ecfdf5', color: '#047857', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap', flex: '0 0 auto'}}>
                           {Number(job.matchScore || 0)}% match
                         </span>
                       </div>
-                      <div style={{marginTop: '8px', fontSize: '13px', color: '#4b5563'}}>{job.company || 'Company'} - {job.location || 'Location not set'}</div>
-                      <div style={{marginTop: '8px', fontSize: '12px', color: '#6b7280'}}>{job.type || job.category || 'Opportunity'}</div>
+                      <div style={{marginTop: '8px', fontSize: '13px', color: '#4b5563', lineHeight: 1.35, overflowWrap: 'anywhere'}}>{job.company || 'Company'} - {job.location || 'Location not set'}</div>
+                      <div style={{marginTop: '8px', fontSize: '12px', color: '#6b7280', overflowWrap: 'anywhere'}}>{job.type || job.category || 'Opportunity'}</div>
                       {keywords.length > 0 ? (
                         <div style={{marginTop: '10px', display: 'flex', gap: '6px', flexWrap: 'wrap'}}>
                           {keywords.map((keyword) => (
-                            <span key={keyword} style={{background: '#fef3c7', color: '#92400e', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: '700'}}>
+                            <span key={keyword} style={{background: '#fef3c7', color: '#92400e', borderRadius: '999px', padding: '4px 8px', fontSize: '11px', fontWeight: '700', maxWidth: '100%', overflowWrap: 'anywhere'}}>
                               {keyword}
                             </span>
                           ))}
