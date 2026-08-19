@@ -21,6 +21,7 @@ export default function AnalyticsReportPage() {
     userRetentionRate: 0,
     engagedUsers: 0,
     jobApplicantsCount: 0,
+    jobApplicantsList: [],
     certificationsCompleted: 0,
     certificationCompletionRate: 0,
     engagementRate: 0,
@@ -73,12 +74,13 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
         const directoryData = directoryRes.ok ? await directoryRes.json() : { users: [] };
         const achievementsData = achievementsRes.ok ? await achievementsRes.json() : { stats: {} };
         const applicantsData = applicantsRes.ok ? await applicantsRes.json().catch(() => ({ applications: [] })) : { applications: [] };
-        const applicantsInWindow = Array.isArray(applicantsData?.applications)
+        const applicantsListInWindow = Array.isArray(applicantsData?.applications)
           ? applicantsData.applications.filter((app) => {
               const ts = app?.createdAt ? new Date(app.createdAt).getTime() : Number.NaN;
               return Number.isFinite(ts) && ts >= since.getTime() && ts <= now.getTime();
-            }).length
-          : 0;
+            })
+          : [];
+        const applicantsInWindow = applicantsListInWindow.length;
 
       const totalEligibleUsers = Array.isArray(directoryData?.users) ? directoryData.users.length : 0;
       const activeUsers = totalEligibleUsers;
@@ -188,12 +190,13 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
             start.setDate(start.getDate() - (win - 1));
             return start;
           })();
-          const applicantsInWindow = Array.isArray(applicantsList?.applications)
+          const applicantsListInWindow = Array.isArray(applicantsList?.applications)
             ? applicantsList.applications.filter((app) => {
                 const ts = app?.createdAt ? new Date(app.createdAt).getTime() : Number.NaN;
                 return Number.isFinite(ts) && ts >= sinceStartForApplicants.getTime() && ts <= Date.now();
-              }).length
-            : 0;
+              })
+            : [];
+          const applicantsInWindow = applicantsListInWindow.length;
           console.debug('analytics response', { data, selectedWindowDays });
           if (!mounted) return;
           setMetrics({
@@ -206,6 +209,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
             userRetentionRate: Number(data?.userRetentionRate || 0),
             engagedUsers: Number(data?.engagedUsers || 0),
             jobApplicantsCount: Number(applicantsInWindow || 0),
+            jobApplicantsList: applicantsListInWindow,
             certificationsCompleted: Number(data?.certificationsCompleted || 0),
             certificationCompletionRate: Number(data?.certificationCompletionRate || 0),
             engagementRate: Number(data?.engagementRate || 0),
@@ -913,6 +917,75 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="ar-card ar-bottom-card">
+          <div className="ar-chart-head" style={{ marginBottom: '10px' }}>
+            <h2 className="ar-chart-title">Job Applicants Report</h2>
+            <div className="ar-chart-legend">{periodLabel}</div>
+          </div>
+          {(() => {
+            const list = Array.isArray(metrics.jobApplicantsList) ? metrics.jobApplicantsList : [];
+            const statusCounts = list.reduce((acc, app) => {
+              const key = String(app?.status || 'pending').toLowerCase();
+              acc[key] = (acc[key] || 0) + 1;
+              return acc;
+            }, {});
+            const jobCounts = new Map();
+            list.forEach((app) => {
+              const key = `${app?.jobTitle || 'Untitled Role'}::${app?.company || ''}`;
+              const existing = jobCounts.get(key) || { jobTitle: app?.jobTitle || 'Untitled Role', company: app?.company || '', count: 0 };
+              existing.count += 1;
+              jobCounts.set(key, existing);
+            });
+            const topJobs = Array.from(jobCounts.values()).sort((a, b) => b.count - a.count).slice(0, 5);
+
+            if (loading) {
+              return <p style={{ color: '#6b7280', fontSize: 13 }}>Loading job applicants...</p>;
+            }
+
+            if (list.length === 0) {
+              return <p style={{ color: '#6b7280', fontSize: 13 }}>No job applications submitted in this period.</p>;
+            }
+
+            return (
+              <div style={{ display: 'grid', gap: 14, gridTemplateColumns: '1fr 1.4fr' }}>
+                <div>
+                  <div className="ar-kpi-detail-label">Status Breakdown</div>
+                  <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {['pending', 'reviewed', 'approved', 'rejected'].map((key) => (
+                      <div
+                        key={key}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 999,
+                          border: '1px solid #ecdcb4',
+                          background: '#fffaf0',
+                          color: '#6b7280',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {key}: {statusCounts[key] || 0}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="ar-kpi-detail-label">Top Applied Jobs</div>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {topJobs.map((job) => (
+                      <div key={`${job.jobTitle}-${job.company}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13, color: '#374151', borderBottom: '1px solid #f3ede0', paddingBottom: 6 }}>
+                        <span>{job.jobTitle}{job.company ? ` — ${job.company}` : ''}</span>
+                        <span style={{ fontWeight: 800, color: '#a06c04' }}>{job.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="ar-card ar-bottom-card">
