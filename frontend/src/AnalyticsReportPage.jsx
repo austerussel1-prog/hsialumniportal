@@ -336,15 +336,16 @@ export default function AnalyticsReportPage() {
     },
   };
 
+  const safeNumber = (v) => Number(v || 0);
   const cards = [
-    { id: 'totalRegisteredUsers', icon: Users, label: 'Total Registered Users', value: metrics.totalRegisteredUsers.toLocaleString(), trendMetric: metrics.totalRegisteredTrend, helper: 'vs previous period' },
-    { id: 'activeUsers', icon: Users, label: 'Active Users', value: metrics.activeUsers.toLocaleString(), trend: `+${metrics.newUsersInWindow || 0} created | +${metrics.approvalsInWindow || 0} approved`, helper: periodLabel },
-    { id: 'accountApprovalRate', icon: TrendUp, label: 'Account Approval Rate', value: formatPercent(metrics.accountApprovalRate), trendMetric: metrics.accountApprovalTrend, helper: `${metrics.totalApprovedAccounts.toLocaleString()} approved accounts` },
-    { id: 'monthlyActiveUsers', icon: Users, label: 'Monthly Active Users', value: metrics.monthlyActiveUsers.toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
-    { id: 'userRetentionRate', icon: TrendUp, label: 'User Retention Rate', value: formatPercent(metrics.userRetentionRate), trendMetric: metrics.userRetentionTrend, helper: `${metrics.returningUsers.toLocaleString()} returning users` },
-    { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
-    { id: 'jobApplications', icon: Users, label: 'Total Job Applications', value: metrics.totalJobApplications.toLocaleString(), trendMetric: metrics.jobApplicationsTrend, helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
-    { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
+    { id: 'totalRegisteredUsers', icon: Users, label: 'Total Registered Users', value: safeNumber(metrics.totalRegisteredUsers).toLocaleString(), trendMetric: metrics.totalRegisteredTrend, helper: 'vs previous period' },
+    { id: 'activeUsers', icon: Users, label: 'Active Users', value: safeNumber(metrics.activeUsers).toLocaleString(), trend: `+${safeNumber(metrics.newUsersInWindow)} created | +${safeNumber(metrics.approvalsInWindow)} approved`, helper: periodLabel },
+    { id: 'accountApprovalRate', icon: TrendUp, label: 'Account Approval Rate', value: formatPercent(safeNumber(metrics.accountApprovalRate)), trendMetric: metrics.accountApprovalTrend, helper: `${safeNumber(metrics.totalApprovedAccounts).toLocaleString()} approved accounts` },
+    { id: 'monthlyActiveUsers', icon: Users, label: 'Monthly Active Users', value: safeNumber(metrics.monthlyActiveUsers).toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
+    { id: 'userRetentionRate', icon: TrendUp, label: 'User Retention Rate', value: formatPercent(safeNumber(metrics.userRetentionRate)), trendMetric: metrics.userRetentionTrend, helper: `${safeNumber(metrics.returningUsers).toLocaleString()} returning users` },
+    { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: safeNumber(metrics.certificationsCompleted).toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${safeNumber(metrics.certificationsInWindow)} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${safeNumber(metrics.windowDays)} days` },
+    { id: 'jobApplications', icon: Users, label: 'Total Job Applications', value: safeNumber(metrics.totalJobApplications).toLocaleString(), trendMetric: metrics.jobApplicationsTrend, helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${safeNumber(metrics.windowDays)} days` },
+    { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${safeNumber(metrics.engagementRate)}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${safeNumber(metrics.windowDays)} days` },
   ];
   const selectedKpiDetail = selectedKpiKey ? kpiDetails[selectedKpiKey] : null;
 
