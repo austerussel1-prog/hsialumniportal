@@ -50,6 +50,53 @@ export default function AnalyticsReportPage() {
     certificationSeries: [],
   });
 
+  // Ensure analytics payload contains consistent arrays sized to windowDays
+  function normalizeMetrics(raw, selectedWindowDaysFallback = 30) {
+    const out = { ...(raw || {}) };
+    const dayMs = 24 * 60 * 60 * 1000;
+    const windowDays = Math.max(1, Number(out.windowDays || selectedWindowDaysFallback || 30));
+    const today = out.todayStart ? new Date(out.todayStart) : new Date();
+    const since = out.sinceStart ? new Date(out.sinceStart) : new Date(today.getTime() - (windowDays - 1) * dayMs);
+
+    // build daily labels if missing or wrong length
+    const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+    if (!Array.isArray(out.dailyLabels) || out.dailyLabels.length !== windowDays) {
+      const labels = Array.from({ length: windowDays }, (_, i) => dateFormat.format(new Date(since.getTime() + i * dayMs)));
+      out.dailyLabels = labels;
+    }
+
+    const ensureSeries = (key) => {
+      const src = Array.isArray(out[key]) ? out[key].map((v) => Number(v || 0)) : Array.from({ length: windowDays }, () => 0);
+      if (src.length > windowDays) return src.slice(src.length - windowDays);
+      if (src.length < windowDays) return [...Array(windowDays - src.length).fill(0), ...src];
+      return src;
+    };
+
+    out.usersCreatedDaily = ensureSeries('usersCreatedDaily');
+    out.usersApprovedDaily = ensureSeries('usersApprovedDaily');
+    out.awardsAlumniDaily = ensureSeries('awardsAlumniDaily');
+    out.awardsEmployeeDaily = ensureSeries('awardsEmployeeDaily');
+    out.jobApplicationsDaily = ensureSeries('jobApplicationsDaily');
+
+    // safe numeric fallbacks
+    out.totalRegisteredUsers = Number(out.totalRegisteredUsers || 0);
+    out.totalApprovedAccounts = Number(out.totalApprovedAccounts || 0);
+    out.activeUsers = Number(out.activeUsers || 0);
+    out.monthlyActiveUsers = Number(out.monthlyActiveUsers || 0);
+    out.returningUsers = Number(out.returningUsers || 0);
+    out.newUsersInWindow = Number(out.newUsersInWindow || 0);
+    out.approvalsInWindow = Number(out.approvalsInWindow || 0);
+    out.certificationsInWindow = Number(out.certificationsInWindow || 0);
+    out.awardsInWindow = Number(out.awardsInWindow || 0);
+    out.jobApplicationsInWindow = Number(out.jobApplicationsInWindow || 0) || out.jobApplicationsDaily.reduce((s, v) => s + Number(v || 0), 0);
+    out.totalJobApplications = Number(out.totalJobApplications || out.jobApplicationsInWindow || 0);
+
+    out.windowDays = windowDays;
+    out.sinceStart = since.toISOString();
+    out.todayStart = today.toISOString();
+    return out;
+  }
+
   useEffect(() => {
     let mounted = true;
 
@@ -175,47 +222,8 @@ export default function AnalyticsReportPage() {
           const data = await res.json();
           console.debug('analytics response', { data, selectedWindowDays });
           if (!mounted) return;
-          setMetrics({
-            activeUsers: Number(data?.activeUsers || 0),
-            totalRegisteredUsers: Number(data?.totalRegisteredUsers || 0),
-            totalApprovedAccounts: Number(data?.totalApprovedAccounts || 0),
-            accountApprovalRate: Number(data?.accountApprovalRate || 0),
-            monthlyActiveUsers: Number(data?.monthlyActiveUsers || 0),
-            returningUsers: Number(data?.returningUsers || 0),
-            userRetentionRate: Number(data?.userRetentionRate || 0),
-            engagedUsers: Number(data?.engagedUsers || 0),
-            certificationsCompleted: Number(data?.certificationsCompleted || 0),
-            certificationCompletionRate: Number(data?.certificationCompletionRate || 0),
-            engagementRate: Number(data?.engagementRate || 0),
-            totalJobApplications: Number(data?.totalJobApplications || 0),
-            jobApplicationsInWindow: Number(data?.jobApplicationsInWindow || 0),
-            jobApplicationsDaily: Array.isArray(data?.jobApplicationsDaily) ? data.jobApplicationsDaily : [],
-            jobApplicationsTrend: data?.jobApplicationsTrend || { change: 0, direction: 'up' },
-            totalRegisteredTrend: data?.totalRegisteredTrend || { change: 0, direction: 'up' },
-            accountApprovalTrend: data?.accountApprovalTrend || { change: 0, direction: 'up' },
-            monthlyActiveUsersTrend: data?.monthlyActiveUsersTrend || { change: 0, direction: 'up' },
-            userRetentionTrend: data?.userRetentionTrend || { change: 0, direction: 'up' },
-            certificationCompletionTrend: data?.certificationCompletionTrend || { change: 0, direction: 'up' },
-            windowDays: Number(data?.windowDays || 30),
-            windowMode: String(data?.windowMode || ''),
-            sinceStart: typeof data?.sinceStart === 'string' ? data.sinceStart : '',
-            todayStart: typeof data?.todayStart === 'string' ? data.todayStart : '',
-            newUsersInWindow: Number(data?.newUsersInWindow || 0),
-            approvalsInWindow: Number(data?.approvalsInWindow || 0),
-            certificationsInWindow: Number(data?.certificationsInWindow || 0),
-            dailyLabels: Array.isArray(data?.dailyLabels) ? data.dailyLabels : [],
-            usersCreatedDaily: Array.isArray(data?.usersCreatedDaily) ? data.usersCreatedDaily : [],
-            usersApprovedDaily: Array.isArray(data?.usersApprovedDaily) ? data.usersApprovedDaily : [],
-            awardsAlumniDaily: Array.isArray(data?.awardsAlumniDaily) ? data.awardsAlumniDaily : [],
-            awardsEmployeeDaily: Array.isArray(data?.awardsEmployeeDaily) ? data.awardsEmployeeDaily : [],
-            awardsInWindow: Number(data?.awardsInWindow || 0),
-            userGrowthSeries: Array.isArray(data?.userGrowthSeries) ? data.userGrowthSeries : [],
-            userGrowthAdded: Array.isArray(data?.userGrowthAdded) ? data.userGrowthAdded : [],
-            userGrowthCumulative: Array.isArray(data?.userGrowthCumulative) ? data.userGrowthCumulative : [],
-            timelineLabels: Array.isArray(data?.timelineLabels) ? data.timelineLabels : [],
-            certificationPeriodLabels: Array.isArray(data?.certificationPeriodLabels) ? data.certificationPeriodLabels : [],
-            certificationSeries: Array.isArray(data?.certificationSeries) ? data.certificationSeries : [],
-          });
+          const normalized = normalizeMetrics(data, selectedWindowDays);
+          setMetrics(normalized);
           setError('');
           return;
         }
@@ -224,13 +232,13 @@ export default function AnalyticsReportPage() {
         const fallback = await loadFallbackAnalytics();
         console.debug('analytics fallback', { fallback, selectedWindowDays });
         if (!mounted) return;
-        setMetrics(fallback);
+        setMetrics(normalizeMetrics(fallback, selectedWindowDays));
         setError('');
       } catch (err) {
         try {
           const fallback = await loadFallbackAnalytics();
           if (!mounted) return;
-          setMetrics(fallback);
+          setMetrics(normalizeMetrics(fallback, selectedWindowDays));
           setError('');
           return;
         } catch {
