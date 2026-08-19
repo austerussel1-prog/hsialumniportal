@@ -753,11 +753,13 @@ export default function EventsPage() {
           }
           .eventsCreateModalContent {
             max-width: 640px;
+            max-height: calc(100vh - 56px);
+            overflow-y: auto;
           }
           .eventsCreateGrid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 12px;
           }
           @media (max-width: 640px) {
             .eventsCreateModalContent {
@@ -1927,9 +1929,9 @@ export default function EventsPage() {
                 exit={{ opacity: 0, y: 14, scale: 0.98 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
                 className="eventsCreateModalContent"
-                style={{ width: '100%', maxWidth: 680, background: '#fff', borderRadius: 14, padding: 20, boxSizing: 'border-box', margin: '0 12px' }}
+                style={{ width: '100%', maxWidth: 680, maxHeight: 'calc(100vh - 56px)', background: '#fff', borderRadius: 14, padding: 20, boxSizing: 'border-box', margin: '0 12px', overflowY: 'auto' }}
               >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Create Event</h3>
                 <button
                   type="button"
@@ -2025,9 +2027,9 @@ export default function EventsPage() {
                     setCreating(false);
                   }
                 }}
-                style={{ marginTop: 8, display: 'grid', gap: 14, width: '100%' }}
+                style={{ marginTop: 8, display: 'grid', gap: 16, width: '100%' }}
               >
-                <div className="eventsCreateGrid" style={{ width: '100%', gap: 14 }}>
+                <div className="eventsCreateGrid" style={{ width: '100%', gap: 16 }}>
                   <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
                   <input name="category" placeholder="Category (e.g., Webinar)" style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
                   <input name="capacity" type="number" min="0" placeholder="Capacity (optional)" style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
