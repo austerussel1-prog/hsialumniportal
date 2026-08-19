@@ -332,7 +332,16 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
     }
   };
 
-  const periodLabel = metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days`;
+  const formatWindowLabel = (days, mode) => {
+    if (mode === 'all_time') return 'all time';
+    const n = Number(days) || 0;
+    if (n >= 60) {
+      const months = Math.round(n / 30);
+      return `last ${months} month${months === 1 ? '' : 's'}`;
+    }
+    return `last ${n} day${n === 1 ? '' : 's'}`;
+  };
+  const periodLabel = formatWindowLabel(metrics.windowDays, metrics.windowMode);
   const formatPercent = (value) => `${Number(value || 0).toFixed(1).replace(/\.0$/, '')}%`;
   const selectedRangeLabel = selectedWindowDays === 365 ? 'Last Year' : `Last ${selectedWindowDays} Days`;
   const kpiDetails = {
@@ -392,8 +401,8 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
     { id: 'accountApprovalRate', icon: TrendUp, label: 'Account Approval Rate', value: formatPercent(metrics.accountApprovalRate), trendMetric: metrics.accountApprovalTrend, helper: `${metrics.totalApprovedAccounts.toLocaleString()} approved accounts` },
     { id: 'monthlyActiveUsers', icon: Users, label: 'Monthly Active Users', value: metrics.monthlyActiveUsers.toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
     { id: 'userRetentionRate', icon: TrendUp, label: 'User Retention Rate', value: formatPercent(metrics.userRetentionRate), trendMetric: metrics.userRetentionTrend, helper: `${metrics.returningUsers.toLocaleString()} returning users` },
-    { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
-    { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
+    { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: periodLabel },
+    { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: periodLabel },
   ];
   const selectedKpiDetail = selectedKpiKey ? kpiDetails[selectedKpiKey] : null;
 
@@ -1103,7 +1112,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
               `Engaged users: ${loading ? '...' : metrics.engagedUsers.toLocaleString()}`,
               `Certifications completed: ${loading ? '...' : metrics.certificationsCompleted.toLocaleString()}`,
               `Engagement rate: ${loading ? '...' : `${metrics.engagementRate}%`}`,
-              metrics.windowMode === 'all_time' ? 'Window: All time' : `Window: Last ${metrics.windowDays} days`,
+              metrics.windowMode === 'all_time' ? 'Window: All time' : `Window: ${formatWindowLabel(metrics.windowDays, metrics.windowMode).replace(/^last/, 'Last')}`,
             ].map((item) => (
               <div
                 key={item}
