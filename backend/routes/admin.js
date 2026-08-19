@@ -719,7 +719,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       role: { $in: ['user', 'alumni'] },
       status: { $ne: 'rejected' },
       isDeleted: { $ne: true },
-    }).select('_id createdAt approvedAt status').lean();
+    }).select('_id createdAt approvedAt status lastLoginAt').lean();
     const totalEligibleUsers = eligibleUsers.length;
     const eligibleUserIds = new Set(eligibleUsers.map((item) => String(item._id)));
 
@@ -844,6 +844,8 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
     });
     const usersCreatedDaily = Array.from({ length: windowDays }, () => 0);
     const usersApprovedDaily = Array.from({ length: windowDays }, () => 0);
+    const monthlyActiveDaily = Array.from({ length: windowDays }, () => 0);
+    const returningUsersDaily = Array.from({ length: windowDays }, () => 0);
 
     for (const user of eligibleUsers) {
       const createdDay = startOfDay(user?.createdAt);
@@ -856,6 +858,15 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       if (approvedDay && approvedDay >= sinceStart && approvedDay <= todayStart) {
         const index = Math.floor((approvedDay.getTime() - sinceStart.getTime()) / dayMs);
         if (index >= 0 && index < windowDays) usersApprovedDaily[index] += 1;
+      }
+
+      const loginDay = startOfDay(user?.lastLoginAt);
+      if (loginDay && loginDay >= sinceStart && loginDay <= todayStart) {
+        const index = Math.floor((loginDay.getTime() - sinceStart.getTime()) / dayMs);
+        if (index >= 0 && index < windowDays) {
+          monthlyActiveDaily[index] += 1;
+          if (createdDay && createdDay < sinceStart) returningUsersDaily[index] += 1;
+        }
       }
     }
 
@@ -872,6 +883,24 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
     const engagedUsers = activeParticipants.reduce((count, row) => {
       return eligibleUserIds.has(String(row._id)) ? count + 1 : count;
     }, 0);
+
+    const messagesInWindow = await Message.find({ createdAt: { $gte: sinceStart, $lte: now } })
+      .select('sender recipient createdAt')
+      .lean();
+    const engagedUsersDailySets = Array.from({ length: windowDays }, () => new Set());
+    for (const msg of messagesInWindow) {
+      const msgDay = startOfDay(msg?.createdAt);
+      if (!msgDay || msgDay < sinceStart || msgDay > todayStart) continue;
+      const index = Math.floor((msgDay.getTime() - sinceStart.getTime()) / dayMs);
+      if (index < 0 || index >= windowDays) continue;
+      [msg.sender, msg.recipient].forEach((participant) => {
+        if (participant && eligibleUserIds.has(String(participant))) {
+          engagedUsersDailySets[index].add(String(participant));
+        }
+      });
+    }
+    const engagedUsersDaily = engagedUsersDailySets.map((set) => set.size);
+
 
     const achievement = prefetchedAchievement || await Achievement.findOne().sort({ updatedAt: -1 }).lean();
     const certificationsCompleted = Number(achievement?.stats?.totalBadgesAwarded || 0);
@@ -1013,6 +1042,9 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       dailyLabels,
       usersCreatedDaily,
       usersApprovedDaily,
+      monthlyActiveDaily,
+      returningUsersDaily,
+      engagedUsersDaily,
       awardsAlumniDaily,
       awardsEmployeeDaily,
       awardsInWindow,

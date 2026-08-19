@@ -65,6 +65,9 @@ export default function AnalyticsReportPage() {
     dailyLabels: [],
     usersCreatedDaily: [],
     usersApprovedDaily: [],
+    monthlyActiveDaily: [],
+    returningUsersDaily: [],
+    engagedUsersDaily: [],
     awardsAlumniDaily: [],
     awardsEmployeeDaily: [],
     awardsInWindow: 0,
@@ -187,6 +190,9 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
         dailyLabels,
         usersCreatedDaily,
         usersApprovedDaily,
+        monthlyActiveDaily: Array.from({ length: windowDays }, () => 0),
+        returningUsersDaily: Array.from({ length: windowDays }, () => 0),
+        engagedUsersDaily: Array.from({ length: windowDays }, () => 0),
         awardsAlumniDaily,
         awardsEmployeeDaily,
         newUsersInWindow: 0,
@@ -256,6 +262,9 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
             dailyLabels: Array.isArray(data?.dailyLabels) ? data.dailyLabels : [],
             usersCreatedDaily: Array.isArray(data?.usersCreatedDaily) ? data.usersCreatedDaily : [],
             usersApprovedDaily: Array.isArray(data?.usersApprovedDaily) ? data.usersApprovedDaily : [],
+            monthlyActiveDaily: Array.isArray(data?.monthlyActiveDaily) ? data.monthlyActiveDaily : [],
+            returningUsersDaily: Array.isArray(data?.returningUsersDaily) ? data.returningUsersDaily : [],
+            engagedUsersDaily: Array.isArray(data?.engagedUsersDaily) ? data.engagedUsersDaily : [],
             awardsAlumniDaily: Array.isArray(data?.awardsAlumniDaily) ? data.awardsAlumniDaily : [],
             awardsEmployeeDaily: Array.isArray(data?.awardsEmployeeDaily) ? data.awardsEmployeeDaily : [],
             awardsInWindow: Number(data?.awardsInWindow || 0),
@@ -429,6 +438,15 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
   const usersApprovedDaily = Array.isArray(metrics.usersApprovedDaily) && metrics.usersApprovedDaily.length === windowDays
     ? metrics.usersApprovedDaily.map((value) => Number(value || 0))
     : Array.from({ length: windowDays }, () => 0);
+  const monthlyActiveDaily = Array.isArray(metrics.monthlyActiveDaily) && metrics.monthlyActiveDaily.length === windowDays
+    ? metrics.monthlyActiveDaily.map((value) => Number(value || 0))
+    : Array.from({ length: windowDays }, () => 0);
+  const returningUsersDaily = Array.isArray(metrics.returningUsersDaily) && metrics.returningUsersDaily.length === windowDays
+    ? metrics.returningUsersDaily.map((value) => Number(value || 0))
+    : Array.from({ length: windowDays }, () => 0);
+  const engagedUsersDaily = Array.isArray(metrics.engagedUsersDaily) && metrics.engagedUsersDaily.length === windowDays
+    ? metrics.engagedUsersDaily.map((value) => Number(value || 0))
+    : Array.from({ length: windowDays }, () => 0);
 
   const maxUserDaily = Math.max(...usersCreatedDaily, ...usersApprovedDaily, 1);
   const userChartLeftPad = 28;
@@ -456,6 +474,27 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
     const approvedValue = approvedBuckets[i]?.value || 0;
     const createdValue = bucket.value || 0;
     const rate = createdValue > 0 ? Number(((approvedValue / createdValue) * 100).toFixed(1)) : (approvedValue > 0 ? 100 : 0);
+    return { label: bucket.label, value: rate };
+  });
+  const monthlyActiveBuckets = useMonthlyBuckets
+    ? bucketDailyByMonth(monthlyActiveDaily)
+    : dailyLabels.map((label, i) => ({ label, value: monthlyActiveDaily[i] || 0 }));
+  const returningUsersBuckets = useMonthlyBuckets
+    ? bucketDailyByMonth(returningUsersDaily)
+    : dailyLabels.map((label, i) => ({ label, value: returningUsersDaily[i] || 0 }));
+  const engagedUsersBuckets = useMonthlyBuckets
+    ? bucketDailyByMonth(engagedUsersDaily)
+    : dailyLabels.map((label, i) => ({ label, value: engagedUsersDaily[i] || 0 }));
+  const userRetentionRateBuckets = monthlyActiveBuckets.map((bucket, i) => {
+    const returningValue = returningUsersBuckets[i]?.value || 0;
+    const activeValue = bucket.value || 0;
+    const rate = activeValue > 0 ? Number(((returningValue / activeValue) * 100).toFixed(1)) : 0;
+    return { label: bucket.label, value: rate };
+  });
+  const activeUsersDenominator = Number(metrics.activeUsers) || 0;
+  const engagementRateBuckets = engagedUsersBuckets.map((bucket) => {
+    const engagedValue = bucket.value || 0;
+    const rate = activeUsersDenominator > 0 ? Number(((engagedValue / activeUsersDenominator) * 100).toFixed(1)) : 0;
     return { label: bucket.label, value: rate };
   });
   const certBuckets = (metrics.certificationPeriodLabels || []).map((label, i) => ({ label, value: Number(metrics.certificationSeries?.[i] || 0) }));
@@ -488,10 +527,10 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
     activeUsers: <MiniBarChart data={approvedBuckets} color="#2563eb" />,
     accountApprovalRate: <MiniBarChart data={approvalRateBuckets} color="#15803d" suffix="%" />,
     monthlyActiveUsers: <MiniBarChart data={approvedBuckets} color="#7c3aed" />,
-    userRetentionRate: <MiniBarChart data={[{ label: periodLabel, value: metrics.userRetentionRate }]} color="#0ea5e9" suffix="%" />,
+    userRetentionRate: <MiniBarChart data={userRetentionRateBuckets} color="#0ea5e9" suffix="%" />,
     certificationsCompleted: <MiniBarChart data={certBuckets} color="#d97706" />,
     jobApplicantsCount: <MiniBarChart data={applicantBuckets} color="#a06c04" />,
-    engagementRate: <MiniBarChart data={[{ label: periodLabel, value: metrics.engagementRate }]} color="#dc2626" suffix="%" />,
+    engagementRate: <MiniBarChart data={engagementRateBuckets} color="#dc2626" suffix="%" />,
   };
   const makePath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
 
