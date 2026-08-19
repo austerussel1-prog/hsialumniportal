@@ -414,7 +414,9 @@ export default function AnalyticsReportPage() {
 
   const createdLinePath = makePath(createdPoints);
   const approvedLinePath = makePath(approvedPoints);
-  const createdAreaPath = `${createdLinePath} L${createdPoints[createdPoints.length - 1]?.x ?? (700 - userChartRightPad)},270 L${createdPoints[0]?.x ?? userChartLeftPad},270 Z`;
+  const createdAreaPath = (createdLinePath && createdPoints.length > 0)
+    ? `${createdLinePath} L${createdPoints[createdPoints.length - 1].x},270 L${createdPoints[0].x},270 Z`
+    : '';
 
   const axisLabels = datePoints.map((d, index) => {
     if (windowDays <= 31) return dateFormat.format(d);
@@ -775,32 +777,38 @@ export default function AnalyticsReportPage() {
                   {[40, 90, 140, 190, 240].map((y) => (
                   <line key={y} x1={userChartLeftPad} y1={y} x2={700 - userChartRightPad} y2={y} stroke="#f0e6d4" strokeDasharray="5 6" />
                   ))}
-                  <motion.path
-                    d={createdAreaPath}
-                    fill="url(#arCreatedFill)"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1, d: createdAreaPath }}
-                    transition={{ duration: 0.6, ease: 'easeInOut' }}
-                  />
-                  <motion.path
-                    d={createdLinePath}
-                    fill="none"
-                    stroke="#b07a15"
-                    strokeWidth="4"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1, d: createdLinePath }}
-                    transition={{ duration: 0.6, ease: 'easeInOut' }}
-                  />
-                  <motion.path
-                    d={approvedLinePath}
-                    fill="none"
-                    stroke="#2563eb"
-                    strokeWidth="4"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1, d: approvedLinePath }}
-                    transition={{ duration: 0.6, ease: 'easeInOut', delay: 0.08 }}
-                  />
-                  {windowDays <= 120 ? createdPoints.map((point, idx) => (
+                  {createdAreaPath ? (
+                    <motion.path
+                      d={createdAreaPath}
+                      fill="url(#arCreatedFill)"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1, d: createdAreaPath }}
+                      transition={{ duration: 0.6, ease: 'easeInOut' }}
+                    />
+                  ) : null}
+                  {createdLinePath ? (
+                    <motion.path
+                      d={createdLinePath}
+                      fill="none"
+                      stroke="#b07a15"
+                      strokeWidth="4"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1, d: createdLinePath }}
+                      transition={{ duration: 0.6, ease: 'easeInOut' }}
+                    />
+                  ) : null}
+                  {approvedLinePath ? (
+                    <motion.path
+                      d={approvedLinePath}
+                      fill="none"
+                      stroke="#2563eb"
+                      strokeWidth="4"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1, d: approvedLinePath }}
+                      transition={{ duration: 0.6, ease: 'easeInOut', delay: 0.08 }}
+                    />
+                  ) : null}
+                  {windowDays <= 120 ? createdPoints.filter(p => Number.isFinite(p.x) && Number.isFinite(p.y)).map((point, idx) => (
                     <motion.circle
                       key={`p-${idx}`}
                       cx={point.x}
