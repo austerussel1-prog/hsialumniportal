@@ -751,6 +751,12 @@ export default function EventsPage() {
             max-width: calc(100vw - 16px) !important;
             padding: 10px !important;
           }
+          .eventsCreateGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+          .eventsCreateGrid input, .eventsCreateGrid textarea, .eventsCreateGrid select { width: 100%; box-sizing: border-box; }
+          @media (max-width: 640px) {
+            .eventsCreateGrid { grid-template-columns: 1fr !important; gap: 10px !important; }
+            .eventsCreateGrid > [style*="gridColumn"] { grid-column: auto !important; }
+          }
         }
       `}</style>
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
@@ -1905,7 +1911,7 @@ export default function EventsPage() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 14, scale: 0.98 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
-                style={{ width: 640, background: '#fff', borderRadius: 12, padding: 18 }}
+                style={{ width: '100%', maxWidth: 640, background: '#fff', borderRadius: 12, padding: 18, boxSizing: 'border-box', margin: '0 12px' }}
               >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Create Event</h3>
@@ -2005,7 +2011,7 @@ export default function EventsPage() {
                 }}
                 style={{ marginTop: 14 }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="eventsCreateGrid">
                   <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
                   <input name="category" placeholder="Category (e.g., Webinar)" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
                   <input name="capacity" type="number" min="0" placeholder="Capacity (optional)" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
