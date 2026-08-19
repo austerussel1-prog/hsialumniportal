@@ -752,8 +752,7 @@ export default function EventsPage() {
             padding: 10px !important;
           }
           .eventsCreateModalContent {
-            max-height: calc(100vh - 48px) !important;
-            overflow-y: auto !important;
+            max-width: 640px;
           }
           .eventsCreateGrid {
             display: grid;
@@ -761,6 +760,10 @@ export default function EventsPage() {
             gap: 10px;
           }
           @media (max-width: 640px) {
+            .eventsCreateModalContent {
+              max-height: calc(100vh - 48px) !important;
+              overflow-y: auto !important;
+            }
             .eventsCreateGrid {
               grid-template-columns: 1fr !important;
             }
