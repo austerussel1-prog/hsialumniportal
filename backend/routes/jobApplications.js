@@ -1,6 +1,9 @@
 const express = require('express');
 const multer = require('multer');
 const { sendJobApplicationEmail } = require('../services/emailService');
+const fs = require('fs');
+const path = require('path');
+const JobApplication = require('../models/JobApplication');
 
 const router = express.Router();
 
@@ -29,6 +32,40 @@ router.post('/', upload.single('resume'), async (req, res) => {
 
     if (!req.file) {
       return res.status(400).json({ message: 'Resume file is required.' });
+    }
+
+    // persist resume to uploads/job-applications
+    const uploadsDir = path.join(__dirname, '..', 'uploads', 'job-applications');
+    try {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    } catch (err) {
+      // ignore
+    }
+    const timestamp = Date.now();
+    const safeFilename = `${timestamp}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const savePath = path.join(uploadsDir, safeFilename);
+    try {
+      fs.writeFileSync(savePath, req.file.buffer);
+    } catch (err) {
+      console.error('Failed to save resume file:', err);
+    }
+
+    // record application in database
+    try {
+      await JobApplication.create({
+        name,
+        email,
+        phone,
+        mobile,
+        startDate,
+        coverLetter,
+        jobPostingId: jobId || undefined,
+        jobTitle,
+        company,
+        resumePath: `uploads/job-applications/${safeFilename}`,
+      });
+    } catch (dbErr) {
+      console.error('Failed to persist job application:', dbErr);
     }
 
     await sendJobApplicationEmail({

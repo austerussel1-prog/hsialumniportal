@@ -19,6 +19,7 @@ const documentsRoutes = require('./routes/documents');
 const mentorshipRoutes = require('./routes/mentorship');
 const jobApplicationRoutes = require('./routes/jobApplications');
 const jobRoutes = require('./routes/jobs');
+const analyticsRoutes = require('./routes/analytics');
 const notificationsRoutes = require('./routes/notifications');
 const { scheduleDataRetentionJob } = require('./services/privacyRetentionService');
 const { scheduleEventLifecycleJob } = require('./services/eventLifecycleService');
@@ -86,6 +87,7 @@ app.use('/api/mentorship', mentorshipRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/job-applications', jobApplicationRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 
 app.get('/api/health', (req, res) => {
