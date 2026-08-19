@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Message = require('../models/Message');
 const Achievement = require('../models/Achievement');
 const AuditLog = require('../models/AuditLog');
+const JobApplication = require('../models/JobApplication');
 const { sendApprovalEmail, sendRejectionEmail, sendDataRemovalDecisionEmail, sendAdminInviteEmail } = require('../services/emailService');
 const { hardDeleteUsersByIds } = require('../services/userDeletionService');
 const { verifyToken } = require('./auth');
@@ -977,11 +978,35 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       };
     };
 
+    // Job applications analytics
+    const jobApplicationsDaily = Array.from({ length: windowDays }, () => 0);
+    let jobApplicationsInWindow = 0;
+    let previousJobApplicationsInWindow = 0;
+    try {
+      const apps = await JobApplication.find().select('createdAt').lean();
+      for (const a of apps) {
+        const d = startOfDay(a?.createdAt);
+        if (!d) continue;
+        if (d >= sinceStart && d <= todayStart) {
+          const index = Math.floor((d.getTime() - sinceStart.getTime()) / dayMs);
+          if (index >= 0 && index < windowDays) jobApplicationsDaily[index] += 1;
+        }
+        if (d >= sinceStart && d <= todayStart) jobApplicationsInWindow += 1;
+        if (d >= previousStart && d < previousEnd) previousJobApplicationsInWindow += 1;
+      }
+    } catch (err) {
+      console.error('Error fetching job applications for analytics:', err);
+    }
+
     return res.json({
       activeUsers,
       engagedUsers,
       certificationsCompleted,
       engagementRate,
+      jobApplicationsInWindow,
+      jobApplicationsDaily,
+      previousJobApplicationsInWindow,
+      totalJobApplications: await JobApplication.countDocuments(),
       totalRegisteredUsers,
       totalApprovedAccounts,
       accountApprovalRate,
@@ -1087,11 +1112,24 @@ router.get('/analytics-report/kpis', verifyToken, async (req, res) => {
       return { change, direction: change >= 0 ? 'up' : 'down' };
     };
 
+    // Job applications KPIs
+    let totalJobApplications = 0;
+    let jobApplicationsInWindow = 0;
+    let previousJobApplicationsInWindow = 0;
+    try {
+      totalJobApplications = await JobApplication.countDocuments();
+      jobApplicationsInWindow = await JobApplication.countDocuments({ createdAt: { $gte: sinceStart, $lte: new Date() } });
+      previousJobApplicationsInWindow = await JobApplication.countDocuments({ createdAt: { $gte: previousStart, $lt: previousEnd } });
+    } catch (err) {
+      console.error('Error fetching job application KPIs:', err);
+    }
+
     return res.json({
       windowDays,
       sinceStart: sinceStart.toISOString(),
       todayStart: todayStart.toISOString(),
       totalRegisteredUsers,
+      totalJobApplications,
       totalApprovedAccounts,
       accountApprovalRate,
       monthlyActiveUsers,
@@ -1103,6 +1141,9 @@ router.get('/analytics-report/kpis', verifyToken, async (req, res) => {
       monthlyActiveUsersTrend: periodTrend(monthlyActiveUsers, previousMonthlyActiveUsers),
       userRetentionTrend: rateTrend(userRetentionRate, previousUserRetentionRate),
       certificationCompletionTrend: rateTrend(certificationCompletionRate, previousCertificationCompletionRate),
+      jobApplicationsInWindow,
+      previousJobApplicationsInWindow,
+      jobApplicationsTrend: periodTrend(jobApplicationsInWindow, previousJobApplicationsInWindow),
     });
   } catch (err) {
     console.error(err);

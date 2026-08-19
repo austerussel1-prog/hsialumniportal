@@ -23,6 +23,10 @@ export default function AnalyticsReportPage() {
     certificationsCompleted: 0,
     certificationCompletionRate: 0,
     engagementRate: 0,
+    totalJobApplications: 0,
+    jobApplicationsInWindow: 0,
+    jobApplicationsDaily: [],
+    jobApplicationsTrend: { change: 0, direction: 'up' },
     totalRegisteredTrend: { change: 0, direction: 'up' },
     accountApprovalTrend: { change: 0, direction: 'up' },
     monthlyActiveUsersTrend: { change: 0, direction: 'up' },
@@ -183,6 +187,10 @@ export default function AnalyticsReportPage() {
             certificationsCompleted: Number(data?.certificationsCompleted || 0),
             certificationCompletionRate: Number(data?.certificationCompletionRate || 0),
             engagementRate: Number(data?.engagementRate || 0),
+            totalJobApplications: Number(data?.totalJobApplications || 0),
+            jobApplicationsInWindow: Number(data?.jobApplicationsInWindow || 0),
+            jobApplicationsDaily: Array.isArray(data?.jobApplicationsDaily) ? data.jobApplicationsDaily : [],
+            jobApplicationsTrend: data?.jobApplicationsTrend || { change: 0, direction: 'up' },
             totalRegisteredTrend: data?.totalRegisteredTrend || { change: 0, direction: 'up' },
             accountApprovalTrend: data?.accountApprovalTrend || { change: 0, direction: 'up' },
             monthlyActiveUsersTrend: data?.monthlyActiveUsersTrend || { change: 0, direction: 'up' },
@@ -320,6 +328,12 @@ export default function AnalyticsReportPage() {
       formula: 'Engaged Users / Active Users x 100.',
       use: 'This shows whether users are not only registered, but also interacting with the system.',
     },
+    jobApplications: {
+      title: 'Total Job Applications',
+      description: 'Total number of job applications submitted by users through the portal.',
+      formula: 'Count of Job Application records submitted via the jobs application form.',
+      use: 'Helps measure hiring engagement and interest from alumni in posted job opportunities.',
+    },
   };
 
   const cards = [
@@ -329,6 +343,7 @@ export default function AnalyticsReportPage() {
     { id: 'monthlyActiveUsers', icon: Users, label: 'Monthly Active Users', value: metrics.monthlyActiveUsers.toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
     { id: 'userRetentionRate', icon: TrendUp, label: 'User Retention Rate', value: formatPercent(metrics.userRetentionRate), trendMetric: metrics.userRetentionTrend, helper: `${metrics.returningUsers.toLocaleString()} returning users` },
     { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
+    { id: 'jobApplications', icon: Users, label: 'Total Job Applications', value: metrics.totalJobApplications.toLocaleString(), trendMetric: metrics.jobApplicationsTrend, helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
     { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
   ];
   const selectedKpiDetail = selectedKpiKey ? kpiDetails[selectedKpiKey] : null;
