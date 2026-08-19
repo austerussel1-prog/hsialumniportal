@@ -751,12 +751,6 @@ export default function EventsPage() {
             max-width: calc(100vw - 16px) !important;
             padding: 10px !important;
           }
-          .eventsCreateGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-          .eventsCreateGrid input, .eventsCreateGrid textarea, .eventsCreateGrid select { width: 100%; box-sizing: border-box; }
-          @media (max-width: 640px) {
-            .eventsCreateGrid { grid-template-columns: 1fr !important; gap: 10px !important; }
-            .eventsCreateGrid > [style*="gridColumn"] { grid-column: auto !important; }
-          }
         }
       `}</style>
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
@@ -1911,7 +1905,7 @@ export default function EventsPage() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 14, scale: 0.98 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
-                style={{ width: '100%', maxWidth: 760, background: '#fff', borderRadius: 12, padding: 18, boxSizing: 'border-box', margin: '0 12px', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' }}
+                style={{ width: 640, background: '#fff', borderRadius: 12, padding: 18 }}
               >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Create Event</h3>
@@ -2009,9 +2003,9 @@ export default function EventsPage() {
                     setCreating(false);
                   }
                 }}
-                style={{ marginTop: 14, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto' }}
+                style={{ marginTop: 14 }}
               >
-                <div className="eventsCreateGrid">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
                   <input name="category" placeholder="Category (e.g., Webinar)" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
                   <input name="capacity" type="number" min="0" placeholder="Capacity (optional)" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
@@ -2036,14 +2030,14 @@ export default function EventsPage() {
                   </div>
                 </div>
 
-                {createMessage && <div style={{ marginTop: 10, color: '#b91c1c' }}>{createMessage}</div>}
-
-                <div style={{ position: 'sticky', bottom: 0, background: '#fff', display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end', paddingTop: 12, paddingBottom: 6 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
                   <button className="hsi-btn hsi-btn-secondary" type="button" onClick={() => setShowCreate(false)} style={{ padding: '10px 14px' }}>Cancel</button>
                   <button className={creating ? 'hsi-btn hsi-btn-secondary' : 'hsi-btn hsi-btn-primary'} disabled={creating} type="submit" style={{ padding: '10px 14px' }}>
                     {creating ? 'Creating...' : 'Create'}
                   </button>
                 </div>
+
+                {createMessage && <div style={{ marginTop: 10, color: '#b91c1c' }}>{createMessage}</div>}
               </form>
               </motion.div>
             </motion.div>
