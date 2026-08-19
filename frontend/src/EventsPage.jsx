@@ -1911,7 +1911,7 @@ export default function EventsPage() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 14, scale: 0.98 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
-                style={{ width: '100%', maxWidth: 640, background: '#fff', borderRadius: 12, padding: 18, boxSizing: 'border-box', margin: '0 12px' }}
+                style={{ width: '100%', maxWidth: 640, background: '#fff', borderRadius: 12, padding: 18, boxSizing: 'border-box', margin: '0 12px', maxHeight: 'calc(100vh - 48px)', overflowY: 'auto' }}
               >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Create Event</h3>
@@ -2009,7 +2009,7 @@ export default function EventsPage() {
                     setCreating(false);
                   }
                 }}
-                style={{ marginTop: 14 }}
+                style={{ marginTop: 14, maxHeight: 'calc(100vh - 140px)', overflowY: 'auto', paddingRight: 8 }}
               >
                 <div className="eventsCreateGrid">
                   <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
