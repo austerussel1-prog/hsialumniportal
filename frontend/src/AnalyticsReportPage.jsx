@@ -4,6 +4,34 @@ import { Users, Certificate, TrendUp, TrendDown, DownloadSimple, CaretDown, X } 
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
+function MiniBarChart({ data, color = '#b07a15', suffix = '' }) {
+  const values = Array.isArray(data) ? data : [];
+  if (values.length === 0) {
+    return <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>No trend data available for this period.</p>;
+  }
+  const max = Math.max(...values.map((d) => Number(d.value) || 0), 1);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 150, borderBottom: '1px solid #efe5d7', paddingBottom: 6, overflowX: 'auto' }}>
+      {values.map((d, i) => {
+        const heightPct = Math.max(4, (Number(d.value || 0) / max) * 100);
+        return (
+          <div
+            key={`${d.label}-${i}`}
+            title={`${d.label}: ${d.value}${suffix}`}
+            style={{ flex: '1 1 0', minWidth: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}
+          >
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#374151' }}>{d.value}{suffix}</span>
+            <div style={{ width: '100%', height: 110, display: 'flex', alignItems: 'flex-end' }}>
+              <div style={{ width: '100%', height: `${heightPct}%`, background: color, borderRadius: '6px 6px 2px 2px', minHeight: 4 }} />
+            </div>
+            <span style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', whiteSpace: 'nowrap' }}>{d.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AnalyticsReportPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -398,6 +426,64 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
   const userChartRightPad = 28;
   const userChartWidth = 700 - userChartLeftPad - userChartRightPad;
   const xStep = windowDays === 1 ? 0 : (userChartWidth / (windowDays - 1));
+
+  const useMonthlyBuckets = windowDays > 31;
+  const bucketDailyByMonth = (values) => {
+    const map = new Map();
+    datePoints.forEach((d, i) => {
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!map.has(key)) map.set(key, { label: monthYearFormat.format(d), value: 0 });
+      map.get(key).value += Number(values[i] || 0);
+    });
+    return Array.from(map.values());
+  };
+  const createdBuckets = useMonthlyBuckets
+    ? bucketDailyByMonth(usersCreatedDaily)
+    : dailyLabels.map((label, i) => ({ label, value: usersCreatedDaily[i] || 0 }));
+  const approvedBuckets = useMonthlyBuckets
+    ? bucketDailyByMonth(usersApprovedDaily)
+    : dailyLabels.map((label, i) => ({ label, value: usersApprovedDaily[i] || 0 }));
+  const approvalRateBuckets = createdBuckets.map((bucket, i) => {
+    const approvedValue = approvedBuckets[i]?.value || 0;
+    const createdValue = bucket.value || 0;
+    const rate = createdValue > 0 ? Number(((approvedValue / createdValue) * 100).toFixed(1)) : (approvedValue > 0 ? 100 : 0);
+    return { label: bucket.label, value: rate };
+  });
+  const certBuckets = (metrics.certificationPeriodLabels || []).map((label, i) => ({ label, value: Number(metrics.certificationSeries?.[i] || 0) }));
+  const applicantBuckets = (() => {
+    const list = Array.isArray(metrics.jobApplicantsList) ? metrics.jobApplicantsList : [];
+    if (list.length === 0) return [];
+    if (useMonthlyBuckets) {
+      const map = new Map();
+      list.forEach((app) => {
+        const d = app?.createdAt ? new Date(app.createdAt) : null;
+        if (!d || Number.isNaN(d.getTime())) return;
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        if (!map.has(key)) map.set(key, { label: monthYearFormat.format(d), value: 0 });
+        map.get(key).value += 1;
+      });
+      return Array.from(map.values());
+    }
+    const buckets = dailyLabels.map((label) => ({ label, value: 0 }));
+    list.forEach((app) => {
+      const d = app?.createdAt ? new Date(app.createdAt) : null;
+      if (!d || Number.isNaN(d.getTime())) return;
+      const dayIndex = Math.floor((d.getTime() - sinceStartDate.getTime()) / dayMs);
+      if (dayIndex >= 0 && dayIndex < buckets.length) buckets[dayIndex].value += 1;
+    });
+    return buckets;
+  })();
+
+  const kpiChartByKey = {
+    totalRegisteredUsers: <MiniBarChart data={createdBuckets} color="#b07a15" />,
+    activeUsers: <MiniBarChart data={approvedBuckets} color="#2563eb" />,
+    accountApprovalRate: <MiniBarChart data={approvalRateBuckets} color="#15803d" suffix="%" />,
+    monthlyActiveUsers: <MiniBarChart data={approvedBuckets} color="#7c3aed" />,
+    userRetentionRate: <MiniBarChart data={[{ label: periodLabel, value: metrics.userRetentionRate }]} color="#0ea5e9" suffix="%" />,
+    certificationsCompleted: <MiniBarChart data={certBuckets} color="#d97706" />,
+    jobApplicantsCount: <MiniBarChart data={applicantBuckets} color="#a06c04" />,
+    engagementRate: <MiniBarChart data={[{ label: periodLabel, value: metrics.engagementRate }]} color="#dc2626" suffix="%" />,
+  };
   const makePath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
 
   const createdPoints = usersCreatedDaily.map((value, index) => ({
@@ -755,6 +841,12 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
                 <div>
                   <div className="ar-kpi-detail-label">Why It Matters</div>
                   <p className="ar-kpi-detail-text">{selectedKpiDetail.use}</p>
+                </div>
+                <div>
+                  <div className="ar-kpi-detail-label">Trend {useMonthlyBuckets ? '(Per Month)' : '(Per Day)'}</div>
+                  <div style={{ marginTop: 6 }}>
+                    {kpiChartByKey[selectedKpiKey] || null}
+                  </div>
                 </div>
               </div>
             </motion.div>
