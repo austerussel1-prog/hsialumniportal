@@ -875,7 +875,20 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
                     <div style={{ color: isSelected ? '#a06c04' : '#9ca3af', fontSize: 11, fontWeight: 700 }}>
                       {isSelected ? 'Guide open' : 'Click for guide'}
                     </div>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 999, background: '#f8f3e8', border: '1px solid #eadfca', color: '#7a5a12', fontSize: 10, fontWeight: 800 }}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => { event.stopPropagation(); setSelectedKpiKey('jobApplicantsCount'); }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          setSelectedKpiKey('jobApplicantsCount');
+                        }
+                      }}
+                      aria-label="Show details for Job Applicants"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 999, background: '#f8f3e8', border: '1px solid #eadfca', color: '#7a5a12', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}
+                    >
                       <Users size={12} />
                       {metrics.jobApplicantsCount.toLocaleString()} applicants
                     </div>
