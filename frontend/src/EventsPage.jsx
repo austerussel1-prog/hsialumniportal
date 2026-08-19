@@ -1927,14 +1927,14 @@ export default function EventsPage() {
                 exit={{ opacity: 0, y: 14, scale: 0.98 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
                 className="eventsCreateModalContent"
-                style={{ width: '100%', maxWidth: 640, background: '#fff', borderRadius: 12, padding: 18, boxSizing: 'border-box', margin: '0 12px' }}
+                style={{ width: '100%', maxWidth: 680, background: '#fff', borderRadius: 14, padding: 20, boxSizing: 'border-box', margin: '0 12px' }}
               >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
                 <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>Create Event</h3>
                 <button
                   type="button"
                   onClick={() => setShowCreate(false)}
-                  style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff' }}
+                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', fontWeight: 600 }}
                 >
                   Close
                 </button>
@@ -2025,38 +2025,38 @@ export default function EventsPage() {
                     setCreating(false);
                   }
                 }}
-                style={{ marginTop: 14 }}
+                style={{ marginTop: 8, display: 'grid', gap: 12 }}
               >
                 <div className="eventsCreateGrid">
-                  <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                  <input name="category" placeholder="Category (e.g., Webinar)" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                  <input name="capacity" type="number" min="0" placeholder="Capacity (optional)" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, gridColumn: '1 / -1', fontSize: 14, color: '#374151' }}>
-                    <input name="isVirtual" type="checkbox" />
+                  <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <input name="category" placeholder="Category (e.g., Webinar)" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <input name="capacity" type="number" min="0" placeholder="Capacity (optional)" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, gridColumn: '1 / -1', fontSize: 14, color: '#374151', padding: '2px 2px' }}>
+                    <input name="isVirtual" type="checkbox" style={{ width: 16, height: 16 }} />
                     Virtual event
                   </label>
-                  <textarea name="description" placeholder="Description (required, at least 100 chars)" rows={3} required minLength={100} style={{ gridColumn: '1 / -1', padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                  <textarea name="description" placeholder="Description (required, at least 100 chars)" rows={4} required minLength={100} style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 112, resize: 'vertical', boxSizing: 'border-box', fontSize: 14 }} />
                   <div style={{ display: 'grid', gap: 6 }}>
-                    <label style={{ fontSize: 12, color: '#6b7280' }}>Start date/time</label>
-                    <input name="startDate" type="datetime-local" required style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                    <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Start date/time</label>
+                    <input name="startDate" type="datetime-local" required style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
                   </div>
                   <div style={{ display: 'grid', gap: 6 }}>
-                    <label style={{ fontSize: 12, color: '#6b7280' }}>End date/time (optional)</label>
-                    <input name="endDate" type="datetime-local" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                    <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>End date/time (optional)</label>
+                    <input name="endDate" type="datetime-local" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
                   </div>
-                  <input name="location" placeholder="Location (for onsite)" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                  <input name="virtualLink" placeholder="Virtual link (for virtual)" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                  <input name="location" placeholder="Location (for onsite)" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <input name="virtualLink" placeholder="Virtual link (for virtual)" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
                   <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 6 }}>
-                    <label style={{ fontSize: 12, color: '#6b7280' }}>Event image (optional)</label>
-                    <input name="image" type="file" accept="image/*" style={{ padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                    <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Event image (optional)</label>
+                    <input name="image" type="file" accept="image/*" style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #e5e7eb', boxSizing: 'border-box', fontSize: 14 }} />
                   </div>
                 </div>
 
-                {createMessage && <div style={{ marginTop: 10, marginBottom: 12, color: '#b91c1c', fontSize: 13 }}>{createMessage}</div>}
+                {createMessage && <div style={{ marginTop: 2, marginBottom: 0, color: '#b91c1c', fontSize: 13 }}>{createMessage}</div>}
 
-                <div style={{ position: 'sticky', bottom: 0, background: '#fff', display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end', paddingTop: 10, borderTop: '1px solid #e5e7eb', marginLeft: -18, marginRight: -18, paddingLeft: 18, paddingBottom: 0 }}>
-                  <button className="hsi-btn hsi-btn-secondary" type="button" onClick={() => setShowCreate(false)} style={{ padding: '10px 14px' }}>Cancel</button>
-                  <button className={creating ? 'hsi-btn hsi-btn-secondary' : 'hsi-btn hsi-btn-primary'} disabled={creating} type="submit" style={{ padding: '10px 14px' }}>
+                <div style={{ position: 'sticky', bottom: 0, background: '#fff', display: 'flex', gap: 8, marginTop: 4, justifyContent: 'flex-end', paddingTop: 12, borderTop: '1px solid #e5e7eb', marginLeft: -20, marginRight: -20, paddingLeft: 20, paddingRight: 20, paddingBottom: 0 }}>
+                  <button className="hsi-btn hsi-btn-secondary" type="button" onClick={() => setShowCreate(false)} style={{ padding: '10px 16px' }}>Cancel</button>
+                  <button className={creating ? 'hsi-btn hsi-btn-secondary' : 'hsi-btn hsi-btn-primary'} disabled={creating} type="submit" style={{ padding: '10px 16px' }}>
                     {creating ? 'Creating...' : 'Create'}
                   </button>
                 </div>
