@@ -86,6 +86,7 @@ export default function JobListingsPage() {
   const [serverJobs, setServerJobs] = useState([]);
   const [recommendedJobs, setRecommendedJobs] = useState([]);
   const [recommendedModalOpen, setRecommendedModalOpen] = useState(false);
+  const [applicantCounts, setApplicantCounts] = useState({});
   const [postForm, setPostForm] = useState({
     category: 'exclusive',
     company: '',
@@ -223,6 +224,41 @@ export default function JobListingsPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [recommendedModalOpen]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchApplicantCounts() {
+      if (!serverJobs.length) return;
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      try {
+        const counts = {};
+        await Promise.all(serverJobs.map(async (job) => {
+          const jobKey = String(job?.id || job?._id || '');
+          if (!jobKey) return;
+
+          const response = await fetch(`${apiEndpoints.jobApplications}?jobId=${encodeURIComponent(jobKey)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!response.ok) return;
+
+          const data = await response.json().catch(() => ({}));
+          counts[jobKey] = Array.isArray(data?.applications) ? data.applications.length : 0;
+        }));
+
+        if (mounted) setApplicantCounts(counts);
+      } catch (_error) {
+        // ignore per-job applicant count fetch errors
+      }
+    }
+
+    fetchApplicantCounts();
+    return () => {
+      mounted = false;
+    };
+  }, [serverJobs]);
 
   useEffect(() => {
     let mounted = true;
@@ -963,6 +999,17 @@ export default function JobListingsPage() {
                   <img src="/Lion.png" alt="HSI logo small" style={{ width: isMobile ? '20px' : '34px', height: isMobile ? '20px' : '34px', opacity: 0.9 }} />
                 </div>
 
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                  <span style={{ fontSize: isMobile ? '9px' : '10px', fontWeight: '700', color: '#8a5a00', background: '#fef3c7', border: '1px solid #f5d77d', borderRadius: '999px', padding: '4px 8px' }}>
+                    {Number(applicantCounts[String(job.id || job._id)] || 0)} applicant{Number(applicantCounts[String(job.id || job._id)] || 0) === 1 ? '' : 's'}
+                  </span>
+                  {isAdminUser ? (
+                    <span style={{ fontSize: isMobile ? '9px' : '10px', color: '#374151', fontWeight: '600' }}>
+                      Applicants
+                    </span>
+                  ) : null}
+                </div>
+
                 <div style={{ marginTop: '2px', display: 'grid', gridTemplateColumns: canDeleteJob(job) ? '1fr auto auto' : '1fr', gap: '8px', alignItems: 'center' }}>
                   <Link
                     to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
@@ -1122,6 +1169,14 @@ export default function JobListingsPage() {
                 <div style={{ fontSize: '12px', color: '#b07a15', fontWeight: '700' }}>{job.company}</div>
                 <div style={{ fontSize: '19px', color: '#111827', fontWeight: '800' }}>{job.position}</div>
                 <div style={{ fontSize: '13px', color: '#6b7280' }}>{job.location}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: '700', color: '#8a5a00', background: '#fef3c7', border: '1px solid #f5d77d', borderRadius: '999px', padding: '4px 8px' }}>
+                    {Number(applicantCounts[String(job.id || job._id)] || 0)} applicant{Number(applicantCounts[String(job.id || job._id)] || 0) === 1 ? '' : 's'}
+                  </span>
+                  {isAdminUser ? (
+                    <span style={{ fontSize: '10px', color: '#374151', fontWeight: '600' }}>Applicants</span>
+                  ) : null}
+                </div>
                 <div style={{ marginTop: '6px', display: 'grid', gridTemplateColumns: canDeleteJob(job) ? '1fr auto auto' : '1fr', gap: '8px', alignItems: 'center' }}>
                   <Link
                     to={`/career/job-details/${encodeURIComponent(String(job.id))}`}
