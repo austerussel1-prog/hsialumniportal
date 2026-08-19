@@ -60,6 +60,8 @@ export const apiEndpoints = {
 
   // Job application endpoints
   submitJobApplication: `${API_URL}/api/job-applications`,
+  jobApplications: `${API_URL}/api/job-applications`,
+  jobApplicationStatus: (id) => `${API_URL}/api/job-applications/${encodeURIComponent(id)}/status`,
 
   // Alumni endpoints
   allAlumni: `${API_URL}/api/admin/all-alumni`,

@@ -144,6 +144,12 @@ export default function AdminDashboard() {
   const [volunteerLogsLoading, setVolunteerLogsLoading] = useState(false);
   const [volunteerLogActionLoading, setVolunteerLogActionLoading] = useState(null);
 
+  const [jobApplicants, setJobApplicants] = useState([]);
+  const [jobApplicantsLoading, setJobApplicantsLoading] = useState(false);
+  const [jobApplicantsStatusFilter, setJobApplicantsStatusFilter] = useState('all');
+  const [jobApplicantsSearch, setJobApplicantsSearch] = useState('');
+  const [jobApplicantsActionLoading, setJobApplicantsActionLoading] = useState(null);
+
   // Refs for scrolling to sections
   const userVerificationRef = useRef(null);
   const alumniManagementRef = useRef(null);
@@ -217,6 +223,7 @@ export default function AdminDashboard() {
     fetchVolunteerOpportunities('active');
     fetchVolunteerParticipations('applied');
     fetchVolunteerLogs('pending');
+    fetchJobApplications({ silent: true });
     fetchDataRemovalRequests('pending');
     setLoading(false);
   }, [navigate]);
@@ -231,11 +238,12 @@ export default function AdminDashboard() {
       fetchVolunteerOpportunities(volunteerOppsStatus, { silent: true });
       fetchVolunteerParticipations(participationsStatus, { silent: true });
       fetchVolunteerLogs(volunteerLogsStatus, { silent: true });
+      fetchJobApplications({ silent: true });
       fetchDataRemovalRequests(dataRemovalStatus, { silent: true });
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [mentorAppsStatus, volunteerOppsStatus, participationsStatus, volunteerLogsStatus, dataRemovalStatus]);
+  }, [mentorAppsStatus, volunteerOppsStatus, participationsStatus, volunteerLogsStatus, dataRemovalStatus, jobApplicantsStatusFilter, jobApplicantsSearch]);
 
   const authHeaders = () => {
     const token = localStorage.getItem('token');
@@ -570,6 +578,52 @@ export default function AdminDashboard() {
       console.error('Error fetching volunteer logs:', err);
     } finally {
       if (!options.silent) setVolunteerLogsLoading(false);
+    }
+  };
+
+  const fetchJobApplications = async (options = {}) => {
+    try {
+      if (!options.silent) setJobApplicantsLoading(true);
+      const query = new URLSearchParams();
+      if (jobApplicantsStatusFilter && jobApplicantsStatusFilter !== 'all') query.set('status', jobApplicantsStatusFilter);
+      if (jobApplicantsSearch.trim()) query.set('search', jobApplicantsSearch.trim());
+
+      const response = await fetch(`${apiEndpoints.jobApplications}${query.toString() ? `?${query.toString()}` : ''}`, {
+        headers: authHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setJobApplicants(data.applications || []);
+      }
+    } catch (err) {
+      console.error('Error fetching job applications:', err);
+    } finally {
+      if (!options.silent) setJobApplicantsLoading(false);
+    }
+  };
+
+  const updateJobApplicationStatus = async (applicationId, nextStatus) => {
+    setJobApplicantsActionLoading(applicationId);
+    try {
+      const response = await fetch(apiEndpoints.jobApplicationStatus(applicationId), {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        await fetchJobApplications({ silent: true });
+        notify('success', data?.message || 'Application status updated.');
+      } else {
+        notify('error', data?.message || 'Failed to update application status.');
+      }
+    } catch (err) {
+      console.error('Error updating job application status:', err);
+      notify('error', 'Error updating application status.');
+    } finally {
+      setJobApplicantsActionLoading(null);
     }
   };
 
@@ -1844,6 +1898,127 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </section>
+            )}
+
+            {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr' || user?.role === 'alumni_officer') && (
+              <section className="bg-white rounded-[12px] border border-[#efe4d3] mb-8">
+                <div className="p-4 md:p-6 border-b border-[#efe4d3]">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <h2 className="text-[18px] md:text-2xl font-bold text-gray-800 leading-tight">Job Applicants</h2>
+                      <p className="text-sm text-gray-600">{jobApplicantsLoading ? 'Loading…' : `${jobApplicants.length} applicant(s)`}</p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                      <select
+                        value={jobApplicantsStatusFilter}
+                        onChange={(e) => {
+                          setJobApplicantsStatusFilter(e.target.value);
+                          const nextValue = e.target.value;
+                          const params = new URLSearchParams();
+                          if (nextValue && nextValue !== 'all') params.set('status', nextValue);
+                          if (jobApplicantsSearch.trim()) params.set('search', jobApplicantsSearch.trim());
+                          fetch(`${apiEndpoints.jobApplications}${params.toString() ? `?${params.toString()}` : ''}`, {
+                            headers: authHeaders(),
+                          })
+                            .then((res) => res.ok ? res.json() : null)
+                            .then((data) => setJobApplicants(data?.applications || []))
+                            .catch(() => console.error('Error refreshing job applicants'));
+                        }}
+                        className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                      >
+                        <option value="all">All</option>
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                      <div className="relative w-full sm:w-auto">
+                        <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          value={jobApplicantsSearch}
+                          onChange={(e) => setJobApplicantsSearch(e.target.value)}
+                          placeholder="Search applicants"
+                          className="pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm w-full sm:w-[220px]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 md:p-6">
+                  <div className="space-y-3">
+                    {(jobApplicants || [])
+                      .filter((app) => {
+                        const q = jobApplicantsSearch.toLowerCase().trim();
+                        if (!q) return true;
+                        const name = (app?.name || '').toLowerCase();
+                        const email = (app?.email || '').toLowerCase();
+                        const jobTitle = (app?.jobTitle || '').toLowerCase();
+                        const company = (app?.company || '').toLowerCase();
+                        return name.includes(q) || email.includes(q) || jobTitle.includes(q) || company.includes(q);
+                      })
+                      .map((app) => (
+                        <div key={app._id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <div className="font-semibold text-gray-800 text-base">{app.name || 'Unnamed applicant'}</div>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  app.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                  app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                  app.status === 'reviewed' ? 'bg-blue-100 text-blue-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  {String(app.status || 'pending').toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+                                <div><span className="font-medium text-gray-700">Email:</span> {app.email || '—'}</div>
+                                <div><span className="font-medium text-gray-700">Phone:</span> {app.mobile || app.phone || '—'}</div>
+                                <div><span className="font-medium text-gray-700">Opportunity:</span> {app.jobTitle || '—'}</div>
+                                <div><span className="font-medium text-gray-700">Company:</span> {app.company || '—'}</div>
+                                <div><span className="font-medium text-gray-700">Start date:</span> {app.startDate || '—'}</div>
+                                <div><span className="font-medium text-gray-700">Applied:</span> {app.createdAt ? new Date(app.createdAt).toLocaleDateString() : '—'}</div>
+                              </div>
+                              {app.coverLetter ? (
+                                <div className="mt-3 text-sm text-gray-700">
+                                  <span className="font-medium">Cover letter:</span>
+                                  <p className="mt-1 whitespace-pre-line text-gray-600">{app.coverLetter}</p>
+                                </div>
+                              ) : null}
+                            </div>
+
+                            <div className="flex flex-col gap-2 min-w-[180px]">
+                              <select
+                                value={app.status || 'pending'}
+                                onChange={(e) => updateJobApplicationStatus(app._id, e.target.value)}
+                                disabled={jobApplicantsActionLoading === app._id}
+                                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="reviewed">Reviewed</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                    {!jobApplicantsLoading && (jobApplicants || []).filter((app) => {
+                      const q = jobApplicantsSearch.toLowerCase().trim();
+                      if (!q) return true;
+                      const name = (app?.name || '').toLowerCase();
+                      const email = (app?.email || '').toLowerCase();
+                      const jobTitle = (app?.jobTitle || '').toLowerCase();
+                      const company = (app?.company || '').toLowerCase();
+                      return name.includes(q) || email.includes(q) || jobTitle.includes(q) || company.includes(q);
+                    }).length === 0 && (
+                      <div className="text-sm text-gray-500 italic">No applicants found.</div>
+                    )}
+                  </div>
+                </div>
+              </section>
             )}
 
             {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr' || user?.role === 'alumni_officer') && (
