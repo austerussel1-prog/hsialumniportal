@@ -23,10 +23,6 @@ export default function AnalyticsReportPage() {
     certificationsCompleted: 0,
     certificationCompletionRate: 0,
     engagementRate: 0,
-    totalJobApplications: 0,
-    jobApplicationsInWindow: 0,
-    jobApplicationsDaily: [],
-    jobApplicationsTrend: { change: 0, direction: 'up' },
     totalRegisteredTrend: { change: 0, direction: 'up' },
     accountApprovalTrend: { change: 0, direction: 'up' },
     monthlyActiveUsersTrend: { change: 0, direction: 'up' },
@@ -49,84 +45,6 @@ export default function AnalyticsReportPage() {
     certificationPeriodLabels: [],
     certificationSeries: [],
   });
-
-  // Ensure analytics payload contains consistent arrays sized to windowDays
-  function normalizeMetrics(raw, selectedWindowDaysFallback = 30) {
-    const out = { ...(raw || {}) };
-    const dayMs = 24 * 60 * 60 * 1000;
-    // Prefer the explicitly selected window when provided (unless it's 'all')
-    const sel = selectedWindowDaysFallback;
-    let windowDays;
-    if (String(sel).toLowerCase() === 'all' || String(sel).toLowerCase() === 'all_time' || String(sel).toLowerCase() === 'alltime') {
-      windowDays = Number(out.windowDays || 0) || Math.max(1, Math.ceil(((new Date(out.todayStart || Date.now())).getTime() - (new Date(out.sinceStart || Date.now())).getTime()) / dayMs));
-    } else {
-      windowDays = Math.max(1, Number(sel || out.windowDays || 30));
-    }
-    const today = out.todayStart ? new Date(out.todayStart) : new Date();
-    const since = (String(sel).toLowerCase() === 'all' || String(sel).toLowerCase() === 'all_time' || String(sel).toLowerCase() === 'alltime')
-      ? (out.sinceStart ? new Date(out.sinceStart) : new Date(today.getTime() - (windowDays - 1) * dayMs))
-      : new Date(today.getTime() - (windowDays - 1) * dayMs);
-
-    // build daily labels if missing or wrong length
-    const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-    if (!Array.isArray(out.dailyLabels) || out.dailyLabels.length !== windowDays) {
-      const labels = Array.from({ length: windowDays }, (_, i) => dateFormat.format(new Date(since.getTime() + i * dayMs)));
-      out.dailyLabels = labels;
-    }
-
-    const ensureSeries = (key) => {
-      const src = Array.isArray(out[key]) ? out[key].map((v) => Number(v || 0)) : Array.from({ length: windowDays }, () => 0);
-      if (src.length > windowDays) return src.slice(src.length - windowDays);
-      if (src.length < windowDays) return [...Array(windowDays - src.length).fill(0), ...src];
-      return src;
-    };
-
-      // timeline (7-point) series normalization
-      const timelinePoints = 7;
-      const ensureTimelineSeries = (key) => {
-        const src = Array.isArray(out[key]) ? out[key].map((v) => Number(v || 0)) : Array.from({ length: timelinePoints }, () => 0);
-        if (src.length > timelinePoints) return src.slice(src.length - timelinePoints);
-        if (src.length < timelinePoints) return [...Array(timelinePoints - src.length).fill(0), ...src];
-        return src;
-      };
-      out.userGrowthSeries = ensureTimelineSeries('userGrowthSeries');
-      out.userGrowthAdded = ensureTimelineSeries('userGrowthAdded');
-      out.userGrowthCumulative = ensureTimelineSeries('userGrowthCumulative');
-      if (!Array.isArray(out.timelineLabels) || out.timelineLabels.length !== timelinePoints) {
-        const userBucketMs = Math.max(dayMs, (windowDays * dayMs) / timelinePoints);
-        const labels = [];
-        const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-        for (let i = 0; i < timelinePoints; i += 1) {
-          const labelDate = new Date(since.getTime() + userBucketMs * (i + 1));
-          labels.push(dateFormat.format(labelDate > today ? today : labelDate));
-        }
-        out.timelineLabels = labels;
-      }
-
-    out.usersCreatedDaily = ensureSeries('usersCreatedDaily');
-    out.usersApprovedDaily = ensureSeries('usersApprovedDaily');
-    out.awardsAlumniDaily = ensureSeries('awardsAlumniDaily');
-    out.awardsEmployeeDaily = ensureSeries('awardsEmployeeDaily');
-    out.jobApplicationsDaily = ensureSeries('jobApplicationsDaily');
-
-    // safe numeric fallbacks
-    out.totalRegisteredUsers = Number(out.totalRegisteredUsers || 0);
-    out.totalApprovedAccounts = Number(out.totalApprovedAccounts || 0);
-    out.activeUsers = Number(out.activeUsers || 0);
-    out.monthlyActiveUsers = Number(out.monthlyActiveUsers || 0);
-    out.returningUsers = Number(out.returningUsers || 0);
-    out.newUsersInWindow = Number(out.newUsersInWindow || 0);
-    out.approvalsInWindow = Number(out.approvalsInWindow || 0);
-    out.certificationsInWindow = Number(out.certificationsInWindow || 0);
-    out.awardsInWindow = Number(out.awardsInWindow || 0);
-    out.jobApplicationsInWindow = Number(out.jobApplicationsInWindow || 0) || out.jobApplicationsDaily.reduce((s, v) => s + Number(v || 0), 0);
-    out.totalJobApplications = Number(out.totalJobApplications || out.jobApplicationsInWindow || 0);
-
-    out.windowDays = windowDays;
-    out.sinceStart = since.toISOString();
-    out.todayStart = today.toISOString();
-    return out;
-  }
 
   useEffect(() => {
     let mounted = true;
@@ -253,8 +171,43 @@ export default function AnalyticsReportPage() {
           const data = await res.json();
           console.debug('analytics response', { data, selectedWindowDays });
           if (!mounted) return;
-          const normalized = normalizeMetrics(data, selectedWindowDays);
-          setMetrics(normalized);
+          setMetrics({
+            activeUsers: Number(data?.activeUsers || 0),
+            totalRegisteredUsers: Number(data?.totalRegisteredUsers || 0),
+            totalApprovedAccounts: Number(data?.totalApprovedAccounts || 0),
+            accountApprovalRate: Number(data?.accountApprovalRate || 0),
+            monthlyActiveUsers: Number(data?.monthlyActiveUsers || 0),
+            returningUsers: Number(data?.returningUsers || 0),
+            userRetentionRate: Number(data?.userRetentionRate || 0),
+            engagedUsers: Number(data?.engagedUsers || 0),
+            certificationsCompleted: Number(data?.certificationsCompleted || 0),
+            certificationCompletionRate: Number(data?.certificationCompletionRate || 0),
+            engagementRate: Number(data?.engagementRate || 0),
+            totalRegisteredTrend: data?.totalRegisteredTrend || { change: 0, direction: 'up' },
+            accountApprovalTrend: data?.accountApprovalTrend || { change: 0, direction: 'up' },
+            monthlyActiveUsersTrend: data?.monthlyActiveUsersTrend || { change: 0, direction: 'up' },
+            userRetentionTrend: data?.userRetentionTrend || { change: 0, direction: 'up' },
+            certificationCompletionTrend: data?.certificationCompletionTrend || { change: 0, direction: 'up' },
+            windowDays: Number(data?.windowDays || 30),
+            windowMode: String(data?.windowMode || ''),
+            sinceStart: typeof data?.sinceStart === 'string' ? data.sinceStart : '',
+            todayStart: typeof data?.todayStart === 'string' ? data.todayStart : '',
+            newUsersInWindow: Number(data?.newUsersInWindow || 0),
+            approvalsInWindow: Number(data?.approvalsInWindow || 0),
+            certificationsInWindow: Number(data?.certificationsInWindow || 0),
+            dailyLabels: Array.isArray(data?.dailyLabels) ? data.dailyLabels : [],
+            usersCreatedDaily: Array.isArray(data?.usersCreatedDaily) ? data.usersCreatedDaily : [],
+            usersApprovedDaily: Array.isArray(data?.usersApprovedDaily) ? data.usersApprovedDaily : [],
+            awardsAlumniDaily: Array.isArray(data?.awardsAlumniDaily) ? data.awardsAlumniDaily : [],
+            awardsEmployeeDaily: Array.isArray(data?.awardsEmployeeDaily) ? data.awardsEmployeeDaily : [],
+            awardsInWindow: Number(data?.awardsInWindow || 0),
+            userGrowthSeries: Array.isArray(data?.userGrowthSeries) ? data.userGrowthSeries : [],
+            userGrowthAdded: Array.isArray(data?.userGrowthAdded) ? data.userGrowthAdded : [],
+            userGrowthCumulative: Array.isArray(data?.userGrowthCumulative) ? data.userGrowthCumulative : [],
+            timelineLabels: Array.isArray(data?.timelineLabels) ? data.timelineLabels : [],
+            certificationPeriodLabels: Array.isArray(data?.certificationPeriodLabels) ? data.certificationPeriodLabels : [],
+            certificationSeries: Array.isArray(data?.certificationSeries) ? data.certificationSeries : [],
+          });
           setError('');
           return;
         }
@@ -263,13 +216,13 @@ export default function AnalyticsReportPage() {
         const fallback = await loadFallbackAnalytics();
         console.debug('analytics fallback', { fallback, selectedWindowDays });
         if (!mounted) return;
-        setMetrics(normalizeMetrics(fallback, selectedWindowDays));
+        setMetrics(fallback);
         setError('');
       } catch (err) {
         try {
           const fallback = await loadFallbackAnalytics();
           if (!mounted) return;
-          setMetrics(normalizeMetrics(fallback, selectedWindowDays));
+          setMetrics(fallback);
           setError('');
           return;
         } catch {
@@ -367,24 +320,16 @@ export default function AnalyticsReportPage() {
       formula: 'Engaged Users / Active Users x 100.',
       use: 'This shows whether users are not only registered, but also interacting with the system.',
     },
-    jobApplications: {
-      title: 'Total Job Applications',
-      description: 'Total number of job applications submitted by users through the portal.',
-      formula: 'Count of Job Application records submitted via the jobs application form.',
-      use: 'Helps measure hiring engagement and interest from alumni in posted job opportunities.',
-    },
   };
 
-  const safeNumber = (v) => Number(v || 0);
   const cards = [
-    { id: 'totalRegisteredUsers', icon: Users, label: 'Total Registered Users', value: safeNumber(metrics.totalRegisteredUsers).toLocaleString(), trendMetric: metrics.totalRegisteredTrend, helper: 'vs previous period' },
-    { id: 'activeUsers', icon: Users, label: 'Active Users', value: safeNumber(metrics.activeUsers).toLocaleString(), trend: `+${safeNumber(metrics.newUsersInWindow)} created | +${safeNumber(metrics.approvalsInWindow)} approved`, helper: periodLabel },
-    { id: 'accountApprovalRate', icon: TrendUp, label: 'Account Approval Rate', value: formatPercent(safeNumber(metrics.accountApprovalRate)), trendMetric: metrics.accountApprovalTrend, helper: `${safeNumber(metrics.totalApprovedAccounts).toLocaleString()} approved accounts` },
-    { id: 'monthlyActiveUsers', icon: Users, label: 'Monthly Active Users', value: safeNumber(metrics.monthlyActiveUsers).toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
-    { id: 'userRetentionRate', icon: TrendUp, label: 'User Retention Rate', value: formatPercent(safeNumber(metrics.userRetentionRate)), trendMetric: metrics.userRetentionTrend, helper: `${safeNumber(metrics.returningUsers).toLocaleString()} returning users` },
-    { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: safeNumber(metrics.certificationsCompleted).toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${safeNumber(metrics.certificationsInWindow)} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${safeNumber(metrics.windowDays)} days` },
-    { id: 'jobApplications', icon: Users, label: 'Total Job Applications', value: safeNumber(metrics.totalJobApplications).toLocaleString(), trendMetric: metrics.jobApplicationsTrend, helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${safeNumber(metrics.windowDays)} days` },
-    { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${safeNumber(metrics.engagementRate)}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${safeNumber(metrics.windowDays)} days` },
+    { id: 'totalRegisteredUsers', icon: Users, label: 'Total Registered Users', value: metrics.totalRegisteredUsers.toLocaleString(), trendMetric: metrics.totalRegisteredTrend, helper: 'vs previous period' },
+    { id: 'activeUsers', icon: Users, label: 'Active Users', value: metrics.activeUsers.toLocaleString(), trend: `+${metrics.newUsersInWindow || 0} created | +${metrics.approvalsInWindow || 0} approved`, helper: periodLabel },
+    { id: 'accountApprovalRate', icon: TrendUp, label: 'Account Approval Rate', value: formatPercent(metrics.accountApprovalRate), trendMetric: metrics.accountApprovalTrend, helper: `${metrics.totalApprovedAccounts.toLocaleString()} approved accounts` },
+    { id: 'monthlyActiveUsers', icon: Users, label: 'Monthly Active Users', value: metrics.monthlyActiveUsers.toLocaleString(), trendMetric: metrics.monthlyActiveUsersTrend, helper: periodLabel },
+    { id: 'userRetentionRate', icon: TrendUp, label: 'User Retention Rate', value: formatPercent(metrics.userRetentionRate), trendMetric: metrics.userRetentionTrend, helper: `${metrics.returningUsers.toLocaleString()} returning users` },
+    { id: 'certificationsCompleted', icon: Certificate, label: 'Certifications Completed', value: metrics.certificationsCompleted.toLocaleString(), trend: metrics.certificationsInWindow !== undefined ? `+${metrics.certificationsInWindow} new` : '+8%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
+    { id: 'engagementRate', icon: TrendUp, label: 'Engagement Rate', value: `${metrics.engagementRate}%`, trend: '+5%', helper: metrics.windowMode === 'all_time' ? 'all time' : `last ${metrics.windowDays} days` },
   ];
   const selectedKpiDetail = selectedKpiKey ? kpiDetails[selectedKpiKey] : null;
 
@@ -419,35 +364,23 @@ export default function AnalyticsReportPage() {
   const userChartRightPad = 28;
   const userChartWidth = 700 - userChartLeftPad - userChartRightPad;
   const xStep = windowDays === 1 ? 0 : (userChartWidth / (windowDays - 1));
-  const makePath = (points) => {
-    if (!Array.isArray(points) || points.length === 0) return '';
-    const filtered = points.filter(p => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y))).map(p => ({ x: Number(p.x), y: Number(p.y) }));
-    if (filtered.length === 0) return '';
-    return filtered.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
-  };
+  const makePath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
 
-  const createdPoints = usersCreatedDaily.map((value, index) => {
-    const x = Number(userChartLeftPad + (xStep * index));
-    const y = Number(230 - ((Number(value || 0) / Number(maxUserDaily || 1)) * 160));
-    return {
-      x,
-      y,
-      label: dailyLabels[index] || '-',
-      created: Number(value || 0),
-      approved: Number(usersApprovedDaily[index] || 0),
-    };
-  });
-  const approvedPoints = usersApprovedDaily.map((value, index) => {
-    const x = Number(userChartLeftPad + (xStep * index));
-    const y = Number(230 - ((Number(value || 0) / Number(maxUserDaily || 1)) * 160));
-    return { x, y };
-  });
+  const createdPoints = usersCreatedDaily.map((value, index) => ({
+    x: userChartLeftPad + (xStep * index),
+    y: 230 - ((value / maxUserDaily) * 160),
+    label: dailyLabels[index] || '-',
+    created: value,
+    approved: usersApprovedDaily[index] || 0,
+  }));
+  const approvedPoints = usersApprovedDaily.map((value, index) => ({
+    x: userChartLeftPad + (xStep * index),
+    y: 230 - ((value / maxUserDaily) * 160),
+  }));
 
   const createdLinePath = makePath(createdPoints);
   const approvedLinePath = makePath(approvedPoints);
-  const createdAreaPath = (createdLinePath && createdPoints.length > 0)
-    ? `${createdLinePath} L${createdPoints[createdPoints.length - 1].x},270 L${createdPoints[0].x},270 Z`
-    : '';
+  const createdAreaPath = `${createdLinePath} L${createdPoints[createdPoints.length - 1]?.x ?? (700 - userChartRightPad)},270 L${createdPoints[0]?.x ?? userChartLeftPad},270 Z`;
 
   const axisLabels = datePoints.map((d, index) => {
     if (windowDays <= 31) return dateFormat.format(d);
@@ -808,38 +741,32 @@ export default function AnalyticsReportPage() {
                   {[40, 90, 140, 190, 240].map((y) => (
                   <line key={y} x1={userChartLeftPad} y1={y} x2={700 - userChartRightPad} y2={y} stroke="#f0e6d4" strokeDasharray="5 6" />
                   ))}
-                  {createdAreaPath ? (
-                    <motion.path
-                      d={createdAreaPath}
-                      fill="url(#arCreatedFill)"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1, d: createdAreaPath }}
-                      transition={{ duration: 0.6, ease: 'easeInOut' }}
-                    />
-                  ) : null}
-                  {createdLinePath ? (
-                    <motion.path
-                      d={createdLinePath}
-                      fill="none"
-                      stroke="#b07a15"
-                      strokeWidth="4"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1, d: createdLinePath }}
-                      transition={{ duration: 0.6, ease: 'easeInOut' }}
-                    />
-                  ) : null}
-                  {approvedLinePath ? (
-                    <motion.path
-                      d={approvedLinePath}
-                      fill="none"
-                      stroke="#2563eb"
-                      strokeWidth="4"
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1, d: approvedLinePath }}
-                      transition={{ duration: 0.6, ease: 'easeInOut', delay: 0.08 }}
-                    />
-                  ) : null}
-                  {windowDays <= 120 ? createdPoints.filter(p => Number.isFinite(p.x) && Number.isFinite(p.y)).map((point, idx) => (
+                  <motion.path
+                    d={createdAreaPath}
+                    fill="url(#arCreatedFill)"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1, d: createdAreaPath }}
+                    transition={{ duration: 0.6, ease: 'easeInOut' }}
+                  />
+                  <motion.path
+                    d={createdLinePath}
+                    fill="none"
+                    stroke="#b07a15"
+                    strokeWidth="4"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1, d: createdLinePath }}
+                    transition={{ duration: 0.6, ease: 'easeInOut' }}
+                  />
+                  <motion.path
+                    d={approvedLinePath}
+                    fill="none"
+                    stroke="#2563eb"
+                    strokeWidth="4"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1, d: approvedLinePath }}
+                    transition={{ duration: 0.6, ease: 'easeInOut', delay: 0.08 }}
+                  />
+                  {windowDays <= 120 ? createdPoints.map((point, idx) => (
                     <motion.circle
                       key={`p-${idx}`}
                       cx={point.x}
