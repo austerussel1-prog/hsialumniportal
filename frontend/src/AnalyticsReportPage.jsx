@@ -54,9 +54,18 @@ export default function AnalyticsReportPage() {
   function normalizeMetrics(raw, selectedWindowDaysFallback = 30) {
     const out = { ...(raw || {}) };
     const dayMs = 24 * 60 * 60 * 1000;
-    const windowDays = Math.max(1, Number(out.windowDays || selectedWindowDaysFallback || 30));
+    // Prefer the explicitly selected window when provided (unless it's 'all')
+    const sel = selectedWindowDaysFallback;
+    let windowDays;
+    if (String(sel).toLowerCase() === 'all' || String(sel).toLowerCase() === 'all_time' || String(sel).toLowerCase() === 'alltime') {
+      windowDays = Number(out.windowDays || 0) || Math.max(1, Math.ceil(((new Date(out.todayStart || Date.now())).getTime() - (new Date(out.sinceStart || Date.now())).getTime()) / dayMs));
+    } else {
+      windowDays = Math.max(1, Number(sel || out.windowDays || 30));
+    }
     const today = out.todayStart ? new Date(out.todayStart) : new Date();
-    const since = out.sinceStart ? new Date(out.sinceStart) : new Date(today.getTime() - (windowDays - 1) * dayMs);
+    const since = (String(sel).toLowerCase() === 'all' || String(sel).toLowerCase() === 'all_time' || String(sel).toLowerCase() === 'alltime')
+      ? (out.sinceStart ? new Date(out.sinceStart) : new Date(today.getTime() - (windowDays - 1) * dayMs))
+      : new Date(today.getTime() - (windowDays - 1) * dayMs);
 
     // build daily labels if missing or wrong length
     const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
@@ -71,6 +80,28 @@ export default function AnalyticsReportPage() {
       if (src.length < windowDays) return [...Array(windowDays - src.length).fill(0), ...src];
       return src;
     };
+
+      // timeline (7-point) series normalization
+      const timelinePoints = 7;
+      const ensureTimelineSeries = (key) => {
+        const src = Array.isArray(out[key]) ? out[key].map((v) => Number(v || 0)) : Array.from({ length: timelinePoints }, () => 0);
+        if (src.length > timelinePoints) return src.slice(src.length - timelinePoints);
+        if (src.length < timelinePoints) return [...Array(timelinePoints - src.length).fill(0), ...src];
+        return src;
+      };
+      out.userGrowthSeries = ensureTimelineSeries('userGrowthSeries');
+      out.userGrowthAdded = ensureTimelineSeries('userGrowthAdded');
+      out.userGrowthCumulative = ensureTimelineSeries('userGrowthCumulative');
+      if (!Array.isArray(out.timelineLabels) || out.timelineLabels.length !== timelinePoints) {
+        const userBucketMs = Math.max(dayMs, (windowDays * dayMs) / timelinePoints);
+        const labels = [];
+        const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+        for (let i = 0; i < timelinePoints; i += 1) {
+          const labelDate = new Date(since.getTime() + userBucketMs * (i + 1));
+          labels.push(dateFormat.format(labelDate > today ? today : labelDate));
+        }
+        out.timelineLabels = labels;
+      }
 
     out.usersCreatedDaily = ensureSeries('usersCreatedDaily');
     out.usersApprovedDaily = ensureSeries('usersApprovedDaily');
