@@ -2025,30 +2025,30 @@ export default function EventsPage() {
                     setCreating(false);
                   }
                 }}
-                style={{ marginTop: 8, display: 'grid', gap: 12 }}
+                style={{ marginTop: 8, display: 'grid', gap: 14, width: '100%' }}
               >
-                <div className="eventsCreateGrid">
-                  <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
-                  <input name="category" placeholder="Category (e.g., Webinar)" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
-                  <input name="capacity" type="number" min="0" placeholder="Capacity (optional)" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, gridColumn: '1 / -1', fontSize: 14, color: '#374151', padding: '2px 2px' }}>
+                <div className="eventsCreateGrid" style={{ width: '100%', gap: 14 }}>
+                  <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <input name="category" placeholder="Category (e.g., Webinar)" style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <input name="capacity" type="number" min="0" placeholder="Capacity (optional)" style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, gridColumn: '1 / -1', width: '100%', fontSize: 14, color: '#374151', padding: '2px 2px', marginBottom: 2 }}>
                     <input name="isVirtual" type="checkbox" style={{ width: 16, height: 16 }} />
                     Virtual event
                   </label>
-                  <textarea name="description" placeholder="Description (required, at least 100 chars)" rows={4} required minLength={100} style={{ gridColumn: '1 / -1', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 112, resize: 'vertical', boxSizing: 'border-box', fontSize: 14 }} />
-                  <div style={{ display: 'grid', gap: 6 }}>
+                  <textarea name="description" placeholder="Description (required, at least 100 chars)" rows={4} required minLength={100} style={{ gridColumn: '1 / -1', width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 112, resize: 'vertical', boxSizing: 'border-box', fontSize: 14 }} />
+                  <div style={{ display: 'grid', gap: 6, width: '100%' }}>
                     <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Start date/time</label>
-                    <input name="startDate" type="datetime-local" required style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                    <input name="startDate" type="datetime-local" required style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
                   </div>
-                  <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ display: 'grid', gap: 6, width: '100%' }}>
                     <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>End date/time (optional)</label>
-                    <input name="endDate" type="datetime-local" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                    <input name="endDate" type="datetime-local" style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
                   </div>
-                  <input name="location" placeholder="Location (for onsite)" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
-                  <input name="virtualLink" placeholder="Virtual link (for virtual)" style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
-                  <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 6 }}>
+                  <input name="location" placeholder="Location (for onsite)" style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <input name="virtualLink" placeholder="Virtual link (for virtual)" style={{ width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid #e5e7eb', minHeight: 46, boxSizing: 'border-box', fontSize: 14 }} />
+                  <div style={{ gridColumn: '1 / -1', width: '100%', display: 'grid', gap: 6 }}>
                     <label style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>Event image (optional)</label>
-                    <input name="image" type="file" accept="image/*" style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid #e5e7eb', boxSizing: 'border-box', fontSize: 14 }} />
+                    <input name="image" type="file" accept="image/*" style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #e5e7eb', boxSizing: 'border-box', fontSize: 14 }} />
                   </div>
                 </div>
 
