@@ -2022,7 +2022,7 @@ export default function EventsPage() {
                     setCreating(false);
                   }
                 }}
-                style={{ marginTop: 14, maxHeight: 'calc(100vh - 180px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
+                style={{ marginTop: 14 }}
               >
                 <div className="eventsCreateGrid">
                   <input name="title" placeholder="Event title" required style={{ gridColumn: '1 / -1', padding: 10, borderRadius: 8, border: '1px solid #e5e7eb' }} />
