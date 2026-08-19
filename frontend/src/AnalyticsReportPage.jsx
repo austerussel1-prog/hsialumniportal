@@ -20,6 +20,7 @@ export default function AnalyticsReportPage() {
     returningUsers: 0,
     userRetentionRate: 0,
     engagedUsers: 0,
+    jobApplicantsCount: 0,
     certificationsCompleted: 0,
     certificationCompletionRate: 0,
     engagementRate: 0,
@@ -63,13 +64,21 @@ export default function AnalyticsReportPage() {
       const since = new Date(todayStart.getTime() - (windowDays - 1) * dayMs);
       const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 
-      const [directoryRes, achievementsRes] = await Promise.all([
-        fetch(apiEndpoints.directoryUsers, { headers }),
-        fetch(apiEndpoints.achievements, { headers }),
-      ]);
+const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
+          fetch(apiEndpoints.directoryUsers, { headers }),
+          fetch(apiEndpoints.achievements, { headers }),
+          fetch(apiEndpoints.jobApplications, { headers }),
+        ]);
 
-      const directoryData = directoryRes.ok ? await directoryRes.json() : { users: [] };
-      const achievementsData = achievementsRes.ok ? await achievementsRes.json() : { stats: {} };
+        const directoryData = directoryRes.ok ? await directoryRes.json() : { users: [] };
+        const achievementsData = achievementsRes.ok ? await achievementsRes.json() : { stats: {} };
+        const applicantsData = applicantsRes.ok ? await applicantsRes.json().catch(() => ({ applications: [] })) : { applications: [] };
+        const applicantsInWindow = Array.isArray(applicantsData?.applications)
+          ? applicantsData.applications.filter((app) => {
+              const ts = app?.createdAt ? new Date(app.createdAt).getTime() : Number.NaN;
+              return Number.isFinite(ts) && ts >= since.getTime() && ts <= now.getTime();
+            }).length
+          : 0;
 
       const totalEligibleUsers = Array.isArray(directoryData?.users) ? directoryData.users.length : 0;
       const activeUsers = totalEligibleUsers;
@@ -163,12 +172,28 @@ export default function AnalyticsReportPage() {
       try {
         const token = localStorage.getItem('token');
         const url = `${apiEndpoints.analyticsReport}?windowDays=${encodeURIComponent(selectedWindowDays)}`;
-        const res = await fetch(url, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const [res, applicantsRes] = await Promise.all([
+          fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} }),
+          fetch(apiEndpoints.jobApplications, { headers: token ? { Authorization: `Bearer ${token}` } : {} }),
+        ]);
 
         if (res.ok) {
           const data = await res.json();
+          const applicantsList = applicantsRes.ok ? await applicantsRes.json().catch(() => ({ applications: [] })) : { applications: [] };
+          const sinceStartForApplicants = (() => {
+            const win = Number(selectedWindowDays) || 30;
+            const nowDate = new Date();
+            const start = new Date(nowDate);
+            start.setHours(0, 0, 0, 0);
+            start.setDate(start.getDate() - (win - 1));
+            return start;
+          })();
+          const applicantsInWindow = Array.isArray(applicantsList?.applications)
+            ? applicantsList.applications.filter((app) => {
+                const ts = app?.createdAt ? new Date(app.createdAt).getTime() : Number.NaN;
+                return Number.isFinite(ts) && ts >= sinceStartForApplicants.getTime() && ts <= Date.now();
+              }).length
+            : 0;
           console.debug('analytics response', { data, selectedWindowDays });
           if (!mounted) return;
           setMetrics({
@@ -180,6 +205,7 @@ export default function AnalyticsReportPage() {
             returningUsers: Number(data?.returningUsers || 0),
             userRetentionRate: Number(data?.userRetentionRate || 0),
             engagedUsers: Number(data?.engagedUsers || 0),
+            jobApplicantsCount: Number(applicantsInWindow || 0),
             certificationsCompleted: Number(data?.certificationsCompleted || 0),
             certificationCompletionRate: Number(data?.certificationCompletionRate || 0),
             engagementRate: Number(data?.engagementRate || 0),
@@ -313,6 +339,12 @@ export default function AnalyticsReportPage() {
       description: 'The total number of certification or badge completions recorded in the portal.',
       formula: 'Count of awarded certification events/badges.',
       use: 'This helps measure whether alumni are using learning and workforce development features.',
+    },
+    jobApplicantsCount: {
+      title: 'Job Applicants',
+      description: 'The number of candidates who applied to available job or career opportunities in the selected reporting window.',
+      formula: 'Count of job applications created within the selected date range.',
+      use: 'This helps track interest in current openings and gauge which opportunities are attracting applicants.',
     },
     engagementRate: {
       title: 'Engagement Rate',
@@ -658,9 +690,22 @@ export default function AnalyticsReportPage() {
                   )}
                   <div style={{ color: '#6b7280', fontSize: '11px' }}>{item.helper}</div>
                 </div>
-                <div style={{ marginTop: 8, color: isSelected ? '#a06c04' : '#9ca3af', fontSize: 11, fontWeight: 700 }}>
-                  {isSelected ? 'Guide open' : 'Click for guide'}
-                </div>
+                {item.id === 'engagementRate' && (
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ color: isSelected ? '#a06c04' : '#9ca3af', fontSize: 11, fontWeight: 700 }}>
+                      {isSelected ? 'Guide open' : 'Click for guide'}
+                    </div>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 999, background: '#f8f3e8', border: '1px solid #eadfca', color: '#7a5a12', fontSize: 10, fontWeight: 800 }}>
+                      <Users size={12} />
+                      {metrics.jobApplicantsCount.toLocaleString()} applicants
+                    </div>
+                  </div>
+                )}
+                {item.id !== 'engagementRate' && (
+                  <div style={{ marginTop: 8, color: isSelected ? '#a06c04' : '#9ca3af', fontSize: 11, fontWeight: 700 }}>
+                    {isSelected ? 'Guide open' : 'Click for guide'}
+                  </div>
+                )}
               </button>
             );
           })}
