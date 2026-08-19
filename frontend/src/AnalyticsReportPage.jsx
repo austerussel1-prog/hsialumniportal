@@ -618,6 +618,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
           background: #fff;
           padding: 16px;
           box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+          overflow: hidden;
         }
         .ar-kpi-modal-head {
           display: flex;
@@ -643,15 +644,19 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
           margin-top: 14px;
           display: grid;
           gap: 10px;
-          grid-template-columns: 1fr;
+          grid-template-columns: minmax(0, 1fr);
           align-items: start;
+          min-width: 0;
         }
+        .ar-kpi-modal-body > div { min-width: 0; }
         .ar-kpi-detail-title { margin: 0; color: #111827; font-size: 18px; line-height: 1.2; font-weight: 900; }
         .ar-kpi-detail-label { color: #374151; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0; }
         .ar-kpi-detail-text { margin: 4px 0 0; color: #4b5563; font-size: 13px; line-height: 1.45; }
         .ar-minichart-scroll {
           scrollbar-width: none;
           -ms-overflow-style: none;
+          min-width: 0;
+          max-width: 100%;
         }
         .ar-minichart-scroll::-webkit-scrollbar { display: none; height: 0; }
         .ar-middle-grid {
@@ -847,9 +852,9 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
                   <div className="ar-kpi-detail-label">Why It Matters</div>
                   <p className="ar-kpi-detail-text">{selectedKpiDetail.use}</p>
                 </div>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div className="ar-kpi-detail-label">Trend {useMonthlyBuckets ? '(Per Month)' : '(Per Day)'}</div>
-                  <div style={{ marginTop: 6 }}>
+                  <div style={{ marginTop: 6, minWidth: 0 }}>
                     {kpiChartByKey[selectedKpiKey] || null}
                   </div>
                 </div>
