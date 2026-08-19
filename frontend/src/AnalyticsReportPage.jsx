@@ -11,20 +11,20 @@ function MiniBarChart({ data, color = '#b07a15', suffix = '' }) {
   }
   const max = Math.max(...values.map((d) => Number(d.value) || 0), 1);
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 150, borderBottom: '1px solid #efe5d7', paddingBottom: 6, overflowX: 'auto' }}>
+    <div className="ar-minichart-scroll" style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 152, borderBottom: '1px solid #efe5d7', paddingBottom: 6, overflowX: 'auto' }}>
       {values.map((d, i) => {
         const heightPct = Math.max(4, (Number(d.value || 0) / max) * 100);
         return (
           <div
             key={`${d.label}-${i}`}
             title={`${d.label}: ${d.value}${suffix}`}
-            style={{ flex: '1 1 0', minWidth: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}
+            style={{ flex: '0 0 auto', width: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}
           >
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#374151' }}>{d.value}{suffix}</span>
-            <div style={{ width: '100%', height: 110, display: 'flex', alignItems: 'flex-end' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#374151', lineHeight: 1 }}>{d.value}{suffix}</span>
+            <div style={{ width: '100%', height: 100, display: 'flex', alignItems: 'flex-end' }}>
               <div style={{ width: '100%', height: `${heightPct}%`, background: color, borderRadius: '6px 6px 2px 2px', minHeight: 4 }} />
             </div>
-            <span style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', whiteSpace: 'nowrap' }}>{d.label}</span>
+            <span style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', whiteSpace: 'nowrap', lineHeight: 1 }}>{d.label}</span>
           </div>
         );
       })}
@@ -649,6 +649,11 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
         .ar-kpi-detail-title { margin: 0; color: #111827; font-size: 18px; line-height: 1.2; font-weight: 900; }
         .ar-kpi-detail-label { color: #374151; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0; }
         .ar-kpi-detail-text { margin: 4px 0 0; color: #4b5563; font-size: 13px; line-height: 1.45; }
+        .ar-minichart-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .ar-minichart-scroll::-webkit-scrollbar { display: none; height: 0; }
         .ar-middle-grid {
           margin-top: 14px;
           display: grid;
