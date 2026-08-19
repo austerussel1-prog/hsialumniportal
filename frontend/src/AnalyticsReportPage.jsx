@@ -4,30 +4,62 @@ import { Users, Certificate, TrendUp, TrendDown, DownloadSimple, CaretDown, X } 
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 
-function MiniBarChart({ data, color = '#b07a15', suffix = '' }) {
+function MiniBarChart({ data, color = '#b07a15', suffix = '', metricLabel = '' }) {
   const values = Array.isArray(data) ? data : [];
   if (values.length === 0) {
     return <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>No trend data available for this period.</p>;
   }
   const max = Math.max(...values.map((d) => Number(d.value) || 0), 1);
+  const useWideBars = values.length <= 8;
   return (
-    <div className="ar-minichart-scroll" style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 152, borderBottom: '1px solid #efe5d7', paddingBottom: 6, overflowX: 'auto' }}>
-      {values.map((d, i) => {
-        const heightPct = Math.max(4, (Number(d.value || 0) / max) * 100);
-        return (
-          <div
-            key={`${d.label}-${i}`}
-            title={`${d.label}: ${d.value}${suffix}`}
-            style={{ flex: '0 0 auto', width: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}
-          >
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#374151', lineHeight: 1 }}>{d.value}{suffix}</span>
-            <div style={{ width: '100%', height: 100, display: 'flex', alignItems: 'flex-end' }}>
-              <div style={{ width: '100%', height: `${heightPct}%`, background: color, borderRadius: '6px 6px 2px 2px', minHeight: 4 }} />
+    <div>
+      {metricLabel && (
+        <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.2 }}>
+          {metricLabel}
+        </div>
+      )}
+      <div
+        className="ar-minichart-scroll"
+        style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: useWideBars ? 172 : 152, borderBottom: '1px solid #efe5d7', paddingBottom: 6, overflowX: 'auto' }}
+      >
+        {values.map((d, i) => {
+          const heightPct = Math.max(4, (Number(d.value || 0) / max) * 100);
+          return (
+            <div
+              key={`${d.label}-${i}`}
+              title={`${d.label}: ${d.value}${suffix}`}
+              style={{
+                flex: useWideBars ? '1 1 0' : '0 0 auto',
+                width: useWideBars ? undefined : 40,
+                minWidth: useWideBars ? 56 : 40,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 4,
+                height: '100%',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#374151', lineHeight: 1 }}>{d.value}{suffix}</span>
+              <div style={{ width: '100%', height: 100, display: 'flex', alignItems: 'flex-end' }}>
+                <div style={{ width: '100%', height: `${heightPct}%`, background: color, borderRadius: '6px 6px 2px 2px', minHeight: 4 }} />
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  color: '#6b7280',
+                  textAlign: 'center',
+                  lineHeight: 1.25,
+                  whiteSpace: useWideBars ? 'normal' : 'nowrap',
+                  wordBreak: useWideBars ? 'break-word' : 'normal',
+                }}
+              >
+                {d.label}
+              </span>
             </div>
-            <span style={{ fontSize: 10, color: '#6b7280', textAlign: 'center', whiteSpace: 'nowrap', lineHeight: 1 }}>{d.label}</span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -523,14 +555,14 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
   })();
 
   const kpiChartByKey = {
-    totalRegisteredUsers: <MiniBarChart data={createdBuckets} color="#b07a15" />,
-    activeUsers: <MiniBarChart data={approvedBuckets} color="#2563eb" />,
-    accountApprovalRate: <MiniBarChart data={approvalRateBuckets} color="#15803d" suffix="%" />,
-    monthlyActiveUsers: <MiniBarChart data={approvedBuckets} color="#7c3aed" />,
-    userRetentionRate: <MiniBarChart data={userRetentionRateBuckets} color="#0ea5e9" suffix="%" />,
-    certificationsCompleted: <MiniBarChart data={certBuckets} color="#d97706" />,
-    jobApplicantsCount: <MiniBarChart data={applicantBuckets} color="#a06c04" />,
-    engagementRate: <MiniBarChart data={engagementRateBuckets} color="#dc2626" suffix="%" />,
+    totalRegisteredUsers: <MiniBarChart data={createdBuckets} color="#b07a15" metricLabel="New Registrations" />,
+    activeUsers: <MiniBarChart data={approvedBuckets} color="#2563eb" metricLabel="Newly Approved Accounts" />,
+    accountApprovalRate: <MiniBarChart data={approvalRateBuckets} color="#15803d" suffix="%" metricLabel="Approval Rate" />,
+    monthlyActiveUsers: <MiniBarChart data={approvedBuckets} color="#7c3aed" metricLabel="Logins Recorded" />,
+    userRetentionRate: <MiniBarChart data={userRetentionRateBuckets} color="#0ea5e9" suffix="%" metricLabel="User Retention Rate" />,
+    certificationsCompleted: <MiniBarChart data={certBuckets} color="#d97706" metricLabel="Certifications Awarded" />,
+    jobApplicantsCount: <MiniBarChart data={applicantBuckets} color="#a06c04" metricLabel="Job Applicants" />,
+    engagementRate: <MiniBarChart data={engagementRateBuckets} color="#dc2626" suffix="%" metricLabel="Engagement Rate" />,
   };
   const makePath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
 
