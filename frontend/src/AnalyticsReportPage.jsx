@@ -333,10 +333,8 @@ export default function AnalyticsReportPage() {
   ];
   const selectedKpiDetail = selectedKpiKey ? kpiDetails[selectedKpiKey] : null;
 
-  const windowDays = Math.max(
-    1,
-    Number(metrics.windowDays || (selectedWindowDays === 'all' ? 30 : selectedWindowDays) || 30)
-  );
+  const selectedWindowValue = Number(selectedWindowDays) || Number(metrics.windowDays) || 30;
+  const windowDays = Math.max(1, selectedWindowValue);
   const dayMs = 24 * 60 * 60 * 1000;
   const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
   const monthFormat = new Intl.DateTimeFormat('en-US', { month: 'short' });
