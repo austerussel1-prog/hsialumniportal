@@ -388,19 +388,29 @@ export default function AnalyticsReportPage() {
   const userChartRightPad = 28;
   const userChartWidth = 700 - userChartLeftPad - userChartRightPad;
   const xStep = windowDays === 1 ? 0 : (userChartWidth / (windowDays - 1));
-  const makePath = (points) => points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
+  const makePath = (points) => {
+    if (!Array.isArray(points) || points.length === 0) return '';
+    const filtered = points.filter(p => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y))).map(p => ({ x: Number(p.x), y: Number(p.y) }));
+    if (filtered.length === 0) return '';
+    return filtered.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
+  };
 
-  const createdPoints = usersCreatedDaily.map((value, index) => ({
-    x: userChartLeftPad + (xStep * index),
-    y: 230 - ((value / maxUserDaily) * 160),
-    label: dailyLabels[index] || '-',
-    created: value,
-    approved: usersApprovedDaily[index] || 0,
-  }));
-  const approvedPoints = usersApprovedDaily.map((value, index) => ({
-    x: userChartLeftPad + (xStep * index),
-    y: 230 - ((value / maxUserDaily) * 160),
-  }));
+  const createdPoints = usersCreatedDaily.map((value, index) => {
+    const x = Number(userChartLeftPad + (xStep * index));
+    const y = Number(230 - ((Number(value || 0) / Number(maxUserDaily || 1)) * 160));
+    return {
+      x,
+      y,
+      label: dailyLabels[index] || '-',
+      created: Number(value || 0),
+      approved: Number(usersApprovedDaily[index] || 0),
+    };
+  });
+  const approvedPoints = usersApprovedDaily.map((value, index) => {
+    const x = Number(userChartLeftPad + (xStep * index));
+    const y = Number(230 - ((Number(value || 0) / Number(maxUserDaily || 1)) * 160));
+    return { x, y };
+  });
 
   const createdLinePath = makePath(createdPoints);
   const approvedLinePath = makePath(approvedPoints);
