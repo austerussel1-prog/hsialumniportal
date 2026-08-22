@@ -94,6 +94,14 @@ export default function AnalyticsReportPage() {
   const [selectedWindowDays, setSelectedWindowDays] = useState(30);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedKpiKey, setSelectedKpiKey] = useState(null);
+  const [performanceForm, setPerformanceForm] = useState({
+    employeeName: '',
+    department: '',
+    assignedTasks: '20',
+    completedTasks: '18',
+    inProgressTasks: '2',
+    overdueTasks: '0',
+  });
   const [metrics, setMetrics] = useState({
     activeUsers: 0,
     totalRegisteredUsers: 0,
@@ -384,6 +392,54 @@ export default function AnalyticsReportPage() {
     } catch (err) {
       setError(err?.message || 'Failed to download report.');
     }
+  };
+
+  const updatePerformanceField = (field, value) => {
+    setPerformanceForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toWholeNumber = (value) => {
+    const parsed = parseInt(String(value || '0'), 10);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return parsed;
+  };
+
+  const assignedTasks = toWholeNumber(performanceForm.assignedTasks);
+  const completedTasks = toWholeNumber(performanceForm.completedTasks);
+  const inProgressTasks = toWholeNumber(performanceForm.inProgressTasks);
+  const overdueTasks = toWholeNumber(performanceForm.overdueTasks);
+  const productivityRate = assignedTasks > 0
+    ? Math.min(100, Number(((completedTasks / assignedTasks) * 100).toFixed(1)))
+    : 0;
+  const pendingTasks = Math.max(0, assignedTasks - completedTasks);
+  const performanceRating = (() => {
+    if (assignedTasks <= 0) return { label: 'No Tasks Yet', color: '#6b7280', background: '#f3f4f6' };
+    if (productivityRate >= 90) return { label: 'Very Satisfactory', color: '#166534', background: '#ecfdf3' };
+    if (productivityRate >= 75) return { label: 'Satisfactory', color: '#1d4ed8', background: '#eff6ff' };
+    if (productivityRate >= 60) return { label: 'Needs Improvement', color: '#a16207', background: '#fffbeb' };
+    return { label: 'For Coaching', color: '#b91c1c', background: '#fef2f2' };
+  })();
+
+  const applyCurrentReportToPerformance = () => {
+    const reviewedApplicants = (Array.isArray(metrics.jobApplicantsList) ? metrics.jobApplicantsList : [])
+      .filter((app) => String(app?.status || '').toLowerCase() !== 'pending')
+      .length;
+    const completedFromReport = Number(metrics.approvalsInWindow || 0)
+      + reviewedApplicants
+      + Number(metrics.certificationsInWindow || 0)
+      + Number(metrics.awardsInWindow || 0);
+    const assignedFromReport = Number(metrics.newUsersInWindow || 0)
+      + Number(metrics.jobApplicantsCount || 0)
+      + Number(metrics.certificationsInWindow || 0)
+      + Number(metrics.awardsInWindow || 0);
+
+    setPerformanceForm((prev) => ({
+      ...prev,
+      assignedTasks: String(Math.max(assignedFromReport, completedFromReport, 0)),
+      completedTasks: String(Math.max(completedFromReport, 0)),
+      inProgressTasks: String(Math.max(assignedFromReport - completedFromReport, 0)),
+      overdueTasks: '0',
+    }));
   };
 
   const formatWindowLabel = (days, mode) => {
@@ -770,9 +826,66 @@ export default function AnalyticsReportPage() {
         .ar-linechart { width: 100%; height: 210px; display: block; }
         .ar-awards-wrap { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; padding-bottom: 4px; box-sizing: border-box; }
         .ar-snapshot-chips { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .ar-performance-grid {
+          display: grid;
+          grid-template-columns: 1.15fr 0.85fr;
+          gap: 16px;
+          align-items: stretch;
+        }
+        .ar-performance-form {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+        .ar-performance-field {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          min-width: 0;
+        }
+        .ar-performance-field label {
+          font-size: 12px;
+          color: #4b5563;
+          font-weight: 800;
+        }
+        .ar-performance-field input {
+          width: 100%;
+          border: 1px solid #eadfca;
+          border-radius: 8px;
+          min-height: 42px;
+          padding: 9px 10px;
+          font: inherit;
+          color: #111827;
+          background: #fff;
+          box-sizing: border-box;
+        }
+        .ar-performance-score {
+          border: 1px solid #eadfca;
+          border-radius: 12px;
+          padding: 14px;
+          background: #fffaf0;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 14px;
+          min-width: 0;
+        }
+        .ar-performance-stats {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+        }
+        .ar-performance-stat {
+          border: 1px solid #f0e6d4;
+          border-radius: 10px;
+          padding: 10px;
+          background: #fff;
+          min-width: 0;
+        }
         @media (max-width: 1220px) {
           .ar-top-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .ar-middle-grid { grid-template-columns: 1fr; }
+          .ar-performance-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 900px) {
           .ar-shell { padding: 74px 10px 18px; overflow-x: clip; }
@@ -793,6 +906,8 @@ export default function AnalyticsReportPage() {
           .ar-linechart-wrap { overflow-x: hidden; padding-bottom: 2px; }
           .ar-linechart { min-width: 0; height: 205px; }
           .ar-snapshot-chips { margin-top: 12px; gap: 8px; }
+          .ar-performance-form { grid-template-columns: 1fr; }
+          .ar-performance-stats { grid-template-columns: 1fr; }
         }
         @media (max-width: 480px) {
           .ar-chart-title { font-size: 19px; }
@@ -1195,6 +1310,137 @@ export default function AnalyticsReportPage() {
               </div>
             );
           })()}
+        </div>
+
+        <div className="ar-card ar-bottom-card">
+          <div className="ar-chart-head" style={{ marginBottom: 14 }}>
+            <h2 className="ar-chart-title">Performance Analyzer</h2>
+            <button
+              type="button"
+              className="ar-filter"
+              onClick={applyCurrentReportToPerformance}
+              disabled={loading}
+              style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
+            >
+              Use Current Report
+            </button>
+          </div>
+          <div className="ar-performance-grid">
+            <div>
+              <div className="ar-performance-form">
+                <div className="ar-performance-field">
+                  <label htmlFor="performanceEmployee">Employee</label>
+                  <input
+                    id="performanceEmployee"
+                    type="text"
+                    value={performanceForm.employeeName}
+                    onChange={(event) => updatePerformanceField('employeeName', event.target.value)}
+                    placeholder="Employee name"
+                  />
+                </div>
+                <div className="ar-performance-field">
+                  <label htmlFor="performanceDepartment">Department</label>
+                  <input
+                    id="performanceDepartment"
+                    type="text"
+                    value={performanceForm.department}
+                    onChange={(event) => updatePerformanceField('department', event.target.value)}
+                    placeholder="Department"
+                  />
+                </div>
+                <div className="ar-performance-field">
+                  <label htmlFor="assignedTasks">Assigned Tasks</label>
+                  <input
+                    id="assignedTasks"
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={performanceForm.assignedTasks}
+                    onChange={(event) => updatePerformanceField('assignedTasks', event.target.value)}
+                  />
+                </div>
+                <div className="ar-performance-field">
+                  <label htmlFor="completedTasks">Completed Tasks</label>
+                  <input
+                    id="completedTasks"
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={performanceForm.completedTasks}
+                    onChange={(event) => updatePerformanceField('completedTasks', event.target.value)}
+                  />
+                </div>
+                <div className="ar-performance-field">
+                  <label htmlFor="inProgressTasks">In Progress</label>
+                  <input
+                    id="inProgressTasks"
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={performanceForm.inProgressTasks}
+                    onChange={(event) => updatePerformanceField('inProgressTasks', event.target.value)}
+                  />
+                </div>
+                <div className="ar-performance-field">
+                  <label htmlFor="overdueTasks">Overdue</label>
+                  <input
+                    id="overdueTasks"
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={performanceForm.overdueTasks}
+                    onChange={(event) => updatePerformanceField('overdueTasks', event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="ar-performance-stats" style={{ marginTop: 12 }}>
+                {[
+                  ['Pending', pendingTasks],
+                  ['In Progress', inProgressTasks],
+                  ['Overdue', overdueTasks],
+                ].map(([label, value]) => (
+                  <div key={label} className="ar-performance-stat">
+                    <div className="ar-kpi-detail-label">{label}</div>
+                    <div style={{ marginTop: 4, color: '#111827', fontSize: 22, fontWeight: 900 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="ar-performance-score">
+              <div>
+                <div className="ar-kpi-detail-label">Productivity</div>
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 44, lineHeight: 1, fontWeight: 900, color: '#111827' }}>
+                    {formatPercent(productivityRate)}
+                  </div>
+                  <div style={{ color: '#6b7280', fontSize: 13, fontWeight: 700 }}>
+                    {completedTasks} of {assignedTasks} completed
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, height: 10, borderRadius: 999, background: '#f0e6d4', overflow: 'hidden' }}>
+                  <motion.div
+                    key={`performance-${productivityRate}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${productivityRate}%` }}
+                    transition={{ duration: 0.45, ease: 'easeOut' }}
+                    style={{ height: '100%', background: '#b07a15', borderRadius: 999 }}
+                  />
+                </div>
+              </div>
+              <div
+                style={{
+                  borderRadius: 10,
+                  padding: '10px 12px',
+                  color: performanceRating.color,
+                  background: performanceRating.background,
+                  fontWeight: 900,
+                  textAlign: 'center',
+                }}
+              >
+                {performanceRating.label}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="ar-card ar-bottom-card">
