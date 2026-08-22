@@ -391,6 +391,54 @@ export default function AnalyticsReportPage() {
     return () => { mounted = false; };
   }, []);
 
+  // Assigned/completed/in-progress/overdue counts always come from real Task records for the
+  // selected employee - never manually entered - so productivity reflects only what was actually submitted.
+  useEffect(() => {
+    let mounted = true;
+    const userId = performanceForm.selectedUserId;
+
+    if (!userId) {
+      setPerformanceForm((prev) => ({
+        ...prev,
+        assignedTasks: '0',
+        completedTasks: '0',
+        inProgressTasks: '0',
+        overdueTasks: '0',
+      }));
+      return () => { mounted = false; };
+    }
+
+    (async () => {
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      try {
+        const res = await fetch(apiEndpoints.adminTasks('all', userId), { headers });
+        const data = res.ok ? await res.json().catch(() => ({ tasks: [] })) : { tasks: [] };
+        const tasks = Array.isArray(data?.tasks) ? data.tasks : [];
+        if (!mounted) return;
+        setPerformanceForm((prev) => ({
+          ...prev,
+          assignedTasks: String(tasks.length),
+          completedTasks: String(tasks.filter((task) => task.status === 'completed').length),
+          inProgressTasks: String(tasks.filter((task) => task.status === 'in_progress').length),
+          overdueTasks: String(tasks.filter((task) => task.status === 'overdue').length),
+        }));
+      } catch {
+        if (mounted) {
+          setPerformanceForm((prev) => ({
+            ...prev,
+            assignedTasks: '0',
+            completedTasks: '0',
+            inProgressTasks: '0',
+            overdueTasks: '0',
+          }));
+        }
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, [performanceForm.selectedUserId]);
+
   useEffect(() => {
     if (!selectedKpiKey) return undefined;
     const handleKeyDown = (event) => {
@@ -514,28 +562,6 @@ export default function AnalyticsReportPage() {
     if (productivityRate >= 60) return { label: 'Needs Improvement', color: '#a16207', background: '#fffbeb' };
     return { label: 'For Coaching', color: '#b91c1c', background: '#fef2f2' };
   })();
-
-  const applyCurrentReportToPerformance = () => {
-    const reviewedApplicants = (Array.isArray(metrics.jobApplicantsList) ? metrics.jobApplicantsList : [])
-      .filter((app) => String(app?.status || '').toLowerCase() !== 'pending')
-      .length;
-    const completedFromReport = Number(metrics.approvalsInWindow || 0)
-      + reviewedApplicants
-      + Number(metrics.certificationsInWindow || 0)
-      + Number(metrics.awardsInWindow || 0);
-    const assignedFromReport = Number(metrics.newUsersInWindow || 0)
-      + Number(metrics.jobApplicantsCount || 0)
-      + Number(metrics.certificationsInWindow || 0)
-      + Number(metrics.awardsInWindow || 0);
-
-    setPerformanceForm((prev) => ({
-      ...prev,
-      assignedTasks: String(Math.max(assignedFromReport, completedFromReport, 0)),
-      completedTasks: String(Math.max(completedFromReport, 0)),
-      inProgressTasks: String(Math.max(assignedFromReport - completedFromReport, 0)),
-      overdueTasks: '0',
-    }));
-  };
 
   const formatWindowLabel = (days, mode) => {
     if (mode === 'all_time') return 'all time';
@@ -1476,15 +1502,9 @@ export default function AnalyticsReportPage() {
         <div className="ar-card ar-bottom-card">
           <div className="ar-chart-head" style={{ marginBottom: 14 }}>
             <h2 className="ar-chart-title">Performance Analyzer</h2>
-            <button
-              type="button"
-              className="ar-filter"
-              onClick={applyCurrentReportToPerformance}
-              disabled={loading}
-              style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
-            >
-              Use Current Report
-            </button>
+            <span style={{ fontSize: 12, color: '#6b7280' }}>
+              Task counts reflect real tasks assigned via the Tasks page.
+            </span>
           </div>
           <div className="ar-performance-grid">
             <div>
@@ -1567,10 +1587,10 @@ export default function AnalyticsReportPage() {
                   <input
                     id="assignedTasks"
                     type="number"
-                    min="0"
-                    inputMode="numeric"
+                    readOnly
+                    tabIndex={-1}
+                    style={{ background: '#f9fafb', color: '#374151', cursor: 'default' }}
                     value={performanceForm.assignedTasks}
-                    onChange={(event) => updatePerformanceField('assignedTasks', event.target.value)}
                   />
                 </div>
                 <div className="ar-performance-field">
@@ -1578,10 +1598,10 @@ export default function AnalyticsReportPage() {
                   <input
                     id="completedTasks"
                     type="number"
-                    min="0"
-                    inputMode="numeric"
+                    readOnly
+                    tabIndex={-1}
+                    style={{ background: '#f9fafb', color: '#374151', cursor: 'default' }}
                     value={performanceForm.completedTasks}
-                    onChange={(event) => updatePerformanceField('completedTasks', event.target.value)}
                   />
                 </div>
                 <div className="ar-performance-field">
@@ -1589,10 +1609,10 @@ export default function AnalyticsReportPage() {
                   <input
                     id="inProgressTasks"
                     type="number"
-                    min="0"
-                    inputMode="numeric"
+                    readOnly
+                    tabIndex={-1}
+                    style={{ background: '#f9fafb', color: '#374151', cursor: 'default' }}
                     value={performanceForm.inProgressTasks}
-                    onChange={(event) => updatePerformanceField('inProgressTasks', event.target.value)}
                   />
                 </div>
                 <div className="ar-performance-field">
@@ -1600,10 +1620,10 @@ export default function AnalyticsReportPage() {
                   <input
                     id="overdueTasks"
                     type="number"
-                    min="0"
-                    inputMode="numeric"
+                    readOnly
+                    tabIndex={-1}
+                    style={{ background: '#f9fafb', color: '#374151', cursor: 'default' }}
                     value={performanceForm.overdueTasks}
-                    onChange={(event) => updatePerformanceField('overdueTasks', event.target.value)}
                   />
                 </div>
               </div>

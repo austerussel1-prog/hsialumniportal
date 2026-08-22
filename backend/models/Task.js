@@ -9,6 +9,13 @@ const taskSchema = new mongoose.Schema(
     status: { type: String, enum: ['pending', 'in_progress', 'completed', 'overdue'], default: 'pending', index: true },
     dueDate: { type: Date },
     completedAt: { type: Date },
+    submission: {
+      text: { type: String, default: '' },
+      fileUrl: { type: String, default: '' },
+      fileName: { type: String, default: '' },
+      storedName: { type: String, default: '' },
+      submittedAt: { type: Date },
+    },
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now },

@@ -1,12 +1,17 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const Task = require('../models/Task');
 const User = require('../models/User');
 const { verifyToken } = require('./auth');
 const { createUserNotification } = require('../services/userNotificationService');
 const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
+const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured, isRemoteFileUrl, fetchRemoteFile } = require('../services/mediaStorage');
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'hr', 'alumni_officer'];
+const MAX_SUBMISSION_FILE_SIZE_BYTES = 15 * 1024 * 1024;
 
 const verifyAdmin = (req, res, next) => {
   if (!ADMIN_ROLES.includes(req.user?.role)) {
@@ -14,6 +19,49 @@ const verifyAdmin = (req, res, next) => {
   }
   next();
 };
+
+const submissionUploadsDir = path.join(__dirname, '..', 'uploads', 'task-submissions');
+if (!fs.existsSync(submissionUploadsDir)) fs.mkdirSync(submissionUploadsDir, { recursive: true });
+
+const submissionStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, submissionUploadsDir),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, '_');
+    cb(null, `${unique}-${safeName}`);
+  },
+});
+
+const uploadSubmission = multer({ storage: submissionStorage, limits: { fileSize: MAX_SUBMISSION_FILE_SIZE_BYTES } });
+
+const handleSubmissionUpload = (req, res, next) => {
+  uploadSubmission.single('file')(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File must be 15MB or smaller.' });
+    }
+    return res.status(400).json({ message: err.message || 'File upload failed.' });
+  });
+};
+
+async function storeSubmissionFile(file) {
+  if (!file?.filename) return null;
+
+  const fallbackUrl = `/uploads/task-submissions/${file.filename}`;
+  if (isCloudinaryConfigured() && file.path) {
+    try {
+      const uploadedUrl = await uploadLocalFile(file.path, { folder: 'task-submissions', resourceType: 'raw' });
+      if (uploadedUrl) {
+        cleanupLocalFile(file.path);
+        return { fileUrl: uploadedUrl, fileName: file.originalname, storedName: file.filename };
+      }
+    } catch (err) {
+      console.error('Task submission cloud upload failed:', err.message);
+    }
+  }
+
+  return { fileUrl: fallbackUrl, fileName: file.originalname, storedName: file.filename };
+}
 
 function revealEncrypted(value) {
   const raw = String(value || '');
@@ -151,6 +199,87 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
   } catch (err) {
     console.error('PATCH /api/tasks/:id/status error', err);
     return res.status(500).json({ message: 'Failed to update task.' });
+  }
+});
+
+// Assignee: submit completed work (optional file + optional write-up), marks task completed
+router.post('/:id/submit', verifyToken, handleSubmissionUpload, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: 'Task not found.' });
+    if (String(task.assignedTo) !== String(req.user.id)) {
+      return res.status(403).json({ message: 'Only the assigned employee can submit this task.' });
+    }
+
+    const text = String(req.body?.text || '').trim();
+    if (!text && !req.file) {
+      return res.status(400).json({ message: 'Add a write-up or attach a file before submitting.' });
+    }
+
+    const stored = req.file ? await storeSubmissionFile(req.file) : null;
+    task.submission = {
+      text,
+      fileUrl: stored?.fileUrl || '',
+      fileName: stored?.fileName || '',
+      storedName: stored?.storedName || '',
+      submittedAt: new Date(),
+    };
+    task.status = 'completed';
+    task.completedAt = new Date();
+    await task.save();
+
+    if (task.assignedBy) {
+      await createUserNotification({
+        recipient: task.assignedBy,
+        kind: 'task',
+        source: 'System',
+        title: 'Task submitted',
+        message: `A task has been marked as done: "${task.title}".`,
+        level: 'success',
+        actionType: 'route',
+        actionPath: '/tasks',
+        metadata: { taskId: String(task._id) },
+      });
+    }
+
+    return res.json({ task });
+  } catch (err) {
+    console.error('POST /api/tasks/:id/submit error', err);
+    return res.status(500).json({ message: 'Failed to submit task.' });
+  }
+});
+
+// Assignee or admin: download the file attached to a task submission
+router.get('/:id/submission/download', verifyToken, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id).lean();
+    if (!task) return res.status(404).json({ message: 'Task not found.' });
+
+    const isOwner = String(task.assignedTo) === String(req.user.id);
+    const isAdmin = ADMIN_ROLES.includes(req.user?.role);
+    if (!isOwner && !isAdmin) return res.status(403).json({ message: 'Not allowed.' });
+
+    const fileUrl = task.submission?.fileUrl;
+    if (!fileUrl) return res.status(404).json({ message: 'No file was submitted for this task.' });
+
+    const downloadName = String(task.submission?.fileName || 'submission').replace(/[\r\n"]/g, '_');
+
+    if (isRemoteFileUrl(fileUrl)) {
+      const remoteResponse = await fetchRemoteFile(fileUrl);
+      if (!remoteResponse.ok) return res.status(502).json({ message: 'File is unavailable right now.' });
+      const fileBuffer = Buffer.from(await remoteResponse.arrayBuffer());
+      res.setHeader('Content-Type', remoteResponse.headers.get('content-type') || 'application/octet-stream');
+      res.setHeader('Content-Length', String(fileBuffer.length));
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadName}"`);
+      return res.send(fileBuffer);
+    }
+
+    const filePath = path.join(submissionUploadsDir, task.submission.storedName);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File missing on server.' });
+    return res.download(filePath, downloadName);
+  } catch (err) {
+    console.error('GET /api/tasks/:id/submission/download error', err);
+    return res.status(500).json({ message: 'Failed to download submission.' });
   }
 });
 

@@ -156,7 +156,9 @@ export const apiEndpoints = {
   // Task assignment endpoints
   tasks: `${API_URL}/api/tasks`,
   myTasks: `${API_URL}/api/tasks/me`,
-  adminTasks: (status = 'all') => `${API_URL}/api/tasks/admin?status=${encodeURIComponent(status)}`,
+  adminTasks: (status = 'all', assignedTo = '') => `${API_URL}/api/tasks/admin?status=${encodeURIComponent(status)}${assignedTo ? `&assignedTo=${encodeURIComponent(assignedTo)}` : ''}`,
   updateTaskStatus: (id) => `${API_URL}/api/tasks/${encodeURIComponent(id)}/status`,
+  submitTask: (id) => `${API_URL}/api/tasks/${encodeURIComponent(id)}/submit`,
+  downloadTaskSubmission: (id) => `${API_URL}/api/tasks/${encodeURIComponent(id)}/submission/download`,
   deleteTask: (id) => `${API_URL}/api/tasks/${encodeURIComponent(id)}`,
 };

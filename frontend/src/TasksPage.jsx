@@ -50,6 +50,8 @@ export default function TasksPage() {
 
   // Everyone: my tasks state
   const [myTasks, setMyTasks] = useState(null);
+  const [submitDrafts, setSubmitDrafts] = useState({});
+  const [submittingTaskId, setSubmittingTaskId] = useState(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -246,6 +248,66 @@ export default function TasksPage() {
     }
   };
 
+  const updateSubmitDraft = (taskId, field, value) => {
+    setSubmitDrafts((prev) => ({
+      ...prev,
+      [taskId]: { ...(prev[taskId] || { text: '', file: null }), [field]: value },
+    }));
+  };
+
+  const submitMyTask = async (taskId) => {
+    const draft = submitDrafts[taskId] || { text: '', file: null };
+    if (!draft.text.trim() && !draft.file) {
+      showToast('error', 'Add a write-up or attach a file before submitting.');
+      return;
+    }
+
+    setSubmittingTaskId(taskId);
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('text', draft.text.trim());
+      if (draft.file) formData.append('file', draft.file);
+
+      const res = await fetch(apiEndpoints.submitTask(taskId), {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Failed to submit task.');
+
+      setMyTasks((prev) => prev.map((task) => (String(task._id) === String(taskId) ? data.task : task)));
+      setSubmitDrafts((prev) => ({ ...prev, [taskId]: { text: '', file: null } }));
+      showToast('success', 'Task submitted.');
+    } catch (err) {
+      showToast('error', err?.message || 'Failed to submit task.');
+    } finally {
+      setSubmittingTaskId(null);
+    }
+  };
+
+  const downloadSubmission = async (taskId, fileName) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(apiEndpoints.downloadTaskSubmission(taskId), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to download the submitted file.');
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName || 'submission';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      showToast('error', err?.message || 'Failed to download the submitted file.');
+    }
+  };
+
   return (
     <motion.div
       style={{ display: 'flex', height: '100vh', background: '#f3f4f6', overflow: 'hidden' }}
@@ -255,7 +317,8 @@ export default function TasksPage() {
       transition={{ duration: 0.3 }}
     >
       <style>{`
-        .tk-shell { flex: 1; overflow-y: auto; padding: 32px; }
+        .tk-scroll { flex: 1; overflow-y: auto; }
+        .tk-shell { padding: 32px; }
         .tk-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 24px; margin-bottom: 24px; }
         .tk-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; position: relative; }
         .tk-field label { font-size: 12px; color: #4b5563; font-weight: 800; }
@@ -281,22 +344,22 @@ export default function TasksPage() {
         .tk-dropdown-empty { padding: 8px 9px; font-size: 12px; color: #9ca3af; }
         .tk-task-list { display: flex; flex-direction: column; gap: 8px; }
         .tk-task-row {
-          display: flex; justify-content: space-between; align-items: center; gap: 12px;
+          display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
           border: 1px solid #f0e6d4; border-radius: 10px; padding: 10px 12px; background: #fff; flex-wrap: wrap;
         }
         .tk-header { background: #f4f4f4; padding: 34px 32px 26px; }
         .tk-header h1 { margin: 0; font-size: 42px; font-weight: 800; color: #0f172a; line-height: 1.02; }
         @media (max-width: 900px) {
-          .tk-shell { padding: 74px 12px 18px; }
+          .tk-shell { padding: 18px 12px; }
           .tk-form { grid-template-columns: 1fr; }
-          .tk-header { padding: 26px 12px 14px; }
+          .tk-header { padding: 74px 12px 14px; }
           .tk-header h1 { font-size: 22px; line-height: 1.1; }
         }
       `}</style>
 
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="tk-scroll" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="tk-header">
           <h1>
             Manage <span style={{ color: '#d4a009' }}>Tasks</span>
@@ -451,6 +514,22 @@ export default function TasksPage() {
                             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                               {assigneeName}{task.department ? ` - ${task.department}` : ''}{task.dueDate ? ` - Due ${new Date(task.dueDate).toLocaleDateString()}` : ''}
                             </div>
+                            {task.status === 'completed' && (task.submission?.text || task.submission?.fileUrl) && (
+                              <div style={{ marginTop: 6 }}>
+                                {task.submission?.text && (
+                                  <div style={{ fontSize: 12, color: '#374151', whiteSpace: 'pre-wrap' }}>{task.submission.text}</div>
+                                )}
+                                {task.submission?.fileUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadSubmission(task._id, task.submission.fileName)}
+                                    style={{ marginTop: 4, fontSize: 11, fontWeight: 700, color: '#1d4ed8', background: 'none', border: '1px solid #bfdbfe', borderRadius: 999, padding: '3px 9px', cursor: 'pointer' }}
+                                  >
+                                    Download {task.submission.fileName || 'attachment'}
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: 11, fontWeight: 800, color: statusInfo.color, background: statusInfo.background, borderRadius: 999, padding: '4px 10px' }}>
@@ -495,23 +574,64 @@ export default function TasksPage() {
                       {task.dueDate && (
                         <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Due {new Date(task.dueDate).toLocaleDateString()}</div>
                       )}
-                      {task.status !== 'completed' && (
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                          {task.status !== 'in_progress' && (
+                      {task.status === 'completed' ? (
+                        <div style={{ marginTop: '8px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px 12px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#047857' }}>
+                            Submitted {task.submission?.submittedAt ? new Date(task.submission.submittedAt).toLocaleString() : ''}
+                          </div>
+                          {task.submission?.text && (
+                            <div style={{ fontSize: '12.5px', color: '#374151', marginTop: '6px', whiteSpace: 'pre-wrap' }}>{task.submission.text}</div>
+                          )}
+                          {task.submission?.fileUrl && (
                             <button
-                              onClick={() => updateMyTaskStatus(task._id, 'in_progress')}
-                              style={{ fontSize: '11px', fontWeight: '700', color: '#1d4ed8', background: 'none', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer' }}
+                              type="button"
+                              onClick={() => downloadSubmission(task._id, task.submission.fileName)}
+                              style={{ marginTop: '8px', fontSize: '11px', fontWeight: '700', color: '#1d4ed8', background: 'none', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer' }}
                             >
-                              Mark in progress
+                              Download {task.submission.fileName || 'attachment'}
                             </button>
                           )}
-                          <button
-                            onClick={() => updateMyTaskStatus(task._id, 'completed')}
-                            style={{ fontSize: '11px', fontWeight: '700', color: '#047857', background: 'none', border: '1px solid #a7f3d0', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer' }}
-                          >
-                            Mark completed
-                          </button>
                         </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                            {task.status !== 'in_progress' && (
+                              <button
+                                onClick={() => updateMyTaskStatus(task._id, 'in_progress')}
+                                style={{ fontSize: '11px', fontWeight: '700', color: '#1d4ed8', background: 'none', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer' }}
+                              >
+                                Mark in progress
+                              </button>
+                            )}
+                          </div>
+                          <div style={{ marginTop: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: '800', color: '#4b5563', display: 'block', marginBottom: '6px' }}>
+                              Submit your work (write-up and/or file)
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={submitDrafts[task._id]?.text || ''}
+                              onChange={(event) => updateSubmitDraft(task._id, 'text', event.target.value)}
+                              placeholder="Write a short summary or essay for this task (optional if attaching a file)"
+                              style={{ width: '100%', border: '1px solid #eadfca', borderRadius: '8px', padding: '8px 10px', font: 'inherit', color: '#111827', background: '#fff', boxSizing: 'border-box', resize: 'vertical' }}
+                            />
+                            <input
+                              type="file"
+                              onChange={(event) => updateSubmitDraft(task._id, 'file', event.target.files?.[0] || null)}
+                              style={{ marginTop: '8px', fontSize: '12px' }}
+                            />
+                            <div style={{ marginTop: '10px' }}>
+                              <button
+                                type="button"
+                                disabled={submittingTaskId === task._id}
+                                onClick={() => submitMyTask(task._id)}
+                                style={{ fontSize: '12px', fontWeight: '700', color: 'white', background: '#3d4451', border: 'none', borderRadius: '999px', padding: '7px 16px', cursor: submittingTaskId === task._id ? 'not-allowed' : 'pointer' }}
+                              >
+                                {submittingTaskId === task._id ? 'Submitting...' : 'Submit task'}
+                              </button>
+                            </div>
+                          </div>
+                        </>
                       )}
                     </div>
                   );

@@ -429,10 +429,10 @@ export default function AlumniDashboard() {
                               </button>
                             )}
                             <button
-                              onClick={() => updateMyTaskStatus(task._id, 'completed')}
+                              onClick={() => navigate('/tasks')}
                               style={{fontSize: '11px', fontWeight: '700', color: '#047857', background: 'none', border: '1px solid #a7f3d0', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer'}}
                             >
-                              Mark completed
+                              Submit task
                             </button>
                           </div>
                         )}
