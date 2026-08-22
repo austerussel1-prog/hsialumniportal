@@ -4,6 +4,7 @@ const Task = require('../models/Task');
 const User = require('../models/User');
 const { verifyToken } = require('./auth');
 const { createUserNotification } = require('../services/userNotificationService');
+const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'hr', 'alumni_officer'];
 
@@ -13,6 +14,27 @@ const verifyAdmin = (req, res, next) => {
   }
   next();
 };
+
+function revealEncrypted(value) {
+  const raw = String(value || '');
+  if (!raw || !isEncryptedValue(raw)) return value;
+  return decryptField(raw);
+}
+
+// Population + .lean() bypasses mongoose getters, so encrypted user fields need manual decryption.
+function decorateTaskUsers(task) {
+  task.department = revealEncrypted(task.department);
+  if (task.assignedTo) {
+    task.assignedTo.name = revealEncrypted(task.assignedTo.name);
+    task.assignedTo.fullName = revealEncrypted(task.assignedTo.fullName);
+  }
+  if (task.assignedBy) {
+    task.assignedBy.name = revealEncrypted(task.assignedBy.name);
+    task.assignedBy.fullName = revealEncrypted(task.assignedBy.fullName);
+  }
+  return task;
+}
+
 
 // Tasks past their due date but not yet completed are surfaced as overdue.
 async function refreshOverdueTasks(filter = {}) {
@@ -83,7 +105,7 @@ router.get('/admin', verifyToken, verifyAdmin, async (req, res) => {
       .populate('assignedBy', 'name fullName email')
       .lean();
 
-    return res.json({ tasks });
+    return res.json({ tasks: tasks.map(decorateTaskUsers) });
   } catch (err) {
     console.error('GET /api/tasks/admin error', err);
     return res.status(500).json({ message: 'Failed to load tasks.' });
@@ -97,7 +119,7 @@ router.get('/me', verifyToken, async (req, res) => {
     const tasks = await Task.find({ assignedTo: req.user.id })
       .sort({ createdAt: -1 })
       .lean();
-    return res.json({ tasks });
+    return res.json({ tasks: tasks.map((task) => ({ ...task, department: revealEncrypted(task.department) })) });
   } catch (err) {
     console.error('GET /api/tasks/me error', err);
     return res.status(500).json({ message: 'Failed to load your tasks.' });

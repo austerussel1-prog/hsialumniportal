@@ -284,17 +284,26 @@ export default function TasksPage() {
           display: flex; justify-content: space-between; align-items: center; gap: 12px;
           border: 1px solid #f0e6d4; border-radius: 10px; padding: 10px 12px; background: #fff; flex-wrap: wrap;
         }
+        .tk-header { background: #f4f4f4; padding: 34px 32px 26px; }
+        .tk-header h1 { margin: 0; font-size: 42px; font-weight: 800; color: #0f172a; line-height: 1.02; }
         @media (max-width: 900px) {
           .tk-shell { padding: 74px 12px 18px; }
           .tk-form { grid-template-columns: 1fr; }
+          .tk-header { padding: 26px 12px 14px; }
+          .tk-header h1 { font-size: 22px; line-height: 1.1; }
         }
       `}</style>
 
       <Sidebar isOpen={sidebarOpen} toggle={() => setSidebarOpen(!sidebarOpen)} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ background: 'white', borderBottom: '1px solid #e5e7eb', padding: '16px 32px' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#333', margin: 0 }}>Tasks</h1>
+        <div className="tk-header">
+          <h1>
+            Manage <span style={{ color: '#d4a009' }}>Tasks</span>
+          </h1>
+          <p style={{ marginTop: 10, fontSize: 14, color: '#566273', fontStyle: 'italic' }}>
+            Assign tasks to your team and keep track of progress.
+          </p>
         </div>
 
         <div className="tk-shell">
