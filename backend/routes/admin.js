@@ -840,8 +840,8 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       },
     ]);
     const facetCount = (name) => Number(accountKpiFacet?.[name]?.[0]?.count || 0);
-    const totalRegisteredUsers = facetCount('totalRegisteredInWindow');
-    const totalApprovedAccounts = facetCount('totalApprovedInWindow');
+    const totalRegisteredUsers = facetCount('totalRegistered');
+    const totalApprovedAccounts = facetCount('totalApproved');
     const totalRegisteredBeforeWindow = facetCount('totalRegisteredPreviousWindow');
     const totalApprovedBeforeWindow = facetCount('totalApprovedPreviousWindow');
     const monthlyActiveUsers = facetCount('monthlyActiveUsers');
@@ -1121,8 +1121,8 @@ router.get('/analytics-report/kpis', verifyToken, async (req, res) => {
     ]);
 
     const facetCount = (name) => Number(accountKpiFacet?.[name]?.[0]?.count || 0);
-    const totalRegisteredUsers = facetCount('totalRegisteredInWindow');
-    const totalApprovedAccounts = facetCount('totalApprovedInWindow');
+    const totalRegisteredUsers = facetCount('totalRegistered');
+    const totalApprovedAccounts = facetCount('totalApproved');
     const totalRegisteredBeforeWindow = facetCount('totalRegisteredPreviousWindow');
     const totalApprovedBeforeWindow = facetCount('totalApprovedPreviousWindow');
     const monthlyActiveUsers = facetCount('monthlyActiveUsers');
