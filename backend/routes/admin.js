@@ -4,6 +4,7 @@ const dns = require('dns').promises;
 const User = require('../models/User');
 const Message = require('../models/Message');
 const Achievement = require('../models/Achievement');
+const JobApplication = require('../models/JobApplication');
 const AuditLog = require('../models/AuditLog');
 const { sendApprovalEmail, sendRejectionEmail, sendDataRemovalDecisionEmail, sendAdminInviteEmail } = require('../services/emailService');
 const { hardDeleteUsersByIds } = require('../services/userDeletionService');
@@ -726,9 +727,12 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
     const windowParam = String(req.query.windowDays || '').trim().toLowerCase();
     const wd = parseInt(req.query.windowDays, 10);
     const isAllTime = windowParam === 'all' || windowParam === 'all_time' || windowParam === 'alltime';
+    const isLastYear = windowParam === 'year' || windowParam === 'last_year' || wd === 365;
     let windowDays;
     let sinceStart;
     let since;
+    let throughStart = todayStart;
+    let throughEnd = now;
     let windowMode = 'month_to_date';
 
     let prefetchedAchievement = null;
@@ -766,6 +770,16 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       windowDays = Math.min(computedDays, 3650); // cap to ~10 years to keep payload reasonable
       sinceStart = new Date(todayStart.getTime() - (windowDays - 1) * dayMs);
       since = sinceStart;
+    } else if (isLastYear) {
+      windowMode = 'last_year';
+      sinceStart = new Date(now.getFullYear() - 1, 0, 1);
+      sinceStart.setHours(0, 0, 0, 0);
+      throughStart = new Date(now.getFullYear() - 1, 11, 31);
+      throughStart.setHours(0, 0, 0, 0);
+      throughEnd = new Date(throughStart);
+      throughEnd.setHours(23, 59, 59, 999);
+      since = sinceStart;
+      windowDays = Math.max(1, Math.ceil((throughStart.getTime() - sinceStart.getTime()) / dayMs) + 1);
     } else if (!Number.isNaN(wd) && wd > 0) {
       windowMode = 'last_n_days';
       windowDays = Math.min(wd, 3650);
@@ -779,7 +793,9 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       windowDays = Math.max(1, Math.ceil((todayStart.getTime() - sinceStart.getTime()) / dayMs) + 1);
     }
 
-    const previousStart = new Date(sinceStart.getTime() - (windowDays * dayMs));
+    const previousStart = isLastYear
+      ? new Date(now.getFullYear() - 2, 0, 1)
+      : new Date(sinceStart.getTime() - (windowDays * dayMs));
     const previousEnd = new Date(sinceStart);
     const userRoleMatch = { role: { $in: ['user', 'alumni'] }, isDeleted: { $ne: true } };
     const [accountKpiFacet = {}] = await User.aggregate([
@@ -789,11 +805,11 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
           totalRegistered: [{ $count: 'count' }],
           totalApproved: [{ $match: { status: 'approved' } }, { $count: 'count' }],
           totalRegisteredInWindow: [
-            { $match: { createdAt: { $gte: sinceStart, $lte: now } } },
+            { $match: { createdAt: { $gte: sinceStart, $lte: throughEnd } } },
             { $count: 'count' },
           ],
           totalApprovedInWindow: [
-            { $match: { status: 'approved', approvedAt: { $gte: sinceStart, $lte: now } } },
+            { $match: { status: 'approved', approvedAt: { $gte: sinceStart, $lte: throughEnd } } },
             { $count: 'count' },
           ],
           totalRegisteredPreviousWindow: [
@@ -805,7 +821,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
             { $count: 'count' },
           ],
           monthlyActiveUsers: [
-            { $match: { lastLoginAt: { $gte: sinceStart, $lte: now } } },
+            { $match: { lastLoginAt: { $gte: sinceStart, $lte: throughEnd } } },
             { $count: 'count' },
           ],
           previousMonthlyActiveUsers: [
@@ -813,7 +829,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
             { $count: 'count' },
           ],
           returningUsers: [
-            { $match: { createdAt: { $lt: sinceStart }, lastLoginAt: { $gte: sinceStart, $lte: now } } },
+            { $match: { createdAt: { $lt: sinceStart }, lastLoginAt: { $gte: sinceStart, $lte: throughEnd } } },
             { $count: 'count' },
           ],
           previousReturningUsers: [
@@ -849,19 +865,19 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
 
     for (const user of eligibleUsers) {
       const createdDay = startOfDay(user?.createdAt);
-      if (createdDay && createdDay >= sinceStart && createdDay <= todayStart) {
+      if (createdDay && createdDay >= sinceStart && createdDay <= throughStart) {
         const index = Math.floor((createdDay.getTime() - sinceStart.getTime()) / dayMs);
         if (index >= 0 && index < windowDays) usersCreatedDaily[index] += 1;
       }
 
       const approvedDay = startOfDay(user?.approvedAt);
-      if (approvedDay && approvedDay >= sinceStart && approvedDay <= todayStart) {
+      if (approvedDay && approvedDay >= sinceStart && approvedDay <= throughStart) {
         const index = Math.floor((approvedDay.getTime() - sinceStart.getTime()) / dayMs);
         if (index >= 0 && index < windowDays) usersApprovedDaily[index] += 1;
       }
 
       const loginDay = startOfDay(user?.lastLoginAt);
-      if (loginDay && loginDay >= sinceStart && loginDay <= todayStart) {
+      if (loginDay && loginDay >= sinceStart && loginDay <= throughStart) {
         const index = Math.floor((loginDay.getTime() - sinceStart.getTime()) / dayMs);
         if (index >= 0 && index < windowDays) {
           monthlyActiveDaily[index] += 1;
@@ -874,7 +890,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
     const usersApprovedInWindow = usersApprovedDaily.reduce((sum, value) => sum + value, 0);
 
     const activeParticipants = await Message.aggregate([
-      { $match: { createdAt: { $gte: since } } },
+      { $match: { createdAt: { $gte: since, $lte: throughEnd } } },
       { $project: { participants: ['$sender', '$recipient'] } },
       { $unwind: '$participants' },
       { $group: { _id: '$participants' } },
@@ -884,13 +900,13 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       return eligibleUserIds.has(String(row._id)) ? count + 1 : count;
     }, 0);
 
-    const messagesInWindow = await Message.find({ createdAt: { $gte: sinceStart, $lte: now } })
+    const messagesInWindow = await Message.find({ createdAt: { $gte: sinceStart, $lte: throughEnd } })
       .select('sender recipient createdAt')
       .lean();
     const engagedUsersDailySets = Array.from({ length: windowDays }, () => new Set());
     for (const msg of messagesInWindow) {
       const msgDay = startOfDay(msg?.createdAt);
-      if (!msgDay || msgDay < sinceStart || msgDay > todayStart) continue;
+      if (!msgDay || msgDay < sinceStart || msgDay > throughStart) continue;
       const index = Math.floor((msgDay.getTime() - sinceStart.getTime()) / dayMs);
       if (index < 0 || index >= windowDays) continue;
       [msg.sender, msg.recipient].forEach((participant) => {
@@ -910,7 +926,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
     const awardsEmployeeDaily = Array.from({ length: windowDays }, () => 0);
     for (const event of awardEvents) {
       const eventDay = startOfDay(event?.createdAt);
-      if (!eventDay || eventDay < sinceStart || eventDay > todayStart) continue;
+      if (!eventDay || eventDay < sinceStart || eventDay > throughStart) continue;
       const index = Math.floor((eventDay.getTime() - sinceStart.getTime()) / dayMs);
       if (index < 0 || index >= windowDays) continue;
       const category = String(event?.category || 'alumni').toLowerCase() === 'employee' ? 'employee' : 'alumni';
@@ -921,12 +937,17 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
     // Backfill legacy data: treat an existing "featured" row as one award event.
     if (awardEvents.length === 0 && achievement?.featured) {
       const fallbackDay = startOfDay(achievement?.updatedAt || now);
-      if (fallbackDay && fallbackDay >= sinceStart && fallbackDay <= todayStart) {
+      if (fallbackDay && fallbackDay >= sinceStart && fallbackDay <= throughStart) {
         const index = Math.floor((fallbackDay.getTime() - sinceStart.getTime()) / dayMs);
         if (index >= 0 && index < windowDays) awardsAlumniDaily[index] += 1;
       }
     }
     const awardsInWindow = awardsAlumniDaily.reduce((sum, v) => sum + v, 0) + awardsEmployeeDaily.reduce((sum, v) => sum + v, 0);
+    const jobApplicantsList = await JobApplication.find({ createdAt: { $gte: sinceStart, $lte: throughEnd } })
+      .select('-resumeBuffer')
+      .sort({ createdAt: -1, _id: -1 })
+      .lean();
+    const jobApplicantsCount = jobApplicantsList.length;
 
     const engagementRate = activeUsers > 0
       ? Number(((engagedUsers / activeUsers) * 100).toFixed(1))
@@ -946,7 +967,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
 
     for (const user of eligibleUsers) {
       const eventDate = user?.approvedAt ? new Date(user.approvedAt) : (user?.createdAt ? new Date(user.createdAt) : null);
-      if (!eventDate || Number.isNaN(eventDate.getTime()) || eventDate < since || eventDate > now) continue;
+      if (!eventDate || Number.isNaN(eventDate.getTime()) || eventDate < since || eventDate > throughEnd) continue;
       const index = Math.min(
         timelinePoints - 1,
         Math.floor((eventDate.getTime() - since.getTime()) / userBucketMs)
@@ -960,7 +981,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       userGrowthCumulative[i] = runningUsers;
 
       const labelDate = new Date(since.getTime() + userBucketMs * (i + 1));
-      timelineLabels.push(dateFormat.format(labelDate > now ? now : labelDate));
+      timelineLabels.push(dateFormat.format(labelDate > throughStart ? throughStart : labelDate));
     }
 
     const certificationBuckets = 5;
@@ -979,7 +1000,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
 
     for (const event of certificationEvents) {
       const eventDate = event?.createdAt ? new Date(event.createdAt) : null;
-      if (!eventDate || Number.isNaN(eventDate.getTime()) || eventDate < since || eventDate > now) continue;
+      if (!eventDate || Number.isNaN(eventDate.getTime()) || eventDate < since || eventDate > throughEnd) continue;
       const index = Math.min(
         certificationBuckets - 1,
         Math.floor((eventDate.getTime() - since.getTime()) / certificationBucketMs)
@@ -989,7 +1010,7 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
 
     if (certificationEvents.length === 0 && certificationsCompleted > 0) {
       const fallbackDate = achievement?.updatedAt ? new Date(achievement.updatedAt) : now;
-      const inRangeDate = fallbackDate < since || fallbackDate > now ? now : fallbackDate;
+      const inRangeDate = fallbackDate < since || fallbackDate > throughEnd ? throughEnd : fallbackDate;
       const index = Math.min(
         certificationBuckets - 1,
         Math.floor((inRangeDate.getTime() - since.getTime()) / certificationBucketMs)
@@ -1019,6 +1040,8 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       engagedUsers,
       certificationsCompleted,
       engagementRate,
+      jobApplicantsCount,
+      jobApplicantsList,
       totalRegisteredUsers,
       totalApprovedAccounts,
       accountApprovalRate,
@@ -1034,7 +1057,8 @@ router.get('/analytics-report', verifyToken, async (req, res) => {
       windowDays,
       windowMode,
       sinceStart: sinceStart.toISOString(),
-      todayStart: todayStart.toISOString(),
+      todayStart: throughStart.toISOString(),
+      throughEnd: throughEnd.toISOString(),
       totalEligibleUsers,
       newUsersInWindow: usersCreatedInWindow,
       approvalsInWindow: usersApprovedInWindow,

@@ -64,6 +64,29 @@ function MiniBarChart({ data, color = '#b07a15', suffix = '', metricLabel = '' }
   );
 }
 
+function getReportingWindow(selectedWindowDays) {
+  const now = new Date();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const selectedDays = Number(selectedWindowDays) || 30;
+
+  if (selectedDays === 365) {
+    const sinceStart = new Date(now.getFullYear() - 1, 0, 1);
+    sinceStart.setHours(0, 0, 0, 0);
+    const throughStart = new Date(now.getFullYear() - 1, 11, 31);
+    throughStart.setHours(0, 0, 0, 0);
+    const throughEnd = new Date(throughStart);
+    throughEnd.setHours(23, 59, 59, 999);
+    const windowDays = Math.max(1, Math.ceil((throughStart.getTime() - sinceStart.getTime()) / dayMs) + 1);
+    return { now, dayMs, windowDays, sinceStart, throughStart, throughEnd, windowMode: 'last_year' };
+  }
+
+  const windowDays = Math.max(1, selectedDays);
+  const sinceStart = new Date(todayStart.getTime() - (windowDays - 1) * dayMs);
+  return { now, dayMs, windowDays, sinceStart, throughStart: todayStart, throughEnd: now, windowMode: 'last_n_days' };
+}
+
 export default function AnalyticsReportPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -117,18 +140,10 @@ export default function AnalyticsReportPage() {
     async function loadFallbackAnalytics() {
       const token = localStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const now = new Date();
-      const dayMs = 24 * 60 * 60 * 1000;
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-      const fallbackWindowDays = selectedWindowDays === 'all'
-        ? Math.max(1, now.getDate())
-        : Math.max(1, Number(selectedWindowDays || 30));
-      const windowDays = Number.isFinite(fallbackWindowDays) ? fallbackWindowDays : 30;
-      const since = new Date(todayStart.getTime() - (windowDays - 1) * dayMs);
+      const { dayMs, windowDays, sinceStart, throughStart, throughEnd, windowMode } = getReportingWindow(selectedWindowDays);
       const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 
-const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
+      const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
           fetch(apiEndpoints.directoryUsers, { headers }),
           fetch(apiEndpoints.achievements, { headers }),
           fetch(apiEndpoints.jobApplications, { headers }),
@@ -140,7 +155,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
         const applicantsListInWindow = Array.isArray(applicantsData?.applications)
           ? applicantsData.applications.filter((app) => {
               const ts = app?.createdAt ? new Date(app.createdAt).getTime() : Number.NaN;
-              return Number.isFinite(ts) && ts >= since.getTime() && ts <= now.getTime();
+              return Number.isFinite(ts) && ts >= sinceStart.getTime() && ts <= throughEnd.getTime();
             })
           : [];
         const applicantsInWindow = applicantsListInWindow.length;
@@ -162,7 +177,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
         : 0;
 
       const dailyLabels = Array.from({ length: windowDays }, (_, i) => {
-        const d = new Date(since.getTime() + (i * dayMs));
+        const d = new Date(sinceStart.getTime() + (i * dayMs));
         return dateFormat.format(d);
       });
       const usersCreatedDaily = Array.from({ length: windowDays }, () => 0);
@@ -177,7 +192,8 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
       const userGrowthCumulative = Array.from({ length: timelinePoints }, () => activeUsers);
       for (let i = 0; i < timelinePoints; i += 1) {
         const offsetDays = Math.round((windowDays / (timelinePoints - 1)) * i);
-        const d = new Date(since.getTime() + offsetDays * dayMs);
+        const d = new Date(sinceStart.getTime() + offsetDays * dayMs);
+        if (d > throughStart) d.setTime(throughStart.getTime());
         timelineLabels.push(dateFormat.format(d));
       }
 
@@ -186,7 +202,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
       const certificationSeries = Array.from({ length: certificationBuckets }, () => 0);
       const bucketSizeDays = Math.floor(windowDays / certificationBuckets);
       for (let i = 0; i < certificationBuckets; i += 1) {
-        const start = new Date(since);
+        const start = new Date(sinceStart);
         start.setDate(start.getDate() + i * bucketSizeDays);
         const end = new Date(start);
         end.setDate(end.getDate() + bucketSizeDays - 1);
@@ -212,9 +228,10 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
         userRetentionTrend: { change: 0, direction: 'up' },
         certificationCompletionTrend: { change: 0, direction: 'up' },
         windowDays,
-        windowMode: selectedWindowDays === 'all' ? 'all_time' : 'last_n_days',
-        sinceStart: since.toISOString(),
-        todayStart: todayStart.toISOString(),
+        windowMode,
+        sinceStart: sinceStart.toISOString(),
+        todayStart: throughStart.toISOString(),
+        throughEnd: throughEnd.toISOString(),
         userGrowthSeries,
         userGrowthAdded,
         userGrowthCumulative,
@@ -230,6 +247,8 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
         newUsersInWindow: 0,
         approvalsInWindow: 0,
         awardsInWindow: 0,
+        jobApplicantsCount: applicantsInWindow,
+        jobApplicantsList: applicantsListInWindow,
         certificationPeriodLabels,
         certificationSeries,
       };
@@ -248,21 +267,15 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
         if (res.ok) {
           const data = await res.json();
           const applicantsList = applicantsRes.ok ? await applicantsRes.json().catch(() => ({ applications: [] })) : { applications: [] };
-          const sinceStartForApplicants = (() => {
-            const win = Number(selectedWindowDays) || 30;
-            const nowDate = new Date();
-            const start = new Date(nowDate);
-            start.setHours(0, 0, 0, 0);
-            start.setDate(start.getDate() - (win - 1));
-            return start;
-          })();
-          const applicantsListInWindow = Array.isArray(applicantsList?.applications)
+          const { sinceStart, throughEnd } = getReportingWindow(selectedWindowDays);
+          const backendApplicants = Array.isArray(data?.jobApplicantsList) ? data.jobApplicantsList : null;
+          const applicantsListInWindow = backendApplicants || (Array.isArray(applicantsList?.applications)
             ? applicantsList.applications.filter((app) => {
                 const ts = app?.createdAt ? new Date(app.createdAt).getTime() : Number.NaN;
-                return Number.isFinite(ts) && ts >= sinceStartForApplicants.getTime() && ts <= Date.now();
+                return Number.isFinite(ts) && ts >= sinceStart.getTime() && ts <= throughEnd.getTime();
               })
-            : [];
-          const applicantsInWindow = applicantsListInWindow.length;
+            : []);
+          const applicantsInWindow = Number(data?.jobApplicantsCount ?? applicantsListInWindow.length);
           console.debug('analytics response', { data, selectedWindowDays });
           if (!mounted) return;
           setMetrics({
@@ -274,7 +287,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
             returningUsers: Number(data?.returningUsers || 0),
             userRetentionRate: Number(data?.userRetentionRate || 0),
             engagedUsers: Number(data?.engagedUsers || 0),
-            jobApplicantsCount: Number(applicantsInWindow || 0),
+            jobApplicantsCount: applicantsInWindow,
             jobApplicantsList: applicantsListInWindow,
             certificationsCompleted: Number(data?.certificationsCompleted || 0),
             certificationCompletionRate: Number(data?.certificationCompletionRate || 0),
@@ -375,6 +388,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
 
   const formatWindowLabel = (days, mode) => {
     if (mode === 'all_time') return 'all time';
+    if (mode === 'last_year') return 'last year';
     const n = Number(days) || 0;
     if (n >= 60) {
       const months = Math.round(n / 30);
@@ -447,7 +461,7 @@ const [directoryRes, achievementsRes, applicantsRes] = await Promise.all([
   ];
   const selectedKpiDetail = selectedKpiKey ? kpiDetails[selectedKpiKey] : null;
 
-  const selectedWindowValue = Number(selectedWindowDays) || Number(metrics.windowDays) || 30;
+  const selectedWindowValue = Number(metrics.windowDays) || Number(selectedWindowDays) || 30;
   const windowDays = Math.max(1, selectedWindowValue);
   const dayMs = 24 * 60 * 60 * 1000;
   const dateFormat = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
