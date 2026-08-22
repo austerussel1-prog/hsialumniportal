@@ -95,6 +95,7 @@ export default function AnalyticsReportPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedKpiKey, setSelectedKpiKey] = useState(null);
   const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
+  const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false);
   const [performanceUsers, setPerformanceUsers] = useState([]);
   const [performanceForm, setPerformanceForm] = useState({
     selectedUserId: '',
@@ -448,19 +449,33 @@ export default function AnalyticsReportPage() {
   const filteredPerformanceUsers = (() => {
     const term = String(performanceForm.employeeName || '').trim().toLowerCase();
     const users = Array.isArray(performanceUsers) ? performanceUsers : [];
-    const filtered = term
-      ? users.filter((user) => {
-          const haystack = [
-            getUserDisplayName(user),
-            user?.email,
-            user?.role,
-            user?.department,
-            user?.employeeId,
-          ].join(' ').toLowerCase();
-          return haystack.includes(term);
-        })
-      : users;
-    return filtered.slice(0, 8);
+    if (!term) return users;
+    return users.filter((user) => {
+      const haystack = [
+        getUserDisplayName(user),
+        user?.email,
+        user?.role,
+        user?.department,
+        user?.employeeId,
+      ].join(' ').toLowerCase();
+      return haystack.includes(term);
+    });
+  })();
+
+  const departmentOptions = (() => {
+    const users = Array.isArray(performanceUsers) ? performanceUsers : [];
+    const unique = new Set();
+    users.forEach((user) => {
+      const dept = getUserDepartment(user);
+      if (dept) unique.add(dept);
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b));
+  })();
+
+  const filteredDepartmentOptions = (() => {
+    const term = String(performanceForm.department || '').trim().toLowerCase();
+    if (!term) return departmentOptions;
+    return departmentOptions.filter((dept) => dept.toLowerCase().includes(term));
   })();
 
   const selectPerformanceUser = (user) => {
@@ -471,6 +486,11 @@ export default function AnalyticsReportPage() {
       department: getUserDepartment(user) || prev.department,
     }));
     setEmployeeDropdownOpen(false);
+  };
+
+  const selectPerformanceDepartment = (dept) => {
+    setPerformanceForm((prev) => ({ ...prev, department: dept }));
+    setDepartmentDropdownOpen(false);
   };
 
   const toWholeNumber = (value) => {
@@ -933,6 +953,60 @@ export default function AnalyticsReportPage() {
           color: #111827;
           background: #fff;
           box-sizing: border-box;
+        }
+        .ar-performance-dropdown-field {
+          position: relative;
+        }
+        .ar-dropdown-list {
+          position: absolute;
+          top: calc(100% + 4px);
+          left: 0;
+          right: 0;
+          z-index: 20;
+          margin: 0;
+          padding: 6px;
+          list-style: none;
+          max-height: 220px;
+          overflow-y: auto;
+          background: #fff;
+          border: 1px solid #eadfca;
+          border-radius: 10px;
+          box-shadow: 0 10px 24px rgba(17, 24, 39, 0.12);
+        }
+        .ar-dropdown-list li + li {
+          margin-top: 2px;
+        }
+        .ar-dropdown-list button {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 1px;
+          border: none;
+          background: transparent;
+          border-radius: 6px;
+          padding: 7px 9px;
+          font: inherit;
+          text-align: left;
+          cursor: pointer;
+        }
+        .ar-dropdown-list button:hover,
+        .ar-dropdown-list button:focus {
+          background: #fff5e0;
+        }
+        .ar-dropdown-name {
+          font-size: 13px;
+          font-weight: 700;
+          color: #111827;
+        }
+        .ar-dropdown-sub {
+          font-size: 11px;
+          color: #6b7280;
+        }
+        .ar-dropdown-empty {
+          padding: 8px 9px;
+          font-size: 12px;
+          color: #9ca3af;
         }
         .ar-performance-score {
           border: 1px solid #eadfca;
@@ -1403,25 +1477,78 @@ export default function AnalyticsReportPage() {
           <div className="ar-performance-grid">
             <div>
               <div className="ar-performance-form">
-                <div className="ar-performance-field">
+                <div className="ar-performance-field ar-performance-dropdown-field">
                   <label htmlFor="performanceEmployee">Employee</label>
                   <input
                     id="performanceEmployee"
                     type="text"
+                    autoComplete="off"
                     value={performanceForm.employeeName}
-                    onChange={(event) => updatePerformanceField('employeeName', event.target.value)}
+                    onChange={(event) => {
+                      updatePerformanceField('employeeName', event.target.value);
+                      setEmployeeDropdownOpen(true);
+                    }}
+                    onFocus={() => setEmployeeDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setEmployeeDropdownOpen(false), 150)}
                     placeholder="Employee name"
                   />
+                  {employeeDropdownOpen && (
+                    <ul className="ar-dropdown-list">
+                      {filteredPerformanceUsers.length === 0 ? (
+                        <li className="ar-dropdown-empty">No matching users</li>
+                      ) : (
+                        filteredPerformanceUsers.map((user) => (
+                          <li key={user?._id || user?.id || user?.email}>
+                            <button
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => selectPerformanceUser(user)}
+                            >
+                              <span className="ar-dropdown-name">{getUserDisplayName(user)}</span>
+                              {getUserDepartment(user) && (
+                                <span className="ar-dropdown-sub">{getUserDepartment(user)}</span>
+                              )}
+                            </button>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
                 </div>
-                <div className="ar-performance-field">
+                <div className="ar-performance-field ar-performance-dropdown-field">
                   <label htmlFor="performanceDepartment">Department</label>
                   <input
                     id="performanceDepartment"
                     type="text"
+                    autoComplete="off"
                     value={performanceForm.department}
-                    onChange={(event) => updatePerformanceField('department', event.target.value)}
+                    onChange={(event) => {
+                      updatePerformanceField('department', event.target.value);
+                      setDepartmentDropdownOpen(true);
+                    }}
+                    onFocus={() => setDepartmentDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setDepartmentDropdownOpen(false), 150)}
                     placeholder="Department"
                   />
+                  {departmentDropdownOpen && (
+                    <ul className="ar-dropdown-list">
+                      {filteredDepartmentOptions.length === 0 ? (
+                        <li className="ar-dropdown-empty">No matching departments</li>
+                      ) : (
+                        filteredDepartmentOptions.map((dept) => (
+                          <li key={dept}>
+                            <button
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => selectPerformanceDepartment(dept)}
+                            >
+                              <span className="ar-dropdown-name">{dept}</span>
+                            </button>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  )}
                 </div>
                 <div className="ar-performance-field">
                   <label htmlFor="assignedTasks">Assigned Tasks</label>
