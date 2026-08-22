@@ -93,6 +93,9 @@ function normalizeUserRecord(user) {
     contactNumber: revealEncrypted(user.contactNumber),
     address: revealEncrypted(user.address),
     profileImage: revealEncrypted(user.profileImage),
+    major: revealEncrypted(user.major),
+    company: revealEncrypted(user.company),
+    jobTitle: revealEncrypted(user.jobTitle),
   };
 }
 

@@ -441,6 +441,9 @@ export default function AlumniDashboard() {
                   })}
                 </div>
               )}
+              <div style={{textAlign: 'right', marginTop: '12px'}}>
+                <button onClick={() => navigate('/tasks')} style={{fontSize: '12px', color: '#b07a15', fontWeight: '600', background: 'none', border: 'none', cursor: 'pointer'}}>View all -&gt;</button>
+              </div>
             </div>
           </div>
         </div>

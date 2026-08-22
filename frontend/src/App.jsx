@@ -25,6 +25,7 @@ import InboxPage from './InboxPage.jsx';
 import TrainingLearningPage from './TrainingLearningPage.jsx';
 import AchievementsRecognitionPage from './AchievementsRecognitionPage.jsx';
 import AnalyticsReportPage from './AnalyticsReportPage.jsx';
+import TasksPage from './TasksPage.jsx';
 import Toast from './components/Toast.jsx';
 import { apiEndpoints, resolveApiAssetUrl } from './config/api';
 import { ADMIN_ROLES, isGuestUser, safelyParseUser } from './config/session';
@@ -571,6 +572,7 @@ function AnimatedRoutes() {
         <Route path="/referral-board" element={<ProtectedRoute><ReferralJobBoard /></ProtectedRoute>} />
         <Route path="/internship-ojt" element={<ProtectedRoute><InternshipOJT /></ProtectedRoute>} />
         <Route path="/refer-friend" element={<ProtectedRoute><ReferFriend /></ProtectedRoute>} />
+        <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
         <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
         <Route path="/events" element={<ProtectedRoute guestAllowed><EventsPage /></ProtectedRoute>} />
         <Route path="/directory" element={<ProtectedRoute><DirectoryPage /></ProtectedRoute>} />
