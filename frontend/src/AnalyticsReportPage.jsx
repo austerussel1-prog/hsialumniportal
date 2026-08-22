@@ -94,7 +94,10 @@ export default function AnalyticsReportPage() {
   const [selectedWindowDays, setSelectedWindowDays] = useState(30);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedKpiKey, setSelectedKpiKey] = useState(null);
+  const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
+  const [performanceUsers, setPerformanceUsers] = useState([]);
   const [performanceForm, setPerformanceForm] = useState({
+    selectedUserId: '',
     employeeName: '',
     department: '',
     assignedTasks: '20',
@@ -360,6 +363,34 @@ export default function AnalyticsReportPage() {
   }, [selectedWindowDays]);
 
   useEffect(() => {
+    let mounted = true;
+
+    async function loadPerformanceUsers() {
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      try {
+        let res = await fetch(apiEndpoints.allUsers, { headers });
+        let data = res.ok ? await res.json().catch(() => ({ users: [] })) : { users: [] };
+
+        if (!res.ok || !Array.isArray(data?.users)) {
+          res = await fetch(apiEndpoints.directoryUsers, { headers });
+          data = res.ok ? await res.json().catch(() => ({ users: [] })) : { users: [] };
+        }
+
+        if (!mounted) return;
+        const users = Array.isArray(data?.users) ? data.users : [];
+        setPerformanceUsers(users);
+      } catch {
+        if (mounted) setPerformanceUsers([]);
+      }
+    }
+
+    loadPerformanceUsers();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
     if (!selectedKpiKey) return undefined;
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') setSelectedKpiKey(null);
@@ -396,6 +427,50 @@ export default function AnalyticsReportPage() {
 
   const updatePerformanceField = (field, value) => {
     setPerformanceForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const getUserDepartment = (user) => {
+    const candidates = [
+      user?.department,
+      user?.role,
+      user?.jobTitle,
+      user?.company,
+      user?.major,
+    ];
+    const value = candidates.find((item) => String(item || '').trim());
+    return String(value || '').replace(/_/g, ' ');
+  };
+
+  const getUserDisplayName = (user) => (
+    String(user?.name || user?.fullName || user?.email || 'Unnamed User').trim()
+  );
+
+  const filteredPerformanceUsers = (() => {
+    const term = String(performanceForm.employeeName || '').trim().toLowerCase();
+    const users = Array.isArray(performanceUsers) ? performanceUsers : [];
+    const filtered = term
+      ? users.filter((user) => {
+          const haystack = [
+            getUserDisplayName(user),
+            user?.email,
+            user?.role,
+            user?.department,
+            user?.employeeId,
+          ].join(' ').toLowerCase();
+          return haystack.includes(term);
+        })
+      : users;
+    return filtered.slice(0, 8);
+  })();
+
+  const selectPerformanceUser = (user) => {
+    setPerformanceForm((prev) => ({
+      ...prev,
+      selectedUserId: String(user?._id || user?.id || ''),
+      employeeName: getUserDisplayName(user),
+      department: getUserDepartment(user) || prev.department,
+    }));
+    setEmployeeDropdownOpen(false);
   };
 
   const toWholeNumber = (value) => {
