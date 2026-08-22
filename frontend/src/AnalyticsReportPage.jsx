@@ -106,6 +106,11 @@ export default function AnalyticsReportPage() {
     inProgressTasks: '2',
     overdueTasks: '0',
   });
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', dueDate: '', priority: 'medium' });
+  const [adminTasks, setAdminTasks] = useState([]);
+  const [taskStatusFilter, setTaskStatusFilter] = useState('all');
+  const [taskSubmitting, setTaskSubmitting] = useState(false);
+  const [taskMessage, setTaskMessage] = useState('');
   const [metrics, setMetrics] = useState({
     activeUsers: 0,
     totalRegisteredUsers: 0,
@@ -391,6 +396,34 @@ export default function AnalyticsReportPage() {
     return () => { mounted = false; };
   }, []);
 
+  const loadAdminTasks = async () => {
+    const token = localStorage.getItem('token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    try {
+      const res = await fetch(apiEndpoints.adminTasks(taskStatusFilter), { headers });
+      const data = res.ok ? await res.json().catch(() => ({ tasks: [] })) : { tasks: [] };
+      setAdminTasks(Array.isArray(data?.tasks) ? data.tasks : []);
+    } catch {
+      setAdminTasks([]);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      try {
+        const res = await fetch(apiEndpoints.adminTasks(taskStatusFilter), { headers });
+        const data = res.ok ? await res.json().catch(() => ({ tasks: [] })) : { tasks: [] };
+        if (mounted) setAdminTasks(Array.isArray(data?.tasks) ? data.tasks : []);
+      } catch {
+        if (mounted) setAdminTasks([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [taskStatusFilter]);
+
   useEffect(() => {
     if (!selectedKpiKey) return undefined;
     const handleKeyDown = (event) => {
@@ -491,6 +524,75 @@ export default function AnalyticsReportPage() {
   const selectPerformanceDepartment = (dept) => {
     setPerformanceForm((prev) => ({ ...prev, department: dept }));
     setDepartmentDropdownOpen(false);
+  };
+
+  const updateTaskField = (field, value) => {
+    setTaskForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const assignTask = async (event) => {
+    event.preventDefault();
+    setTaskMessage('');
+
+    if (!performanceForm.selectedUserId) {
+      setTaskMessage('Select an employee from the dropdown before assigning a task.');
+      return;
+    }
+    if (!taskForm.title.trim()) {
+      setTaskMessage('Task title is required.');
+      return;
+    }
+
+    setTaskSubmitting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(apiEndpoints.tasks, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          assignedTo: performanceForm.selectedUserId,
+          title: taskForm.title.trim(),
+          description: taskForm.description.trim(),
+          department: performanceForm.department,
+          priority: taskForm.priority,
+          dueDate: taskForm.dueDate || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Failed to assign task.');
+
+      setTaskForm({ title: '', description: '', dueDate: '', priority: 'medium' });
+      setTaskMessage(`Task assigned to ${performanceForm.employeeName}.`);
+      loadAdminTasks();
+    } catch (err) {
+      setTaskMessage(err?.message || 'Failed to assign task.');
+    } finally {
+      setTaskSubmitting(false);
+    }
+  };
+
+  const deleteAdminTask = async (taskId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(apiEndpoints.deleteTask(taskId), {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Failed to delete task.');
+      setAdminTasks((prev) => prev.filter((task) => String(task._id) !== String(taskId)));
+    } catch (err) {
+      setTaskMessage(err?.message || 'Failed to delete task.');
+    }
+  };
+
+  const taskStatusStyles = {
+    pending: { label: 'Pending', color: '#92400e', background: '#fef3c7' },
+    in_progress: { label: 'In Progress', color: '#1d4ed8', background: '#dbeafe' },
+    completed: { label: 'Completed', color: '#047857', background: '#d1fae5' },
+    overdue: { label: 'Overdue', color: '#b91c1c', background: '#fee2e2' },
   };
 
   const toWholeNumber = (value) => {
@@ -954,6 +1056,40 @@ export default function AnalyticsReportPage() {
           background: #fff;
           box-sizing: border-box;
         }
+        .ar-performance-field select,
+        .ar-performance-field textarea {
+          width: 100%;
+          border: 1px solid #eadfca;
+          border-radius: 8px;
+          padding: 9px 10px;
+          font: inherit;
+          color: #111827;
+          background: #fff;
+          box-sizing: border-box;
+          resize: vertical;
+        }
+        .ar-task-form {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          align-items: start;
+        }
+        .ar-task-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .ar-task-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          border: 1px solid #f0e6d4;
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: #fff;
+          flex-wrap: wrap;
+        }
         .ar-performance-dropdown-field {
           position: relative;
         }
@@ -1057,6 +1193,7 @@ export default function AnalyticsReportPage() {
           .ar-snapshot-chips { margin-top: 12px; gap: 8px; }
           .ar-performance-form { grid-template-columns: 1fr; }
           .ar-performance-stats { grid-template-columns: 1fr; }
+          .ar-task-form { grid-template-columns: 1fr; }
         }
         @media (max-width: 480px) {
           .ar-chart-title { font-size: 19px; }
@@ -1642,6 +1779,113 @@ export default function AnalyticsReportPage() {
                 {performanceRating.label}
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="ar-card ar-bottom-card">
+          <div className="ar-chart-head" style={{ marginBottom: 14 }}>
+            <h2 className="ar-chart-title">Assign Task</h2>
+            <span style={{ fontSize: 12, color: '#6b7280' }}>
+              {performanceForm.selectedUserId ? `Assigning to ${performanceForm.employeeName}` : 'Select an employee above first'}
+            </span>
+          </div>
+          <form onSubmit={assignTask} className="ar-task-form">
+            <div className="ar-performance-field">
+              <label htmlFor="taskTitle">Task title</label>
+              <input
+                id="taskTitle"
+                type="text"
+                value={taskForm.title}
+                onChange={(event) => updateTaskField('title', event.target.value)}
+                placeholder="e.g. Submit Q3 report"
+              />
+            </div>
+            <div className="ar-performance-field">
+              <label htmlFor="taskDueDate">Due date</label>
+              <input
+                id="taskDueDate"
+                type="date"
+                value={taskForm.dueDate}
+                onChange={(event) => updateTaskField('dueDate', event.target.value)}
+              />
+            </div>
+            <div className="ar-performance-field">
+              <label htmlFor="taskPriority">Priority</label>
+              <select
+                id="taskPriority"
+                value={taskForm.priority}
+                onChange={(event) => updateTaskField('priority', event.target.value)}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div className="ar-performance-field" style={{ gridColumn: '1 / -1' }}>
+              <label htmlFor="taskDescription">Description (optional)</label>
+              <textarea
+                id="taskDescription"
+                rows={2}
+                value={taskForm.description}
+                onChange={(event) => updateTaskField('description', event.target.value)}
+                placeholder="Add any details the employee needs"
+              />
+            </div>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button type="submit" className="ar-filter" disabled={taskSubmitting} style={{ cursor: taskSubmitting ? 'not-allowed' : 'pointer' }}>
+                {taskSubmitting ? 'Assigning...' : 'Assign task'}
+              </button>
+              {taskMessage && <span style={{ fontSize: 12, color: '#6b7280' }}>{taskMessage}</span>}
+            </div>
+          </form>
+
+          <div style={{ marginTop: 18 }}>
+            <div className="ar-chart-head" style={{ marginBottom: 10 }}>
+              <h3 style={{ margin: 0, fontSize: 15, color: '#1f2937' }}>Assigned tasks</h3>
+              <select
+                value={taskStatusFilter}
+                onChange={(event) => setTaskStatusFilter(event.target.value)}
+                style={{ border: '1px solid #eadfca', borderRadius: 8, padding: '6px 8px', font: 'inherit' }}
+              >
+                <option value="all">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="overdue">Overdue</option>
+              </select>
+            </div>
+            {adminTasks.length === 0 ? (
+              <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>No tasks assigned yet.</p>
+            ) : (
+              <div className="ar-task-list">
+                {adminTasks.map((task) => {
+                  const statusInfo = taskStatusStyles[task.status] || taskStatusStyles.pending;
+                  const assigneeName = task.assignedTo?.name || task.assignedTo?.fullName || task.assignedTo?.email || 'Unknown user';
+                  return (
+                    <div key={task._id} className="ar-task-row">
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, color: '#111827', fontSize: 13.5 }}>{task.title}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                          {assigneeName}{task.department ? ` - ${task.department}` : ''}{task.dueDate ? ` - Due ${new Date(task.dueDate).toLocaleDateString()}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: statusInfo.color, background: statusInfo.background, borderRadius: 999, padding: '4px 10px' }}>
+                          {statusInfo.label}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => deleteAdminTask(task._id)}
+                          style={{ border: 'none', background: 'none', color: '#b91c1c', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

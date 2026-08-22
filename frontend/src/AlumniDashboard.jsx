@@ -128,6 +128,56 @@ export default function AlumniDashboard() {
     return () => { mounted = false; };
   }, []);
 
+  const [myTasks, setMyTasks] = useState(null);
+
+  const loadMyTasks = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch(apiEndpoints.myTasks, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setMyTasks([]);
+        return;
+      }
+      const data = await res.json();
+      setMyTasks(Array.isArray(data?.tasks) ? data.tasks : []);
+    } catch (err) {
+      setMyTasks([]);
+    }
+  };
+
+  useEffect(() => {
+    loadMyTasks();
+  }, []);
+
+  const updateMyTaskStatus = async (taskId, status) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(apiEndpoints.updateTaskStatus(taskId), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setMyTasks((prev) => prev.map((task) => (String(task._id) === String(taskId) ? data.task : task)));
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const taskStatusBadge = {
+    pending: { label: 'Pending', color: '#92400e', background: '#fef3c7' },
+    in_progress: { label: 'In Progress', color: '#1d4ed8', background: '#dbeafe' },
+    completed: { label: 'Completed', color: '#047857', background: '#d1fae5' },
+    overdue: { label: 'Overdue', color: '#b91c1c', background: '#fee2e2' },
+  };
+
   const quickLinks = [
     { icon: Folder, title: 'Documents & records', subtitle: 'Request or view doc...' },
     { icon: Briefcase, title: 'Career & jobs', subtitle: 'Browse opportunities' },
@@ -344,6 +394,53 @@ export default function AlumniDashboard() {
               <div style={{textAlign: 'right', marginTop: '12px'}}>
                 <button onClick={() => navigate('/announcements')} style={{fontSize: '12px', color: '#b07a15', fontWeight: '600', background: 'none', border: 'none', cursor: 'pointer'}}>View all -&gt;</button>
               </div>
+            </div>
+
+            <div style={{background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', padding: '24px'}}>
+              <h2 style={{fontSize: '20px', fontWeight: 'bold', color: '#111827', marginBottom: '16px'}}>My tasks</h2>
+              {myTasks === null ? (
+                <div style={{color: '#6b7280', fontSize: '13px'}}>Loading tasks...</div>
+              ) : myTasks.length === 0 ? (
+                <div style={{fontSize: '12px', color: '#6b7280'}}>No tasks assigned to you yet.</div>
+              ) : (
+                <div style={{display: 'flex', flexDirection: 'column', gap: '14px'}}>
+                  {myTasks.slice(0, RECENT_ITEMS_LIMIT).map((task, index) => {
+                    const badge = taskStatusBadge[task.status] || taskStatusBadge.pending;
+                    return (
+                      <div
+                        key={task._id}
+                        style={{paddingBottom: '14px', borderBottom: index < Math.min(myTasks.length, RECENT_ITEMS_LIMIT) - 1 ? '1px solid #e5e7eb' : 'none'}}
+                      >
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px'}}>
+                          <h3 style={{fontWeight: '600', color: '#111827', margin: 0, fontSize: '13.5px'}}>{task.title}</h3>
+                          <span style={{background: badge.background, color: badge.color, padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap'}}>{badge.label}</span>
+                        </div>
+                        {task.dueDate && (
+                          <div style={{fontSize: '12px', color: '#6b7280', marginTop: '4px'}}>Due {new Date(task.dueDate).toLocaleDateString()}</div>
+                        )}
+                        {task.status !== 'completed' && (
+                          <div style={{display: 'flex', gap: '8px', marginTop: '8px'}}>
+                            {task.status !== 'in_progress' && (
+                              <button
+                                onClick={() => updateMyTaskStatus(task._id, 'in_progress')}
+                                style={{fontSize: '11px', fontWeight: '700', color: '#1d4ed8', background: 'none', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer'}}
+                              >
+                                Mark in progress
+                              </button>
+                            )}
+                            <button
+                              onClick={() => updateMyTaskStatus(task._id, 'completed')}
+                              style={{fontSize: '11px', fontWeight: '700', color: '#047857', background: 'none', border: '1px solid #a7f3d0', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer'}}
+                            >
+                              Mark completed
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

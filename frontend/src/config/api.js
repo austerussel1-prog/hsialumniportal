@@ -152,4 +152,11 @@ export const apiEndpoints = {
   volunteerAdminLogs: (status = 'pending') => `${API_URL}/api/mentorship/volunteer/admin/logs?status=${encodeURIComponent(status)}`,
   volunteerApproveLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/approve`,
   volunteerRejectLog: (id) => `${API_URL}/api/mentorship/volunteer/admin/logs/${id}/reject`,
+
+  // Task assignment endpoints
+  tasks: `${API_URL}/api/tasks`,
+  myTasks: `${API_URL}/api/tasks/me`,
+  adminTasks: (status = 'all') => `${API_URL}/api/tasks/admin?status=${encodeURIComponent(status)}`,
+  updateTaskStatus: (id) => `${API_URL}/api/tasks/${encodeURIComponent(id)}/status`,
+  deleteTask: (id) => `${API_URL}/api/tasks/${encodeURIComponent(id)}`,
 };
