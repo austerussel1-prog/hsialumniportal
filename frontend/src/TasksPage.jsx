@@ -1,15 +1,43 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import {
+  CalendarBlank,
+  Play,
+  Hourglass,
+  Clock,
+  CheckCircle,
+  WarningCircle,
+  FileText,
+  CloudArrowUp,
+  UploadSimple,
+  Info,
+  X,
+} from '@phosphor-icons/react';
 import Sidebar from './components/Sidebar';
 import { apiEndpoints } from './config/api';
 import { isAdminUser, safelyParseUser } from './config/session';
 
+const ALLOWED_SUBMISSION_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.zip'];
+const MAX_SUBMISSION_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
 const TASK_STATUS_STYLES = {
-  pending: { label: 'Pending', color: '#92400e', background: '#fef3c7' },
-  in_progress: { label: 'In Progress', color: '#1d4ed8', background: '#dbeafe' },
-  completed: { label: 'Completed', color: '#047857', background: '#d1fae5' },
-  overdue: { label: 'Overdue', color: '#b91c1c', background: '#fee2e2' },
+  pending: { label: 'Pending', color: '#92400e', background: '#fef3c7', icon: Hourglass },
+  in_progress: { label: 'In Progress', color: '#1d4ed8', background: '#dbeafe', icon: Clock },
+  completed: { label: 'Completed', color: '#047857', background: '#d1fae5', icon: CheckCircle },
+  overdue: { label: 'Overdue', color: '#b91c1c', background: '#fee2e2', icon: WarningCircle },
 };
+
+function isAllowedSubmissionFile(file) {
+  if (!file) return { ok: false, message: 'No file selected.' };
+  const ext = `.${String(file.name || '').split('.').pop() || ''}`.toLowerCase();
+  if (!ALLOWED_SUBMISSION_EXTENSIONS.includes(ext)) {
+    return { ok: false, message: 'Unsupported file type. Allowed: PDF, DOC, DOCX, PPT, PPTX, ZIP.' };
+  }
+  if (file.size > MAX_SUBMISSION_FILE_SIZE_BYTES) {
+    return { ok: false, message: 'File must be 10MB or smaller.' };
+  }
+  return { ok: true };
+}
 
 const showToast = (type, text) => {
   window.dispatchEvent(new CustomEvent('hsi-toast', { detail: { type, text } }));
@@ -47,11 +75,13 @@ export default function TasksPage() {
   const [adminTasks, setAdminTasks] = useState([]);
   const [taskStatusFilter, setTaskStatusFilter] = useState('all');
   const [submitting, setSubmitting] = useState(false);
+  const [assignToAll, setAssignToAll] = useState(false);
 
   // Everyone: my tasks state
   const [myTasks, setMyTasks] = useState(null);
   const [submitDrafts, setSubmitDrafts] = useState({});
   const [submittingTaskId, setSubmittingTaskId] = useState(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -174,7 +204,7 @@ export default function TasksPage() {
   const assignTask = async (event) => {
     event.preventDefault();
 
-    if (!assignForm.selectedUserId) {
+    if (!assignToAll && !assignForm.selectedUserId) {
       showToast('error', 'Select an employee from the dropdown before assigning a task.');
       return;
     }
@@ -193,7 +223,8 @@ export default function TasksPage() {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          assignedTo: assignForm.selectedUserId,
+          assignAll: assignToAll,
+          assignedTo: assignToAll ? undefined : assignForm.selectedUserId,
           title: assignForm.title.trim(),
           description: assignForm.description.trim(),
           department: assignForm.department,
@@ -205,7 +236,7 @@ export default function TasksPage() {
       if (!res.ok) throw new Error(data?.message || 'Failed to assign task.');
 
       setAssignForm((prev) => ({ ...prev, title: '', description: '', dueDate: '', priority: 'medium' }));
-      showToast('success', `Task assigned to ${assignForm.employeeName}.`);
+      showToast('success', assignToAll ? `Task assigned to ${data.count ?? 'all'} employees.` : `Task assigned to ${assignForm.employeeName}.`);
       loadAdminTasks();
     } catch (err) {
       showToast('error', err?.message || 'Failed to assign task.');
@@ -253,6 +284,22 @@ export default function TasksPage() {
       ...prev,
       [taskId]: { ...(prev[taskId] || { text: '', file: null }), [field]: value },
     }));
+  };
+
+  const pickSubmissionFile = (taskId, file) => {
+    if (!file) return;
+    const check = isAllowedSubmissionFile(file);
+    if (!check.ok) {
+      showToast('error', check.message);
+      return;
+    }
+    updateSubmitDraft(taskId, 'file', file);
+  };
+
+  const handleDropzoneDrop = (taskId, event) => {
+    event.preventDefault();
+    setDragOverTaskId(null);
+    pickSubmissionFile(taskId, event.dataTransfer.files?.[0] || null);
   };
 
   const submitMyTask = async (taskId) => {
@@ -349,6 +396,39 @@ export default function TasksPage() {
         }
         .tk-header { background: #f4f4f4; padding: 34px 32px 26px; }
         .tk-header h1 { margin: 0; font-size: 42px; font-weight: 800; color: #0f172a; line-height: 1.02; }
+        .tk-task-card {
+          border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; background: #fff;
+        }
+        .tk-status-pill {
+          display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px;
+          font-size: 11px; font-weight: 800; white-space: nowrap;
+        }
+        .tk-btn-outline {
+          display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+          color: #1d4ed8; background: #fff; border: 1px solid #bfdbfe; border-radius: 999px;
+          padding: 6px 14px; cursor: pointer;
+        }
+        .tk-btn-outline:hover { background: #eff6ff; }
+        .tk-submit-panel {
+          margin-top: 16px; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; background: #fafbfc;
+        }
+        .tk-submit-icon {
+          width: 34px; height: 34px; border-radius: 50%; background: #dbeafe; color: #1d4ed8;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .tk-submit-body { margin-top: 14px; }
+        .tk-dropzone {
+          border: 1.5px dashed #d1d5db; border-radius: 10px; padding: 22px 16px; text-align: center;
+          background: #fff; display: flex; flex-direction: column; align-items: center; cursor: default;
+        }
+        .tk-dropzone-active { border-color: #3d4451; background: #f3f4f6; }
+        .tk-browse-link { color: #1d4ed8; font-weight: 700; cursor: pointer; text-decoration: underline; }
+        .tk-submit-btn {
+          display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700;
+          color: #fff; background: #1e2533; border: none; border-radius: 10px; padding: 9px 18px;
+          cursor: pointer;
+        }
+        .tk-submit-btn:disabled { cursor: not-allowed; opacity: 0.7; }
         @media (max-width: 900px) {
           .tk-shell { padding: 18px 12px; }
           .tk-form { grid-template-columns: 1fr; }
@@ -373,6 +453,14 @@ export default function TasksPage() {
           {isAdmin && (
             <div className="tk-card">
               <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827', marginTop: 0, marginBottom: 16 }}>Assign a task</h2>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 16, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={assignToAll}
+                  onChange={(event) => setAssignToAll(event.target.checked)}
+                />
+                Assign to all employees
+              </label>
               <form onSubmit={assignTask} className="tk-form">
                 <div className="tk-field">
                   <label htmlFor="tkEmployee">Employee</label>
@@ -380,7 +468,8 @@ export default function TasksPage() {
                     id="tkEmployee"
                     type="text"
                     autoComplete="off"
-                    value={assignForm.employeeName}
+                    disabled={assignToAll}
+                    value={assignToAll ? 'All employees' : assignForm.employeeName}
                     onChange={(event) => {
                       updateAssignField('employeeName', event.target.value);
                       setEmployeeDropdownOpen(true);
@@ -388,8 +477,9 @@ export default function TasksPage() {
                     onFocus={() => setEmployeeDropdownOpen(true)}
                     onBlur={() => setTimeout(() => setEmployeeDropdownOpen(false), 150)}
                     placeholder="Employee name"
+                    style={assignToAll ? { background: '#f3f4f6', color: '#6b7280', cursor: 'not-allowed' } : undefined}
                   />
-                  {employeeDropdownOpen && (
+                  {!assignToAll && employeeDropdownOpen && (
                     <ul className="tk-dropdown-list">
                       {filteredEmployees.length === 0 ? (
                         <li className="tk-dropdown-empty">No matching users</li>
@@ -559,76 +649,142 @@ export default function TasksPage() {
             ) : myTasks.length === 0 ? (
               <div style={{ fontSize: '12px', color: '#6b7280' }}>No tasks assigned to you yet.</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {myTasks.map((task, index) => {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {myTasks.map((task) => {
                   const badge = TASK_STATUS_STYLES[task.status] || TASK_STATUS_STYLES.pending;
+                  const BadgeIcon = badge.icon;
+                  const draft = submitDrafts[task._id] || { text: '', file: null };
+                  const isSubmitting = submittingTaskId === task._id;
+                  const isDragOver = dragOverTaskId === task._id;
+                  const fileInputId = `tk-file-${task._id}`;
                   return (
-                    <div key={task._id} style={{ paddingBottom: '14px', borderBottom: index < myTasks.length - 1 ? '1px solid #e5e7eb' : 'none' }}>
+                    <div key={task._id} className="tk-task-card">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                        <h3 style={{ fontWeight: '600', color: '#111827', margin: 0, fontSize: '13.5px' }}>{task.title}</h3>
-                        <span style={{ background: badge.background, color: badge.color, padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>{badge.label}</span>
+                        <h3 style={{ fontWeight: '700', color: '#111827', margin: 0, fontSize: '15px' }}>{task.title}</h3>
+                        <span className="tk-status-pill" style={{ color: badge.color, background: badge.background }}>
+                          <BadgeIcon size={13} weight="bold" />
+                          {badge.label}
+                        </span>
                       </div>
                       {task.description && (
-                        <div style={{ fontSize: '12.5px', color: '#4b5563', marginTop: '4px' }}>{task.description}</div>
+                        <div style={{ fontSize: '13px', color: '#4b5563', marginTop: '4px' }}>{task.description}</div>
                       )}
                       {task.dueDate && (
-                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Due {new Date(task.dueDate).toLocaleDateString()}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12.5px', color: '#6b7280', marginTop: '8px' }}>
+                          <CalendarBlank size={14} />
+                          Due {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </div>
                       )}
+
                       {task.status === 'completed' ? (
-                        <div style={{ marginTop: '8px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px 12px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#047857' }}>
+                        <div style={{ marginTop: '14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '12px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '12px', fontWeight: '700', color: '#047857' }}>
+                            <CheckCircle size={14} weight="fill" />
                             Submitted {task.submission?.submittedAt ? new Date(task.submission.submittedAt).toLocaleString() : ''}
                           </div>
                           {task.submission?.text && (
-                            <div style={{ fontSize: '12.5px', color: '#374151', marginTop: '6px', whiteSpace: 'pre-wrap' }}>{task.submission.text}</div>
+                            <div style={{ fontSize: '13px', color: '#374151', marginTop: '8px', whiteSpace: 'pre-wrap' }}>{task.submission.text}</div>
                           )}
                           {task.submission?.fileUrl && (
                             <button
                               type="button"
                               onClick={() => downloadSubmission(task._id, task.submission.fileName)}
-                              style={{ marginTop: '8px', fontSize: '11px', fontWeight: '700', color: '#1d4ed8', background: 'none', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer' }}
+                              className="tk-btn-outline"
+                              style={{ marginTop: '10px' }}
                             >
-                              Download {task.submission.fileName || 'attachment'}
+                              <FileText size={13} /> Download {task.submission.fileName || 'attachment'}
                             </button>
                           )}
                         </div>
                       ) : (
                         <>
-                          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                            {task.status !== 'in_progress' && (
-                              <button
-                                onClick={() => updateMyTaskStatus(task._id, 'in_progress')}
-                                style={{ fontSize: '11px', fontWeight: '700', color: '#1d4ed8', background: 'none', border: '1px solid #bfdbfe', borderRadius: '999px', padding: '4px 10px', cursor: 'pointer' }}
+                          {task.status !== 'in_progress' && (
+                            <button
+                              onClick={() => updateMyTaskStatus(task._id, 'in_progress')}
+                              className="tk-btn-outline"
+                              style={{ marginTop: '12px' }}
+                            >
+                              <Play size={13} weight="fill" /> Mark in progress
+                            </button>
+                          )}
+
+                          <div className="tk-submit-panel">
+                            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                              <div className="tk-submit-icon"><FileText size={18} weight="bold" /></div>
+                              <div>
+                                <div style={{ fontWeight: 800, color: '#111827', fontSize: 14 }}>Submit your work</div>
+                                <div style={{ fontSize: 12.5, color: '#6b7280', marginTop: 2 }}>Write a summary or attach a file to complete this task.</div>
+                              </div>
+                            </div>
+
+                            <div className="tk-submit-body">
+                              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6 }}>
+                                Your submission (write-up)
+                              </label>
+                              <textarea
+                                rows={3}
+                                value={draft.text}
+                                onChange={(event) => updateSubmitDraft(task._id, 'text', event.target.value)}
+                                placeholder="Write a short summary or essay for this task (optional if attaching a file)"
+                                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px', font: 'inherit', color: '#111827', background: '#fff', boxSizing: 'border-box', resize: 'vertical' }}
+                              />
+
+                              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', margin: '14px 0 6px' }}>
+                                Attach a file (optional)
+                              </label>
+                              <div
+                                className={`tk-dropzone${isDragOver ? ' tk-dropzone-active' : ''}`}
+                                onDragOver={(event) => { event.preventDefault(); setDragOverTaskId(task._id); }}
+                                onDragLeave={() => setDragOverTaskId((prev) => (prev === task._id ? null : prev))}
+                                onDrop={(event) => handleDropzoneDrop(task._id, event)}
                               >
-                                Mark in progress
-                              </button>
-                            )}
-                          </div>
-                          <div style={{ marginTop: '10px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px' }}>
-                            <label style={{ fontSize: '11px', fontWeight: '800', color: '#4b5563', display: 'block', marginBottom: '6px' }}>
-                              Submit your work (write-up and/or file)
-                            </label>
-                            <textarea
-                              rows={2}
-                              value={submitDrafts[task._id]?.text || ''}
-                              onChange={(event) => updateSubmitDraft(task._id, 'text', event.target.value)}
-                              placeholder="Write a short summary or essay for this task (optional if attaching a file)"
-                              style={{ width: '100%', border: '1px solid #eadfca', borderRadius: '8px', padding: '8px 10px', font: 'inherit', color: '#111827', background: '#fff', boxSizing: 'border-box', resize: 'vertical' }}
-                            />
-                            <input
-                              type="file"
-                              onChange={(event) => updateSubmitDraft(task._id, 'file', event.target.files?.[0] || null)}
-                              style={{ marginTop: '8px', fontSize: '12px' }}
-                            />
-                            <div style={{ marginTop: '10px' }}>
-                              <button
-                                type="button"
-                                disabled={submittingTaskId === task._id}
-                                onClick={() => submitMyTask(task._id)}
-                                style={{ fontSize: '12px', fontWeight: '700', color: 'white', background: '#3d4451', border: 'none', borderRadius: '999px', padding: '7px 16px', cursor: submittingTaskId === task._id ? 'not-allowed' : 'pointer' }}
-                              >
-                                {submittingTaskId === task._id ? 'Submitting...' : 'Submit task'}
-                              </button>
+                                {draft.file ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <FileText size={18} color="#1d4ed8" />
+                                    <span style={{ fontSize: 13, color: '#111827', fontWeight: 700 }}>{draft.file.name}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateSubmitDraft(task._id, 'file', null)}
+                                      style={{ border: 'none', background: 'none', color: '#b91c1c', cursor: 'pointer', display: 'flex' }}
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <CloudArrowUp size={26} color="#3d4451" />
+                                    <div style={{ fontSize: 13, color: '#374151', marginTop: 8 }}>
+                                      Drag and drop your file here or{' '}
+                                      <label htmlFor={fileInputId} className="tk-browse-link">click to browse</label>
+                                    </div>
+                                    <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 4 }}>
+                                      Supported formats: PDF, DOC, DOCX, PPT, PPTX, ZIP (Max. 10MB)
+                                    </div>
+                                  </>
+                                )}
+                                <input
+                                  id={fileInputId}
+                                  type="file"
+                                  accept={ALLOWED_SUBMISSION_EXTENSIONS.join(',')}
+                                  onChange={(event) => pickSubmissionFile(task._id, event.target.files?.[0] || null)}
+                                  style={{ display: 'none' }}
+                                />
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+                                <button
+                                  type="button"
+                                  disabled={isSubmitting}
+                                  onClick={() => submitMyTask(task._id)}
+                                  className="tk-submit-btn"
+                                >
+                                  <UploadSimple size={14} weight="bold" />
+                                  {isSubmitting ? 'Submitting...' : 'Submit task'}
+                                </button>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#9ca3af' }}>
+                                  <Info size={13} /> You can only submit once.
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </>

@@ -11,7 +11,8 @@ const { decryptField, isEncryptedValue } = require('../utils/fieldEncryption');
 const { uploadLocalFile, cleanupLocalFile, isCloudinaryConfigured, isRemoteFileUrl, fetchRemoteFile } = require('../services/mediaStorage');
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'hr', 'alumni_officer'];
-const MAX_SUBMISSION_FILE_SIZE_BYTES = 15 * 1024 * 1024;
+const MAX_SUBMISSION_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_SUBMISSION_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.zip'];
 
 const verifyAdmin = (req, res, next) => {
   if (!ADMIN_ROLES.includes(req.user?.role)) {
@@ -32,13 +33,23 @@ const submissionStorage = multer.diskStorage({
   },
 });
 
-const uploadSubmission = multer({ storage: submissionStorage, limits: { fileSize: MAX_SUBMISSION_FILE_SIZE_BYTES } });
+const uploadSubmission = multer({
+  storage: submissionStorage,
+  limits: { fileSize: MAX_SUBMISSION_FILE_SIZE_BYTES },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    if (!ALLOWED_SUBMISSION_EXTENSIONS.includes(ext)) {
+      return cb(new Error('Unsupported file type. Allowed: PDF, DOC, DOCX, PPT, PPTX, ZIP.'));
+    }
+    return cb(null, true);
+  },
+});
 
 const handleSubmissionUpload = (req, res, next) => {
   uploadSubmission.single('file')(req, res, (err) => {
     if (!err) return next();
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ message: 'File must be 15MB or smaller.' });
+      return res.status(400).json({ message: 'File must be 10MB or smaller.' });
     }
     return res.status(400).json({ message: err.message || 'File upload failed.' });
   });
@@ -95,10 +106,51 @@ async function refreshOverdueTasks(filter = {}) {
 // Admin: assign a new task to a user
 router.post('/', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { assignedTo, title, description, department, priority, dueDate } = req.body || {};
-    const targetUserId = String(assignedTo || '').trim();
+    const { assignedTo, assignAll, title, description, department, priority, dueDate } = req.body || {};
     const taskTitle = String(title || '').trim();
-    if (!targetUserId || !taskTitle) {
+    if (!taskTitle) {
+      return res.status(400).json({ message: 'title is required.' });
+    }
+
+    const baseFields = {
+      title: taskTitle,
+      description: String(description || '').trim(),
+      department: String(department || '').trim(),
+      priority: ['low', 'medium', 'high'].includes(priority) ? priority : 'medium',
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      assignedBy: req.user.id,
+    };
+    const dueLabel = baseFields.dueDate ? ` Due ${baseFields.dueDate.toLocaleDateString()}.` : '';
+
+    if (assignAll) {
+      const recipients = await User.find({ role: { $ne: 'super_admin' }, isDeleted: { $ne: true } })
+        .select('_id')
+        .lean();
+      if (!recipients.length) {
+        return res.status(404).json({ message: 'No users available to assign this task to.' });
+      }
+
+      const tasks = await Task.insertMany(
+        recipients.map((recipient) => ({ ...baseFields, assignedTo: recipient._id }))
+      );
+
+      await Promise.all(recipients.map((recipient) => createUserNotification({
+        recipient: recipient._id,
+        kind: 'task',
+        source: 'Admin',
+        title: 'New task assigned',
+        message: `You have been assigned a new task: "${taskTitle}".${dueLabel}`,
+        level: 'info',
+        actionType: 'route',
+        actionPath: '/alumni-dashboard',
+        metadata: { taskId: String(tasks.find((t) => String(t.assignedTo) === String(recipient._id))?._id || '') },
+      })));
+
+      return res.status(201).json({ tasks, count: tasks.length });
+    }
+
+    const targetUserId = String(assignedTo || '').trim();
+    if (!targetUserId) {
       return res.status(400).json({ message: 'assignedTo and title are required.' });
     }
 
@@ -107,17 +159,8 @@ router.post('/', verifyToken, verifyAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Assigned user not found.' });
     }
 
-    const task = await Task.create({
-      title: taskTitle,
-      description: String(description || '').trim(),
-      department: String(department || '').trim(),
-      priority: ['low', 'medium', 'high'].includes(priority) ? priority : 'medium',
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      assignedTo: targetUserId,
-      assignedBy: req.user.id,
-    });
+    const task = await Task.create({ ...baseFields, assignedTo: targetUserId });
 
-    const dueLabel = task.dueDate ? ` Due ${task.dueDate.toLocaleDateString()}.` : '';
     await createUserNotification({
       recipient: targetUserId,
       kind: 'task',
@@ -209,6 +252,9 @@ router.post('/:id/submit', verifyToken, handleSubmissionUpload, async (req, res)
     if (!task) return res.status(404).json({ message: 'Task not found.' });
     if (String(task.assignedTo) !== String(req.user.id)) {
       return res.status(403).json({ message: 'Only the assigned employee can submit this task.' });
+    }
+    if (task.status === 'completed') {
+      return res.status(400).json({ message: 'This task was already submitted.' });
     }
 
     const text = String(req.body?.text || '').trim();
